@@ -1,4 +1,4 @@
-// Package shell lets user call shell commands from gshell scripts.
+// Package shell lets user call shell commands from tengo scripts.
 // Try below:
 //  sh := import("shell")
 //  fmt := import("fmt")
@@ -11,6 +11,10 @@
 //  fmt.println(cdr.errcode())
 //  fmt.println(cdr.output())
 //  fmt.println(sh.run(`touch /etc/fstab`).output())
+//
+// Use format() to construct cmd that has references of tengo variables:
+//  file := "shell.go"
+//  fmt.println(sh.run(format("ls -lh %s", file)).output())
 package shell
 
 import (
@@ -66,10 +70,7 @@ func (cdr *commander) wait(seconds int64) bool {
 	select {
 	case cdr.err = <-cdr.waitChan:
 		if cdr.err != nil {
-			//cdr.Stdout.Write([]byte("\n"))
 			cdr.Stdout.Write(cdr.Stderr.(*bytes.Buffer).Bytes())
-			//cdr.Stdout.Write([]byte("\n"))
-			//cdr.Stdout.Write([]byte(cdr.err.Error()))
 		}
 		cdr.done = true
 	case <-time.After(time.Duration(seconds) * time.Second):
