@@ -1,4 +1,4 @@
-// Package shell lets user call shell commands from tengo scripts.
+// Package shell lets user call shell commands from gshell scripts.
 // Try below:
 //  sh := import("shell")
 //  fmt := import("fmt")
@@ -20,7 +20,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/d5/tengo/v2"
 	gs "github.com/godevsig/gshellos"
 )
 
@@ -28,7 +27,7 @@ func init() {
 	gs.RegModule("shell", module)
 }
 
-var module = map[string]tengo.Object{
+var module = map[string]gs.Object{
 	"run": &gs.UserFunction{
 		Value:     run,
 		Signature: `run(cmd string) -> commander`,
@@ -82,9 +81,9 @@ func (cdr *commander) wait(seconds int64) bool {
 
 // Get the output of the command after its execution is done.
 // The output will have content of stderr and return code if error happened.
-func (cdr *commander) output(args ...tengo.Object) (tengo.Object, error) {
+func (cdr *commander) output(args ...gs.Object) (gs.Object, error) {
 	if len(args) != 0 {
-		return nil, tengo.ErrWrongNumArguments
+		return nil, gs.ErrWrongNumArguments
 	}
 	cdr.wait(-1)
 
@@ -96,9 +95,9 @@ func (cdr *commander) output(args ...tengo.Object) (tengo.Object, error) {
 //	-1: the command was killed by kill().
 //	>0: the command itself failed.
 //	-99: undefined error.
-func (cdr *commander) errcode(args ...tengo.Object) (tengo.Object, error) {
+func (cdr *commander) errcode(args ...gs.Object) (gs.Object, error) {
 	if len(args) != 0 {
-		return nil, tengo.ErrWrongNumArguments
+		return nil, gs.ErrWrongNumArguments
 	}
 	cdr.wait(-1)
 
@@ -118,9 +117,9 @@ func (cdr *commander) errcode(args ...tengo.Object) (tengo.Object, error) {
 // Wait can have optional timeout if the first arg is int.
 // Wait forever if the optional timeout not specified, or timeout <= 0
 // Return true if the commander exited(successfully or not) within the timeout peroid.
-func (cdr *commander) waitTimeout(args ...tengo.Object) (tengo.Object, error) {
+func (cdr *commander) waitTimeout(args ...gs.Object) (gs.Object, error) {
 	if len(args) > 1 {
-		return nil, tengo.ErrWrongNumArguments
+		return nil, gs.ErrWrongNumArguments
 	}
 	timeOut := -1
 	if len(args) == 1 {
@@ -130,16 +129,16 @@ func (cdr *commander) waitTimeout(args ...tengo.Object) (tengo.Object, error) {
 	}
 
 	if cdr.wait(int64(timeOut)) {
-		return tengo.TrueValue, nil
+		return gs.TrueValue, nil
 	}
-	return tengo.FalseValue, nil
+	return gs.FalseValue, nil
 }
 
 // Run a sh command/script in background, e.g.
 // cmd := sh.run(`ls -l`)
-func run(args ...tengo.Object) (tengo.Object, error) {
+func run(args ...gs.Object) (gs.Object, error) {
 	if len(args) != 1 {
-		return nil, tengo.ErrWrongNumArguments
+		return nil, gs.ErrWrongNumArguments
 	}
 	var input string
 	if err := gs.FromObject(&input, args[0]); err != nil {
@@ -166,9 +165,9 @@ func run(args ...tengo.Object) (tengo.Object, error) {
 // Kill causes the Process to exit immediately.
 // Kill does not wait until the Process has actually exited.
 // This only kills the Process itself, not any other processes it may have started.
-func (cdr *commander) kill(args ...tengo.Object) (tengo.Object, error) {
+func (cdr *commander) kill(args ...gs.Object) (gs.Object, error) {
 	if len(args) != 0 {
-		return nil, tengo.ErrWrongNumArguments
+		return nil, gs.ErrWrongNumArguments
 	}
 
 	if cdr.done {
@@ -179,8 +178,8 @@ func (cdr *commander) kill(args ...tengo.Object) (tengo.Object, error) {
 	return nil, nil
 }
 
-func commanderObj(cdr *commander) tengo.Object {
-	obj := map[string]tengo.Object{
+func commanderObj(cdr *commander) gs.Object {
+	obj := map[string]gs.Object{
 		"output": &gs.UserFunction{
 			Value:     cdr.output,
 			Signature: `output() -> string`,

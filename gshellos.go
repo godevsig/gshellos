@@ -8,12 +8,27 @@ import (
 	"github.com/d5/tengo/v2"
 )
 
+// Object is an alias of tengo.Object
+type Object = tengo.Object
+
 // List of symbol scopes
 const (
 	ScopeExtend tengo.SymbolScope = "EXTEND"
 )
 
 var (
+	// TrueValue represents a true value.
+	TrueValue = tengo.TrueValue
+	// FalseValue represents a false value.
+	FalseValue = tengo.FalseValue
+	// UndefinedValue represents an undefined value.
+	UndefinedValue = tengo.UndefinedValue
+)
+
+var (
+	// ErrWrongNumArguments represents a wrong number of arguments error.
+	ErrWrongNumArguments = tengo.ErrWrongNumArguments
+
 	// ErrNotExtendable is an error where an Object is not extendable.
 	ErrNotExtendable = errors.New("not extendable")
 	// ErrUndefinedMethod is an error when calling an unknown method.
