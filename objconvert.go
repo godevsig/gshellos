@@ -50,6 +50,17 @@ func ToObject(v interface{}) (tengo.Object, error) {
 		return &tengo.Char{Value: rune(v)}, nil
 	case float64:
 		return &tengo.Float{Value: v}, nil
+	case *UserFunction:
+		return v, nil
+	case *tengo.UserFunction:
+		return v, nil
+	case tengo.Object:
+		return v, nil
+	case tengo.CallableFunc:
+		if v == nil {
+			return tengo.UndefinedValue, nil
+		}
+		return &tengo.UserFunction{Value: v}, nil
 	case []byte:
 		if v == nil {
 			return tengo.UndefinedValue, nil
@@ -205,13 +216,6 @@ func ToObject(v interface{}) (tengo.Object, error) {
 		return &tengo.Array{Value: arr}, nil
 	case time.Time:
 		return &tengo.Time{Value: v}, nil
-	case tengo.Object:
-		return v, nil
-	case tengo.CallableFunc:
-		if v == nil {
-			return tengo.UndefinedValue, nil
-		}
-		return &tengo.UserFunction{Value: v}, nil
 	}
 
 	// slow path
