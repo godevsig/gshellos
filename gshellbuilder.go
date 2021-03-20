@@ -35,11 +35,6 @@ enters interactive mode if no file supplied.
 Maintained by godevsig, see https://github.com/godevsig`
 )
 
-// hasHelp is the one who implements Help
-type hasHelp interface {
-	Help() string
-}
-
 type shell struct {
 	modules     *tengo.ModuleMap
 	symbolTable *tengo.SymbolTable
@@ -65,29 +60,9 @@ func (sh *shell) preCompile() {
 	sh.symbolTable = tengo.NewSymbolTable()
 	sh.globals = make([]tengo.Object, tengo.GlobalsSize)
 
-	sh.addFunction("ex", func(args ...tengo.Object) (tengo.Object, error) {
-		if len(args) != 1 {
-			return nil, tengo.ErrWrongNumArguments
-		}
-		return ExtendObj(args[0])
-	})
-
-	sh.addFunction("show", func(args ...tengo.Object) (tengo.Object, error) {
-		if len(args) != 1 {
-			return nil, tengo.ErrWrongNumArguments
-		}
-
-		var help string
-		switch v := args[0].(type) {
-		case hasHelp:
-			help = v.Help()
-		default:
-			help = v.String()
-		}
-
-		fmt.Println(help)
-		return nil, nil
-	})
+	for _, v := range globalFuncs {
+		sh.addFunction(v.name, v.fn)
+	}
 }
 
 func (sh *shell) runREPL() {
