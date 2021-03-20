@@ -25,6 +25,25 @@ show(c1.recv())
 show(c1.recv())
 show(c1.recv())
 
+//global
+outterChan := makechan(2)
+
+//client
+mapObj := {data:123, innerChan:makechan(1)}
+outterChan.send(mapObj)
+arrayObj := [makechan(1), 234] // [channel, data] as array
+outterChan.send(arrayObj)
+
+//server
+req := outterChan.recv()
+req.innerChan.send(req.data + 1)
+req = outterChan.recv()
+req[0].send(req[1] + 1) // channel.send(data + 1)
+
+//client
+fmt.println(mapObj.innerChan.recv())
+fmt.println(arrayObj[0].recv())
+
 //output:
 //hello
 //godevsig
@@ -35,3 +54,5 @@ show(c1.recv())
 //"before close2"
 //<undefined>
 //<undefined>
+//124
+//235
