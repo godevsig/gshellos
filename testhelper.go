@@ -13,6 +13,8 @@ func getWant(file string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
+
 	var b bytes.Buffer
 	_, err = b.ReadFrom(f)
 	if err != nil {
@@ -50,7 +52,7 @@ func getShellMainOutput() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer func() { outFile.Close() }()
+	defer outFile.Close()
 
 	oldStdout := os.Stdout
 	defer func() { os.Stdout = oldStdout }()
