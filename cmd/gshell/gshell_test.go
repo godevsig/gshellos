@@ -9,7 +9,8 @@ import (
 )
 
 func TestFiles(t *testing.T) {
-	f, err := os.Open(".")
+	examplePath := "../../example/"
+	f, err := os.Open(examplePath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -23,6 +24,8 @@ func TestFiles(t *testing.T) {
 	for _, file := range names {
 		mached, _ := filepath.Match("*_test.gsh", file)
 		if mached {
+			file = examplePath + file
+			t.Log("testing", file)
 			if err := gs.FileTest(file); err != nil {
 				t.Fatalf("%s: %v", file, err)
 			}
