@@ -71,7 +71,7 @@ func ToObject(v interface{}) (tengo.Object, error) {
 		return &tengo.Bytes{Value: v}, nil
 	case error:
 		if v == nil {
-			return tengo.UndefinedValue, nil
+			return tengo.TrueValue, nil
 		}
 		return &tengo.Error{Value: &tengo.String{Value: v.Error()}}, nil
 	case map[string]tengo.Object:
