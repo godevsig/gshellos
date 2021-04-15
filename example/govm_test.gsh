@@ -1,31 +1,29 @@
 times := import("times")
 fmt := import("fmt")
 
-// part 1: simple async call
+// Part 1: simple async call
 var := 0
 
 f1 := func(a,b) { var = 10; return a+b }
 f2 := func(a,b,c) { var = 11; return a+b+c }
 
-gvm1 := govm(f1,1,2)
-gvm2 := govm(f2,1,2,5)
+g1 := go(f1,1,2)
+g2 := go(f2,1,2,5)
 
-fmt.println(gvm1.result()) // 3
-fmt.println(gvm2.result()) // 8
+fmt.println(g1.result()) // 3
+fmt.println(g2.result()) // 8
 //fmt.println(var) // 10 or 11
 
-// part 2: 1 client  1 server
+// Part 2: 1 client 1 server
 reqChan := makechan(8)
 repChan := makechan(8)
 
 client := func(interval) {
 	reqChan.send("hello")
-	i := 0
-	for {
+	for i := 0; true; i++ {
 		fmt.println(repChan.recv())
 		times.sleep(interval*times.second)
 		reqChan.send(i)
-		i++
 	}
 }
 
@@ -41,167 +39,87 @@ server := func() {
 	}
 }
 
-gvmClient := govm(client, 2)
-gvmServer := govm(server)
+gClient := go(client, 2)
+gServer := go(server)
 
-if ok := gvmClient.wait(5); !ok {
-	gvmClient.abort()
+if ok := gClient.wait(5); !ok {
+	gClient.abort()
 }
-gvmServer.abort()
+gServer.abort()
 
-fmt.println("client: ", gvmClient.result())
-fmt.println("server: ", gvmServer.result())
-
-// part 3: n clients 3 servers of different types
+// Part 3: n clients n servers, channel in channel
 sharedReqChan := makechan(128)
 
 client = func(name, interval, timeout) {
 	print := func(s) {
 		fmt.println(name, s)
 	}
-
 	print("started")
-	repChan := makechan(1)
-	msg := {data:"hello", chan:repChan}
-	sharedReqChan.send(msg)
-	print(msg.chan.recv())
 
-	i := 0
-	for i * interval < timeout {
-		msg := [i, repChan]
+	repChan := makechan(1)
+	msg := {chan:repChan}
+
+	msg.data = "hello"
+	sharedReqChan.send(msg)
+	print(repChan.recv())
+
+	for i := 0; i * interval < timeout; i++ {
+		msg.data = i
 		sharedReqChan.send(msg)
-		rep := msg[1].recv()
-		print(rep)
-		i++
+		print(repChan.recv())
 		times.sleep(interval*times.second)
 	}
 }
 
-server = func() {
+server = func(name) {
 	print := func(s) {
-		fmt.println("server: ", s)
+		fmt.println(name, s)
 	}
 	print("started")
 
 	for {
 		req := sharedReqChan.recv()
-		if is_map(req) {
+		if req.data == "hello" {
 			req.chan.send("world")
 		} else {
-			req[1].send(req[0]+100)
+			req.chan.send(req.data+100)
 		}
 	}
 }
 
-asyncServer := func() {
-	print := func(s) {
-		fmt.println("asyncServer: ", s)
+clients := func() {
+	for i :=0; i < 5; i++ {
+		go(client, format("client %d: ", i), 1, 4)
 	}
-	print("started")
-
-	repChan := makechan(128)
-
-	asyncHandle := func(req) {
-		repChan.send([req[0]+100, req[1]])
-	}
-
-	responder := func() {
-		for {
-			rep := repChan.recv()
-			rep[1].send(rep[0])
-		}
-	}
-
-	dispatcher := func() {
-		for {
-			req := sharedReqChan.recv()
-			if is_map(req) {
-				req.chan.send("world")
-			} else {
-				govm(asyncHandle, req)
-			}
-		}
-	}
-
-	govm(responder)
-	govm(dispatcher)
 }
 
-asyncPoolServer := func() {
-	print := func(...s) {
-		fmt.println("asyncPoolServer: ", s...)
+servers := func() {
+	for i :=0; i < 2; i++ {
+		go(server, format("server %d: ", i))
 	}
-	print("started")
-
-	repChan := makechan(128)
-	reqChan := makechan(128)
-
-	handle := func(req) {
-		repChan.send([req[0]+100, req[1]])
-	}
-
-	responder := func() {
-		for {
-			rep := repChan.recv()
-			rep[1].send(rep[0])
-		}
-	}
-
-	worker := func(num) {
-		for {
-			req := reqChan.recv()
-			//print("worker", num)
-			handle(req)
-		}
-	}
-
-	dispatcher := func() {
-		for {
-			req := sharedReqChan.recv()
-			if is_map(req) {
-				req.chan.send("world")
-			} else {
-				reqChan.send(req)
-			}
-		}
-	}
-
-	govm(worker, 1)
-	govm(worker, 2)
-	govm(worker, 3)
-
-	govm(responder)
-	govm(dispatcher)
-
-	times.sleep(10*times.second)
-	abort()
 }
 
-for i :=0; i < 5; i++ {
-	// all clients will exit in 6 seconds
-	govm(client, format("client %d: ", i), 1, 6)
+// After 4 seconds, all clients should have exited normally
+gclts := go(clients)
+// If servers exit earlier than clients, then clients may be
+// blocked forever waiting for the reply chan, because servers
+// were aborted with the req fetched from sharedReqChan before
+// sending back the reply.
+// In such case, do below to abort() the clients manually
+//go(func(){times.sleep(6*times.second); gclts.abort()})
+
+// Servers are infinite loop, abort() them after 5 seconds
+gsrvs := go(servers)
+if ok := gsrvs.wait(5); !ok {
+	gsrvs.abort()
 }
 
-s := govm(server)
-as := govm(asyncServer)
-// server and asyncServer will not exit voluntarily,
-// so force them to abort from outside after 4 seconds.
-// The exit of the 2 servers will not affect the service to the
-// clients which will be still running and getting service from
-// the remaining asyncPoolServer.
-govm(func(){times.sleep(4*times.second); s.abort(); as.abort()})
+// Main VM waits here until all the child "go" finish
 
-// asyncPoolServer itself can exit in 10 seconds
-govm(asyncPoolServer)
-
-// all the descendent VMs will exit in 10 seconds,
-// so we do not need to abort() here.
-// main VM will exit after 10 seconds.
-
-// if we want main VM to exit earlier, do below
-// will cause main VM to exit in 8 seconds but with
-// error: "virtual machine aborted"
-//times.sleep(8*times.second); abort()
+// If somehow the main VM is stuck, that is because there is
+// at least one child VM that has not exited as expected, we
+// can do abort() to force exit.
+abort()
 
 //output:
 //3
@@ -210,50 +128,37 @@ govm(asyncPoolServer)
 //world
 //100
 //101
-//client: error: "virtual machine aborted"
-//server: error: "virtual machine aborted"
 
 //unordered output:
-//client 1: started
-//asyncPoolServer: started
 //client 4: started
-//client 2: started
+//server 0: started
+//client 4: world
+//client 4: 100
 //client 3: started
-//server: started
 //client 3: world
 //client 3: 100
-//asyncServer: started
-//client 1: world
-//client 1: 100
-//client 4: world
+//client 2: started
 //client 2: world
 //client 2: 100
-//client 4: 100
 //client 0: started
 //client 0: world
 //client 0: 100
-//client 3: 101
+//client 1: started
+//client 1: world
+//client 1: 100
+//server 1: started
 //client 1: 101
-//client 4: 101
 //client 2: 101
+//client 4: 101
 //client 0: 101
-//client 4: 102
+//client 3: 101
 //client 3: 102
+//client 0: 102
 //client 2: 102
 //client 1: 102
-//client 0: 102
-//client 4: 103
+//client 4: 102
+//client 0: 103
 //client 3: 103
 //client 2: 103
-//client 0: 103
 //client 1: 103
-//client 3: 104
-//client 2: 104
-//client 1: 104
-//client 0: 104
-//client 4: 104
-//client 2: 105
-//client 3: 105
-//client 1: 105
-//client 0: 105
-//client 4: 105
+//client 4: 103
