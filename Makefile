@@ -1,6 +1,8 @@
 SHELL=bash
 
 PKG_LIST := $(shell go list ./...)
+GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
+LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)'
 
 .PHONY: all dep format build clean test coverage lint vet race help
 
@@ -34,7 +36,7 @@ dep: ## Get the dependencies
 	@mkdir -p bin .test
 
 build: dep ## Build the binary file to bin dir
-	@go build -o bin ./cmd/gshell
+	@go build -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
 clean: ## Remove previous build
 	@rm -rf bin `find -name "\.test"`

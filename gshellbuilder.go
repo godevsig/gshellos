@@ -16,9 +16,10 @@ import (
 	"github.com/godevsig/gshellos/lined"
 )
 
+var version string
+
 const (
-	version = "0.9.1"
-	usage   = `gshell is shell alike interpreter based on Golang
+	usage = `gshell is shell alike interpreter based on Golang
 
 SYNOPSIS
 	gshell [options] [file[.gsh]]
@@ -204,6 +205,9 @@ func ShellMain() error {
 	case "-h", "--help":
 		fmt.Println(usage)
 	case "-v", "--version":
+		if len(version) == 0 {
+			version = "development"
+		}
 		fmt.Println(version)
 	case "-c", "--compile":
 		compileOnly = true
