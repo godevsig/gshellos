@@ -118,7 +118,7 @@ func TestREPL(t *testing.T) {
 	src := `
 fmt := import("fmt")
 fmt.println("hello world")
-show(ex("hello world").split().join(", "))
+help(ex("hello world").split().join(", "))
 `
 	file := prepareSrc(src)
 	inFile, err := os.Open(file)
