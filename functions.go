@@ -9,7 +9,7 @@ var globalFuncs = []struct {
 	fn   func(args ...Object) (Object, error)
 }{
 	{"ex", ex},
-	{"show", show},
+	{"help", help},
 }
 
 func ex(args ...Object) (Object, error) {
@@ -24,7 +24,7 @@ type hasHelp interface {
 	Help() string
 }
 
-func show(args ...Object) (Object, error) {
+func help(args ...Object) (Object, error) {
 	if len(args) != 1 {
 		return nil, ErrWrongNumArguments
 	}
