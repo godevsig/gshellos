@@ -24,6 +24,7 @@ type hasHelp interface {
 	Help() string
 }
 
+// help(obj) is only for debugging purpose
 func help(args ...Object) (Object, error) {
 	if len(args) != 1 {
 		return nil, ErrWrongNumArguments
