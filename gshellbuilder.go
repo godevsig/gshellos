@@ -14,24 +14,79 @@ import (
 	"github.com/d5/tengo/v2/parser"
 	"github.com/d5/tengo/v2/stdlib"
 	"github.com/godevsig/gshellos/lined"
+	sm "github.com/godevsig/gshellos/scalamsg"
 )
 
 var version string
 
 const (
-	usage = `gshell is shell alike interpreter based on Golang
+	usage = `gshell is an interpreter in Golang style syntax and a supervision
+tool to manage .gsh apps.
 
 SYNOPSIS
-	gshell [options] [file[.gsh]]
+    gshell [OPTIONS] [COMMANDS]
 
-OPTIONS
-	-h, --help        show this message
-	-v, --version     show version information
-	-c, --compile     compile .gsh file
+Options:
+    -s, --server [port]
+            Start gRE(gshell Runtime Environment) server for local
+            connection, also accept remote connection if [port]
+            is provided.
+            A gRE instance named "master" is created by the server
+            automatically upon the gRE server started.
 
-gshell runs the file with .gsh suffix, or compiles the file, or
-directly executes the compiled file, or
-enters interactive mode if no file supplied.
+    -c, --connect <hostname:port>
+            Connect to the remote gRE server.
+
+    -e, --gre <name>
+            Specify the name of gRE(gshell Runtime Environment)
+            in which the commands will be running.
+
+            Gshell connects to the remote gRE server if -c provided,
+            otherwise the local gRE server is used.
+
+            The named gRE instance will be created before the
+            execution of the following command if it has not been
+            created by the remote/local gRE server.
+
+    -h, --help      Show this message.
+    -v, --version   Show version information.
+
+Commands:
+    compile <file.gsh>
+            Compile <file.gsh> into byte code <file>.
+
+    exec <file[.gsh]> [args...]
+            Run <file[.gsh]> in a new VM(virtual machine) in standalone
+            mode.
+
+    run [-i] <file[.gsh]> [args...]
+            Run <file[.gsh]> in a new VM(virtual machine) with its name
+            set to <file> in the designated gRE and return VM ID.
+            A VM ID is a value in the format name-1234567, computed
+            from the file name and all its args. The same file name and
+            same args should produce the same VM ID.
+            If -i presents, gshell enters interactive mode, keep STDIN
+            and STDOUT open until <file[.gsh]> finishes execution.
+
+            If no -c presents, the local gRE server is used.
+            If no -e presents, the default "master" gRE is used.
+
+Management Commands of gRE:
+    ps
+            List all VM instances in all gREs in the local/remote gRE server.
+            If -e presents, only list the VMs in the designated gRE.
+
+    kill <ID1 ID2 ...|name1 name2 ...>
+            Abort the execution of one or more VMs in the designated gRE.
+            If only name provided, it matches all VMs with the name.
+
+    outputs <ID>
+            Print the VM output by ID so far.
+
+    logs <ID>
+            Print the VM log by ID so far.
+
+gshell enters interactive mode if no options and no commands provided.
 
 Maintained by godevsig, see https://github.com/godevsig`
 )
@@ -69,7 +124,6 @@ func (sh *shell) preCompile() {
 func (sh *shell) runREPL() {
 	fileSet := parser.NewFileSet()
 	var constants []tengo.Object
-	sh.preCompile()
 
 	led := lined.NewEditor(lined.Cfg{
 		Prompt: ">> ",
@@ -159,7 +213,7 @@ func (sh *shell) compileAndSave(inputFile, outputFile string) (err error) {
 	return
 }
 
-func (sh *shell) compileAndRun(inputFile string) (err error) {
+func (sh *shell) compileAndExec(inputFile string) (err error) {
 	bytecode, err := sh.compile(inputFile)
 	if err != nil {
 		return
@@ -170,7 +224,7 @@ func (sh *shell) compileAndRun(inputFile string) (err error) {
 	return
 }
 
-func (sh *shell) runCompiled(inputFile string) (err error) {
+func (sh *shell) execCompiled(inputFile string) (err error) {
 	data, err := ioutil.ReadFile(inputFile)
 	if err != nil {
 		return
@@ -187,57 +241,135 @@ func (sh *shell) runCompiled(inputFile string) (err error) {
 	return
 }
 
+func newShell() *shell {
+	sh := &shell{}
+	sh.initModules()
+	sh.preCompile()
+	return sh
+}
+
 // ShellMain is the main entry of gshell
 func ShellMain() error {
 	args := os.Args
-	sh := &shell{}
-	sh.initModules()
 
 	// no arg, shell mode
 	if len(args) == 1 {
+		sh := newShell()
 		sh.runREPL()
 		return nil
 	}
+	args = args[1:] // shift
 
-	compileOnly := false
-	// file or option
-	switch args[1] {
-	case "-h", "--help":
-		fmt.Println(usage)
-	case "-v", "--version":
-		if len(version) == 0 {
-			version = "development"
+	remotegREServerAddr := ""
+	greName := ""
+
+	// options
+	for ; len(args) != 0; args = args[1:] {
+		if args[0][0] != '-' {
+			break // not option
 		}
-		fmt.Println(version)
-	case "-c", "--compile":
-		compileOnly = true
-		args = args[1:] // shift
-		if len(args) == 1 {
+		switch args[0] {
+		case "-h", "--help":
+			fmt.Println(usage)
+			return nil
+		case "-v", "--version":
+			if len(version) == 0 {
+				version = "development"
+			}
+			fmt.Println(version)
+			return nil
+		case "-s", "--server": // -s, --server [port]
+			port := ""
+			if len(args) > 1 {
+				port = args[1]
+			}
+			return runServer(port)
+		case "-c", "--connect": // -c, --connect <hostname:port>
+			if len(args) > 1 {
+				remotegREServerAddr = args[1]
+				args = args[1:] // shift
+			}
+		case "-e", "--gre": // -e, --gre <name>
+			if len(args) > 1 {
+				greName = args[1]
+				args = args[1:] // shift
+			}
+		default:
+			return fmt.Errorf("unknown option %s, see --help", args[0])
+		}
+	}
+
+	cmd := args[0]
+	args = args[1:] // shift
+
+	if cmd == "compile" { // compile <file.gsh>
+		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
-		if filepath.Ext(args[1]) != ".gsh" {
+		file := args[0]
+		inputFile, _ := filepath.Abs(file)
+		if filepath.Ext(inputFile) != ".gsh" {
 			return errors.New("wrong file suffix, see --help")
 		}
-		fallthrough
-	default:
-		inputFile, _ := filepath.Abs(args[1])
-		sh.preCompile()
-
-		if compileOnly {
-			outputFile := strings.TrimSuffix(inputFile, filepath.Ext(inputFile))
-			err := sh.compileAndSave(inputFile, outputFile)
-			return err
-		}
-
-		args = args[1:] // shift
-		os.Args = args  // pass os.Args down
-		if filepath.Ext(inputFile) == ".gsh" {
-			err := sh.compileAndRun(inputFile)
-			return err
-		}
-
-		err := sh.runCompiled(inputFile)
-		return err
+		sh := newShell()
+		outputFile := strings.TrimSuffix(inputFile, filepath.Ext(inputFile))
+		return sh.compileAndSave(inputFile, outputFile)
 	}
-	return nil
+
+	if cmd == "exec" { // exec <file[.gsh]> [args...]
+		if len(args) == 0 {
+			return errors.New("no file provided, see --help")
+		}
+		file := args[0]
+		inputFile, _ := filepath.Abs(file)
+		os.Args = args // pass os.Args down
+		sh := newShell()
+		if filepath.Ext(inputFile) == ".gsh" {
+			return sh.compileAndExec(inputFile)
+		}
+		return sh.execCompiled(inputFile)
+	}
+
+	network := "unix"
+	address := "/var/tmp/gshelld.sock"
+	if len(remotegREServerAddr) != 0 {
+		network = "tcp"
+		address = remotegREServerAddr
+	}
+
+	if cmd == "run" { // run [-i] <file[.gsh]> [args...]
+		if len(args) == 0 {
+			return errors.New("no file provided, see --help")
+		}
+		if len(greName) == 0 {
+			greName = "master"
+		}
+		interactive := false
+		if args[0] == "-i" {
+			interactive = true
+			args = args[1:] // shift
+			if len(args) == 0 {
+				return errors.New("no file provided, see --help")
+			}
+		}
+		file := args[0]
+		inputFile, _ := filepath.Abs(file)
+		cmdRun := &cmdRun{greName, inputFile, args, interactive}
+		return sm.DialRun(network, address, cmdRun)
+	}
+	/*
+		if cmd == "ps" {
+			return greClient.ps()
+		}
+		if cmd == "kill" {
+			return greClient.kill()
+		}
+		if cmd == "outputs" {
+			return greClient.outputs()
+		}
+		if cmd == "logs" {
+			return greClient.logs()
+		}
+	*/
+	return fmt.Errorf("unknown command %s, see --help", cmd)
 }

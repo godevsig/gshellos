@@ -1,4 +1,8 @@
 fmt := import("fmt")
+os := import("os")
+
+fmt.println("nihao")
+fmt.println(os.args())
 
 each := func(seq, fn) {
     for x in seq { fn(x) }
