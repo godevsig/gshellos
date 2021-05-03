@@ -38,8 +38,9 @@ dep: ## Get the dependencies
 build: dep ## Build the binary file to bin dir
 	@go build -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
-clean: ## Remove previous build
+clean: ## Remove previous build and test files
 	@rm -rf bin `find -name "\.test"`
+	@rm -rf bin `find -name "test"`
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
