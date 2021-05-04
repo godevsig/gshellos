@@ -9,7 +9,8 @@
 //   "stdout" : output to OS.Stdout.
 // Other supported output destination:
 //   "file:filepath/filename" : output to file in append mode.
-//   more output destinations to be added.
+// More output destinations to be added, see RegOutputterFactory() and
+// fileFactory for an example.
 //
 // Loggers can be created under a named stream if more output destinations are
 // needed.

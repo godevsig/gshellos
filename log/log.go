@@ -1,7 +1,9 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"runtime"
@@ -41,16 +43,55 @@ type Logger struct {
 	level  Loglevel
 }
 
-type logEntry struct {
-	time       string
-	loggerName string
-	level      string
-	fileLine   string
-	rawMsg     string
+// Outputter outputs the log line.
+// The (old) Outputter will be closed when closing the stream or changing
+// the stream's output destination.
+type Outputter io.WriteCloser
+
+type stdout struct{}
+
+func (stdout) Write(p []byte) (n int, err error) {
+	f := file{os.Stdout}
+	return f.Write(p)
+}
+func (stdout) Close() error { return nil }
+
+type file struct {
+	*os.File
 }
 
-type outputter interface {
-	output(*logEntry)
+// OutputterFactory is an outputter type.
+type OutputterFactory interface {
+	NewOutputter(description string) (Outputter, error)
+}
+
+type fileFactory struct{}
+
+func (fileFactory) NewOutputter(filename string) (Outputter, error) {
+	if len(filename) == 0 {
+		return nil, fmt.Errorf("file name is empty")
+	}
+
+	dir := path.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, err
+	}
+
+	// If the file doesn't exist, create it, or append to the file
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	return file{f}, nil
+}
+
+var allFactories = make(map[string]OutputterFactory)
+
+// RegOutputterFactory registers an output destination type.
+// No lock here, use it in init().
+func RegOutputterFactory(keyword string, f OutputterFactory) {
+	allFactories[keyword] = f
 }
 
 // Stream is a output stream handle, all loggers under a stream share one
@@ -64,20 +105,19 @@ type Stream struct {
 	loggers      map[string]*Logger
 	dataMutex    sync.RWMutex // protect fields above
 
-	outputter
-	mutex sync.RWMutex // protect output and close
+	outputter Outputter
+	mutex     sync.RWMutex // protect output and close
 }
 
 // DefaultStream is the builtin output stream instance
-var DefaultStream *Stream
+var DefaultStream = NewStream("default")
 
 // all streams that have been created.
 var allStreams = make(map[string]*Stream)
 var mtx sync.Mutex
 
 func init() {
-	DefaultStream = NewStream("default")
-	newOutputterFactory("file", fileFactory{})
+	RegOutputterFactory("file", fileFactory{})
 }
 
 // NewStream creates a Stream instance
@@ -117,81 +157,13 @@ func (s *Stream) SetFlag(newFlag Flag) {
 	s.flag = newFlag
 }
 
-type outputterFactory interface {
-	newOutputter(description string) (outputter, error)
-}
-
-type stdout struct{}
-type file struct {
-	fd *os.File
-}
-type fileFactory struct{}
-
-func (stdout) output(le *logEntry) {
-	o := file{fd: os.Stdout}
-	o.output(le)
-}
-
-func (f file) output(le *logEntry) {
-	var sb strings.Builder
-	if len(le.time) != 0 {
-		sb.WriteString(le.time)
-	}
-	sb.WriteString(le.loggerName)
-	sb.WriteString("[" + le.level + "]")
-	if len(le.fileLine) != 0 {
-		sb.WriteString(le.fileLine)
-	}
-	sb.WriteByte(' ')
-	sb.WriteString(le.rawMsg)
-
-	sr := strings.NewReader(sb.String())
-	sr.WriteTo(f.fd)
-}
-
-type closer interface {
-	close()
-}
-
-func (f file) close() {
-	f.fd.Close()
-}
-
-func (fileFactory) newOutputter(filename string) (outputter, error) {
-	if len(filename) == 0 {
-		return nil, fmt.Errorf("file name is empty")
-	}
-
-	dir := path.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, err
-	}
-
-	// If the file doesn't exist, create it, or append to the file
-	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, err
-	}
-
-	return file{fd: f}, nil
-}
-
-var allFactories = make(map[string]outputterFactory)
-
-// no lock here, use it in init()
-func newOutputterFactory(keyword string, f outputterFactory) {
-	allFactories[keyword] = f
-}
-
 // Close closes the stream.
 func (s *Stream) Close() {
 	for _, lg := range s.loggers {
 		lg.Close()
 	}
 	s.mutex.Lock()
-	if v, ok := s.outputter.(closer); ok {
-		v.close()
-	}
+	s.outputter.Close()
 	s.mutex.Unlock()
 
 	mtx.Lock()
@@ -208,7 +180,7 @@ func (s *Stream) SetOutput(newOutputDest string) error {
 	description := strings.Join(ss[1:], ":")
 
 	// create the new outputter
-	var newOutputter outputter
+	var newOutputter Outputter
 	if keyword == "stdout" {
 		newOutputter = stdout{}
 	} else {
@@ -216,7 +188,7 @@ func (s *Stream) SetOutput(newOutputDest string) error {
 		if !has {
 			return fmt.Errorf("keyword: %s is not supported", keyword)
 		}
-		otptr, err := f.newOutputter(description)
+		otptr, err := f.NewOutputter(description)
 		if err != nil {
 			return fmt.Errorf("failed to create output for %s, error: %w", keyword, err)
 		}
@@ -225,9 +197,7 @@ func (s *Stream) SetOutput(newOutputDest string) error {
 
 	// close the old one
 	s.mutex.Lock()
-	if v, ok := s.outputter.(closer); ok {
-		v.close()
-	}
+	s.outputter.Close()
 	s.outputter = newOutputter
 	s.mutex.Unlock()
 
@@ -338,7 +308,7 @@ func (s *Stream) GetLogger(name string) *Logger {
 //  name is the identifier of the logger, which is assembled to each log entry.
 //  defaultLoglevel sets the default loglevel of the returned logger instance.
 // Unless the name matches preconfigured namePattern, in which case loglevel sets to preconfigured loglevel.
-// see Stream.SetLoglevel().
+// See Stream.SetLoglevel().
 // Returns nil if stream is nil or name is empty.
 func (s *Stream) NewLogger(name string, defaultLoglevel Loglevel) *Logger {
 	if len(s.name) == 0 {
@@ -388,26 +358,11 @@ func (lg *Logger) SetLoglevel(level Loglevel) {
 	lg.level = level
 }
 
-func (lg *Logger) outputLogEntry(level, format string, args []interface{}) {
+func (lg *Logger) output(level, format string, args []interface{}) {
 	if lg.stream == nil {
 		panic("closed logger")
 	}
-	entry := &logEntry{}
-	entry.loggerName = lg.name
-	entry.level = level
-
-	if len(format) == 0 {
-		// println
-		entry.rawMsg = fmt.Sprintln(args...)
-	} else {
-		// printf, append \n
-		var msg strings.Builder
-		fmt.Fprintf(&msg, format, args...)
-		if msg.Len() == 0 || msg.String()[msg.Len()-1] != '\n' {
-			msg.WriteByte('\n')
-		}
-		entry.rawMsg = msg.String()
-	}
+	var b bytes.Buffer
 
 	lg.stream.dataMutex.RLock()
 	timeFormat := lg.stream.timeFormat
@@ -417,8 +372,11 @@ func (lg *Logger) outputLogEntry(level, format string, args []interface{}) {
 		if lg.stream.flag&LUTC != 0 {
 			t = t.UTC()
 		}
-		entry.time = t.Format(timeFormat)
+		b.WriteString(t.Format(timeFormat))
 	}
+
+	b.WriteString(lg.name)
+	b.WriteString(level)
 
 	if lg.stream.flag&Lfileline != 0 {
 		fileLine := "(???:0)"
@@ -426,11 +384,23 @@ func (lg *Logger) outputLogEntry(level, format string, args []interface{}) {
 		if ok {
 			fileLine = fmt.Sprintf("(%s:%d)", path.Base(file), line)
 		}
-		entry.fileLine = fileLine
+		b.WriteString(fileLine)
+	}
+	b.WriteByte(' ')
+
+	if len(format) == 0 {
+		// println
+		b.WriteString(fmt.Sprintln(args...))
+	} else {
+		// printf, append \n
+		fmt.Fprintf(&b, format, args...)
+		if b.Bytes()[b.Len()-1] != '\n' {
+			b.WriteByte('\n')
+		}
 	}
 
 	lg.stream.mutex.Lock()
-	lg.stream.output(entry)
+	b.WriteTo(lg.stream.outputter)
 	lg.stream.mutex.Unlock()
 }
 
@@ -438,7 +408,7 @@ func (lg *Logger) trace(format string, args []interface{}) {
 	if lg.level > Ltrace {
 		return
 	}
-	lg.outputLogEntry("TRACE", format, args)
+	lg.output("[TRACE]", format, args)
 }
 
 // Tracef writes the trace log, always adds a '\n' if no '\n' supplied by user
@@ -455,7 +425,7 @@ func (lg *Logger) debug(format string, args []interface{}) {
 	if lg.level > Ldebug {
 		return
 	}
-	lg.outputLogEntry("DEBUG", format, args)
+	lg.output("[DEBUG]", format, args)
 }
 
 // Debugf writes the debug log, always adds a '\n' if no '\n' supplied by user
@@ -472,7 +442,7 @@ func (lg *Logger) info(format string, args []interface{}) {
 	if lg.level > Linfo {
 		return
 	}
-	lg.outputLogEntry("INFO", format, args)
+	lg.output("[INFO]", format, args)
 }
 
 // Infof writes the info log, always adds a '\n' if no '\n' supplied by user
@@ -489,7 +459,7 @@ func (lg *Logger) warn(format string, args []interface{}) {
 	if lg.level > Lwarn {
 		return
 	}
-	lg.outputLogEntry("WARN", format, args)
+	lg.output("[WARN]", format, args)
 }
 
 // Warnf writes the warning log, always adds a '\n' if no '\n' supplied by user
@@ -506,7 +476,7 @@ func (lg *Logger) error(format string, args []interface{}) {
 	if lg.level > Lerror {
 		return
 	}
-	lg.outputLogEntry("ERROR", format, args)
+	lg.output("[ERROR]", format, args)
 }
 
 // Errorf writes the error log, always adds a '\n' if no '\n' supplied by user
@@ -519,14 +489,18 @@ func (lg *Logger) Errorln(args ...interface{}) {
 	lg.error("", args)
 }
 
+func (lg *Logger) fatal(format string, args []interface{}) {
+	lg.output("[FATAL]", format, args)
+}
+
 // Fatalf writes the log entry followed by a panic, always adds a '\n' if no '\n' supplied by user
 func (lg *Logger) Fatalf(format string, args ...interface{}) {
-	lg.outputLogEntry("FATAL", format, args)
+	lg.fatal(format, args)
 	panic(fmt.Sprintf(format, args...))
 }
 
 // Fatalln is like fmt.Println with loglevel fatal followed by a panic
 func (lg *Logger) Fatalln(args ...interface{}) {
-	lg.outputLogEntry("FATAL", "", args)
+	lg.fatal("", args)
 	panic(fmt.Sprintln(args...))
 }

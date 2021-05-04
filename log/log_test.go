@@ -173,15 +173,14 @@ func ExampleStream_SetOutput() {
 type nullFactory struct{}
 type null struct{}
 
-func (nullFactory) newOutputter(description string) (outputter, error) {
+func (nullFactory) NewOutputter(description string) (Outputter, error) {
 	return null{}, nil
 }
-func (null) output(*logEntry) {}
-
+func (null) Close() error                  { return nil }
 func (null) Write(buf []byte) (int, error) { return len(buf), nil }
 
 func init() {
-	newOutputterFactory("null", nullFactory{})
+	RegOutputterFactory("null", nullFactory{})
 }
 
 func TestPatternMatch(t *testing.T) {
