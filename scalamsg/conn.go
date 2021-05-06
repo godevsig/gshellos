@@ -101,7 +101,6 @@ var (
 	qWeight     = 16
 	defaultQLen = qWeight * runtime.NumCPU()
 	nilQ        <-chan time.Time
-	closedQ     chan time.Time
 )
 
 type conn struct {
@@ -114,9 +113,15 @@ type conn struct {
 	closeQ  chan struct{}
 	errall  errs
 	done    chan struct{}
+	lgr     Logger
 }
 
-func newConn(ctx context.Context, netConn net.Conn) *conn {
+func (c *conn) logError(err error) {
+	c.lgr.Errorln(err)
+	c.errall.addError(err)
+}
+
+func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 	c := &conn{
 		contextImpl: contextImpl{kv: make(map[reflect.Type]interface{})},
 		netConn:     netConn,
@@ -125,6 +130,7 @@ func newConn(ctx context.Context, netConn net.Conn) *conn {
 		recvQ:       make(chan interface{}, defaultQLen),
 		closeQ:      make(chan struct{}),
 		done:        make(chan struct{}),
+		lgr:         lgr,
 	}
 
 	handlemsg := func(msg Message, exclusive bool) (eof bool) {
@@ -141,7 +147,7 @@ func newConn(ctx context.Context, netConn net.Conn) *conn {
 				eof = true
 				return
 			}
-			c.errall.addError(errorHere(err))
+			c.logError(errorHere(err))
 			return
 		}
 		if reply != nil {
@@ -149,7 +155,7 @@ func newConn(ctx context.Context, netConn net.Conn) *conn {
 			err := c.Send(reply)
 			c.RUnlock()
 			if err != nil {
-				c.errall.addError(errorHere(err))
+				c.logError(errorHere(err))
 			}
 		}
 		return
@@ -184,7 +190,7 @@ func newConn(ctx context.Context, netConn net.Conn) *conn {
 				if strings.Contains(err.Error(), "use of closed network connection") {
 					break
 				}
-				c.errall.addError(errorHere(err))
+				c.logError(errorHere(err))
 			} else if emsg, ok := msg.(ExclusiveMessage); ok {
 				if eof := handlemsg(emsg, true); eof {
 					break
@@ -203,7 +209,7 @@ func newConn(ctx context.Context, netConn net.Conn) *conn {
 				select {
 				case c.recvQ <- msg:
 				default:
-					c.errall.addError(errorHere("message dropped"))
+					c.logError(errorHere("message dropped"))
 				}
 			}
 		}
@@ -239,11 +245,23 @@ func (c *conn) wait() (err error) {
 	return
 }
 
+// Errors returns all errors occurred in the connection so far.
+func (c *conn) Errors() (err error) {
+	if len(c.errall.errs) != 0 {
+		err = &c.errall
+	}
+	return
+}
+
 // Send sends an arbitrary message.
 func (c *conn) Send(msg interface{}) error {
 	// to be able to decode directly into an interface variable,
 	// we need to encode it as reference of the interface
-	return c.enc.Encode(&msg)
+	err := c.enc.Encode(&msg)
+	if err != nil {
+		c.logError(errorHere(err))
+	}
+	return err
 }
 
 // RecvTimeout receives an unknown message within timeout.
@@ -259,12 +277,17 @@ func (c *conn) RecvTimeout(timeout time.Duration) (msg interface{}, err error) {
 
 	select {
 	case <-closeQ:
-		return nil, ErrClosed
+		err = ErrClosed
 	case <-timeQ:
-		return nil, ErrRecvTimeout
+		err = ErrRecvTimeout
 	case m := <-recvQ:
-		return m, nil
+		msg = m
 	}
+
+	if err != nil {
+		c.logError(errorHere(err))
+	}
+	return
 }
 
 // Recv receives an unknown message.
