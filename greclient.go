@@ -8,7 +8,13 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/godevsig/gshellos/log"
 	sm "github.com/godevsig/gshellos/scalamsg"
+)
+
+var (
+	gcStream = log.NewStream("greClient")
+	gcLogger = gcStream.NewLogger("gre client", log.Linfo)
 )
 
 type cmdRun struct {
@@ -19,6 +25,7 @@ type cmdRun struct {
 }
 
 func (c *cmdRun) OnConnect(conn sm.Conn) error {
+	gcLogger.Debugln("connected to gre server")
 	sh := newShell()
 	var b bytes.Buffer
 	if filepath.Ext(c.file) == ".gsh" {
@@ -47,6 +54,7 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 		ByteCode:    b.Bytes(),
 	}
 
+	gcLogger.Debugln("sending run request")
 	if err := conn.Send(msg); err != nil {
 		fmt.Println(err)
 		return io.EOF
@@ -61,6 +69,7 @@ type redirectMsg struct{}
 
 func (redirectMsg) IsExclusive() {}
 func (redirectMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
+	gcLogger.Debugln("enter interactive io")
 	if err := conn.Send(redirectAckMsg{}); err != nil {
 		fmt.Println(err)
 		return nil, io.EOF
@@ -68,6 +77,7 @@ func (redirectMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	netconn := conn.GetNetConn()
 	go io.Copy(netconn, os.Stdin)
 	io.Copy(os.Stdout, netconn)
+	gcLogger.Debugln("exit interactive io")
 	return
 }
 

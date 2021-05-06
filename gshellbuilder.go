@@ -14,6 +14,7 @@ import (
 	"github.com/d5/tengo/v2/parser"
 	"github.com/d5/tengo/v2/stdlib"
 	"github.com/godevsig/gshellos/lined"
+	"github.com/godevsig/gshellos/log"
 	sm "github.com/godevsig/gshellos/scalamsg"
 )
 
@@ -48,6 +49,7 @@ Options:
             execution of the following command if it has not been
             created by the remote/local gRE server.
 
+    -d, --debug     Set loglevel to debug
     -h, --help      Show this message.
     -v, --version   Show version information.
 
@@ -278,6 +280,10 @@ func ShellMain() error {
 			}
 			fmt.Println(version)
 			return nil
+		case "-d", "--debug":
+			gsStream.SetLoglevel("*", log.Ldebug)
+			gcStream.SetLoglevel("*", log.Ldebug)
+			greStream.SetLoglevel("*", log.Ldebug)
 		case "-s", "--server": // -s, --server [port]
 			port := ""
 			if len(args) > 1 {
@@ -331,7 +337,7 @@ func ShellMain() error {
 	}
 
 	network := "unix"
-	address := "/var/tmp/gshelld.sock"
+	address := workDir + "gshelld.sock"
 	if len(remotegREServerAddr) != 0 {
 		network = "tcp"
 		address = remotegREServerAddr
@@ -355,7 +361,7 @@ func ShellMain() error {
 		file := args[0]
 		inputFile, _ := filepath.Abs(file)
 		cmdRun := &cmdRun{greName, inputFile, args, interactive}
-		return sm.DialRun(network, address, cmdRun)
+		return sm.DialRun(cmdRun, network, address, sm.WithLogger(gcLogger))
 	}
 	/*
 		if cmd == "ps" {

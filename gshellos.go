@@ -42,7 +42,9 @@ var (
 )
 
 // modules are extension modules managed by this package.
-var modules = map[string]map[string]tengo.Object{}
+var (
+	modules = map[string]map[string]tengo.Object{}
+)
 
 func init() {
 	gob.Register(&UserFunction{})
