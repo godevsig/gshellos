@@ -88,6 +88,9 @@ type Conn interface {
 	// Note known messages are handled automatically.
 	Recv() (msg interface{}, err error)
 
+	// Close closes the Conn, and triggers the termination process of this Conn.
+	Close()
+
 	// RecvTimeout receives an unknown message within timeout.
 	// It returns ErrRecvTimeout if timout happens, ErrClosed if the connection
 	// was closed.
@@ -98,13 +101,15 @@ type Conn interface {
 }
 
 var (
-	qWeight     = 16
-	defaultQLen = qWeight * runtime.NumCPU()
-	nilQ        <-chan time.Time
+	defaultQWeight     = 8
+	defaultScaleFactor = 8
+	defaultQlen        = 128
+	nilQ               <-chan time.Time
 )
 
 type conn struct {
 	sync.RWMutex
+	conf
 	contextImpl
 	netConn net.Conn
 	enc     *gob.Encoder
@@ -113,7 +118,6 @@ type conn struct {
 	closeQ  chan struct{}
 	errall  errs
 	done    chan struct{}
-	lgr     Logger
 }
 
 func (c *conn) logError(err error) {
@@ -121,19 +125,21 @@ func (c *conn) logError(err error) {
 	c.errall.addError(err)
 }
 
-func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
+func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 	c := &conn{
+		conf:        cnf,
 		contextImpl: contextImpl{kv: make(map[reflect.Type]interface{})},
 		netConn:     netConn,
 		enc:         gob.NewEncoder(netConn),
 		dec:         gob.NewDecoder(netConn),
-		recvQ:       make(chan interface{}, defaultQLen),
+		recvQ:       make(chan interface{}, cnf.recvQlen),
 		closeQ:      make(chan struct{}),
 		done:        make(chan struct{}),
-		lgr:         lgr,
 	}
+	c.lgr.Traceln("new connection established")
 
 	handlemsg := func(msg Message, exclusive bool) (eof bool) {
+		c.lgr.Traceln("handling message")
 		if exclusive {
 			c.Lock()
 		}
@@ -141,16 +147,8 @@ func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 		if exclusive {
 			c.Unlock()
 		}
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				c.close()
-				eof = true
-				return
-			}
-			c.logError(errorHere(err))
-			return
-		}
-		if reply != nil {
+
+		if reply != nil { // send reply first
 			c.RLock()
 			err := c.Send(reply)
 			c.RUnlock()
@@ -158,16 +156,27 @@ func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 				c.logError(errorHere(err))
 			}
 		}
+		if err != nil {
+			if c.errorAsEOF || errors.Is(err, io.EOF) {
+				c.Close()
+				eof = true
+			}
+			if !errors.Is(err, io.EOF) {
+				c.logError(errorHere(err))
+			}
+		}
 		return
 	}
 
+	qlen := cnf.qWeight * cnf.scaleFactor * runtime.NumCPU()
 	receiver := func() {
-		msgs := make(chan Message, defaultQLen)
+		c.lgr.Traceln("receiver started")
+		msgs := make(chan Message, qlen)
 		worker := func(done <-chan struct{}) {
 			for {
 				select {
 				case <-ctx.Done():
-					c.close()
+					c.Close()
 					return
 				case <-done:
 					return
@@ -180,11 +189,12 @@ func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 		}
 		wp := NewWorkerPool()
 		wp.AddWorker(worker)
+		c.lgr.Traceln("worker added")
 		for {
 			var msg interface{}
 			if err := c.dec.Decode(&msg); err != nil {
 				if errors.Is(err, io.EOF) {
-					c.close()
+					c.Close()
 					break
 				}
 				if strings.Contains(err.Error(), "use of closed network connection") {
@@ -192,20 +202,26 @@ func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 				}
 				c.logError(errorHere(err))
 			} else if emsg, ok := msg.(ExclusiveMessage); ok {
+				c.lgr.Traceln("exclusive message received")
 				if eof := handlemsg(emsg, true); eof {
 					break
 				}
 			} else if mmsg, ok := msg.(Message); ok {
-				should := len(msgs)/qWeight + 1
+				c.lgr.Traceln("message received")
+				should := len(msgs)/cnf.qWeight + 1
 				now := wp.Len()
+				c.lgr.Debugf("worker number: should: %d, now: %d\n", should, now)
 				switch {
 				case should > now:
 					wp.AddWorker(worker)
+					c.lgr.Traceln("worker added")
 				case should < now:
 					wp.RmWorker()
+					c.lgr.Traceln("worker removed")
 				}
 				msgs <- mmsg
 			} else {
+				c.lgr.Traceln("unknown message received")
 				select {
 				case c.recvQ <- msg:
 				default:
@@ -217,6 +233,7 @@ func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 			time.Sleep(time.Second)
 		}
 		wp.Close()
+		c.lgr.Traceln("receiver done")
 	}
 
 	go func() {
@@ -226,10 +243,11 @@ func newConn(ctx context.Context, netConn net.Conn, lgr Logger) *conn {
 	return c
 }
 
-func (c *conn) close() {
+func (c *conn) Close() {
 	c.Lock()
 	defer c.Unlock()
 	if c.closeQ != nil {
+		c.lgr.Traceln("closing connection")
 		close(c.closeQ)
 		c.closeQ = nil
 		c.netConn.Close()

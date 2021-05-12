@@ -56,9 +56,15 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 
 	gcLogger.Debugln("sending run request")
 	if err := conn.Send(msg); err != nil {
-		fmt.Println(err)
-		return io.EOF
+		return err
 	}
+
+	reply, err := conn.Recv()
+	fmt.Println(reply, err)
+	if err != nil {
+		return err
+	}
+
 	if !c.interactive {
 		return io.EOF
 	}

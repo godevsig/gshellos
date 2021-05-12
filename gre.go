@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/d5/tengo/v2"
 	"github.com/godevsig/gshellos/log"
@@ -12,19 +13,19 @@ import (
 )
 
 var (
+	greLogger *log.Logger
 	greStream = log.NewStream("gre")
-	greLogger = greStream.NewLogger("gre", log.Linfo)
 )
 
 func init() {
+	// same file shared by multiple gshell processes in append mode.
 	greStream.SetOutput("file:" + workDir + "gre.log")
 }
 
 type gre struct {
-	name    string
-	socket  string
-	l       *sm.Listener
-	errChan chan error
+	name   string
+	socket string
+	l      *sm.Listener
 }
 
 type session struct {
@@ -32,24 +33,40 @@ type session struct {
 }
 
 func newgre(name string) (*gre, error) {
-	greLogger.Infoln("starting gre", name)
-	gre := &gre{name: name, errChan: make(chan error)}
-	gre.socket = workDir + "gre-" + name + ".sock"
+	if greLogger = greStream.GetLogger(name); greLogger == nil {
+		greLogger = greStream.NewLogger(name, log.Linfo)
+	}
+
+	gre := &gre{
+		name:   name,
+		socket: workDir + "gre-" + name + ".sock",
+	}
 	l, err := sm.Listen("unix", gre.socket, sm.WithLogger(greLogger))
 	if err != nil {
-		greLogger.Errorln("gRE listen failed:", err)
 		return nil, err
 	}
 	gre.l = l
-	go func() {
-		err := l.Run(gre)
-		if err != nil {
-			greLogger.Errorln("gRE run error:", err)
-		}
-		gre.errChan <- err
-	}()
-
 	return gre, nil
+}
+
+func (gre *gre) run() error {
+	return gre.l.Run(gre)
+}
+
+func (gre *gre) clean() {
+	os.Remove(gre.socket)
+}
+
+func (gre *gre) close() {
+	gre.l.Close()
+}
+
+func rungre(name string) error {
+	gre, err := newgre(name)
+	if err != nil {
+		return err
+	}
+	return gre.run()
 }
 
 func (gre *gre) OnConnect(conn sm.Conn) error {
@@ -81,25 +98,24 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	if cmd.Interactive {
 		session := conn.GetContext().(*session)
 		session.vm = vm
-		greLogger.Debugln("cmdRunMsg: sending redirectMsg")
+		greLogger.Traceln("cmdRunMsg: sending redirectMsg")
 		return redirectMsg{}, nil
 	}
 
-	greLogger.Debugln("cmdRunMsg: non-interactive")
+	greLogger.Traceln("cmdRunMsg: non-interactive")
 	vmerr := vm.Run()
 	if vmerr != nil {
 		greLogger.Errorln("cmdRunMsg: vm run return error:", vmerr)
 	}
 
-	greLogger.Debugln("cmdRunMsg: closing connection")
-	return nil, io.EOF
+	return nil, nil
 }
 
 type redirectAckMsg struct{}
 
 func (redirectAckMsg) IsExclusive() {}
 func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
-	greLogger.Debugln("redirectAckMsg: enter")
+	greLogger.Traceln("redirectAckMsg: enter")
 	session := conn.GetContext().(*session)
 	vm := session.vm
 	vm.In = conn.GetNetConn()
@@ -109,7 +125,7 @@ func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	if vmerr != nil {
 		fmt.Fprintln(conn.GetNetConn(), vmerr)
 	}
-	greLogger.Debugln("redirectAckMsg: closing")
+	greLogger.Traceln("redirectAckMsg: closing")
 	return nil, io.EOF
 }
 
