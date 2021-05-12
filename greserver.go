@@ -4,8 +4,14 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
+	"path/filepath"
+	"strconv"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/godevsig/gshellos/log"
 	sm "github.com/godevsig/gshellos/scalamsg"
@@ -14,19 +20,26 @@ import (
 var (
 	workDir  = "/var/tmp/gshell/"
 	gsStream = log.NewStream("greServer")
-	gsLogger = gsStream.NewLogger("gre server", log.Linfo)
-	gserver  = &server{gres: make(map[string]*gre)}
+	gsLogger = gsStream.NewLogger("server", log.Linfo)
+	gserver  = &server{greConns: make(map[string]*greConn), errRecovers: make(chan errorRecover, 128)}
 )
 
 func init() {
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		panic(err)
 	}
-	gsStream.SetOutput("file:" + workDir + "greserver.log")
+	gsStream.SetOutput("file:" + workDir + "server.log")
 }
 
 type server struct {
-	gres map[string]*gre
+	sync.RWMutex
+	greConns    map[string]*greConn
+	errRecovers chan errorRecover
+}
+
+type greConn struct {
+	*gre
+	sm.Conn // built-in conn to the gre
 }
 
 func (s *server) OnConnect(conn sm.Conn) error {
@@ -34,35 +47,144 @@ func (s *server) OnConnect(conn sm.Conn) error {
 	return nil
 }
 
-func runServer(port string) error {
-	errChan := make(chan error)
+func setupgre(name string) (*greConn, error) {
+	gre, err := newgre(name)
+	if err != nil {
+		gsLogger.Errorf("newgre %s failed: %v", name, err)
+		return nil, err
+	}
+	fakeRecover := func() bool {
+		return true
+	}
+	go func() {
+		var err error
+		defer func() {
+			gsLogger.Errorf("%s gre terminated unexpectedly", name)
+			gserver.Lock()
+			delete(gserver.greConns, name)
+			gserver.Unlock()
+			gre.clean()
+			if perr := recover(); perr != nil {
+				gsLogger.Errorf("%s gre runtime panic: %v", name, perr)
+			}
+			// not attempt to restart the gre
+			gserver.errRecovers <- customErrorRecover{err, name + " gre runtime error", fakeRecover}
+		}()
+
+		err = gre.run() // gres are not supposed to exit
+	}()
+
+	greConnLogger := gsStream.GetLogger(name + " conn")
+	if greConnLogger == nil {
+		greConnLogger = gsStream.NewLogger(name+" conn", log.Linfo)
+	}
+
+	grecChan := make(chan *greConn)
+	onConnect := func(conn sm.Conn) error {
+		grec := &greConn{gre, conn}
+		gserver.Lock()
+		gserver.greConns[name] = grec
+		gserver.Unlock()
+		grecChan <- grec
+		return nil
+	}
+
+	go func() {
+		var err error
+		defer func() {
+			gserver.Lock()
+			delete(gserver.greConns, name)
+			gserver.Unlock()
+			gsLogger.Infof("closing gre %s due to connection lost", name)
+			gre.close() // shut down the gre
+			if perr := recover(); perr != nil {
+				gsLogger.Errorf("builtin connection to %s runtime panic: %v", name, perr)
+			}
+			gserver.errRecovers <- customErrorRecover{err, name + " builtin connection error", fakeRecover}
+		}()
+
+		if _, err := os.Stat(gre.socket); os.IsNotExist(err) {
+			time.Sleep(time.Second)
+		}
+		// built-in conn to gre, not supposed to exit
+		err = sm.DialRun(sm.OnConnectFunc(onConnect), "unix", gre.socket, sm.WithLogger(greConnLogger))
+	}()
+
+	grec := <-grecChan
+	gsLogger.Infof("%s gre created\n", name)
+	return grec, nil
+}
+
+func runServer(version, port string) error {
+	gsLogger.Infof("gshell server version: %s", version)
+	pidFile := workDir + "gserver.pid"
+
+	getPidFromFile := func() int {
+		data, err := ioutil.ReadFile(pidFile)
+		if err != nil {
+			return 0
+		}
+		pid, err := strconv.Atoi(string(data))
+		if err != nil {
+			return 0
+		}
+		return pid
+	}
+
+	cleanOldgserver := func() {
+		defer func() {
+			sockets, _ := filepath.Glob(workDir + "*.sock")
+			for _, s := range sockets {
+				os.Remove(s)
+			}
+		}()
+
+		pid := getPidFromFile()
+		if pid == 0 {
+			return
+		}
+		process, err := os.FindProcess(pid)
+		if err != nil {
+			return
+		}
+		gsLogger.Infoln("shutting down old gre server", pid)
+		if err := process.Signal(syscall.SIGTERM); err != nil {
+			gsLogger.Errorf("kill pid %d failed: %s", pid, err)
+		}
+	}
+	cleanOldgserver()
+	pid := os.Getpid() // new pid
+	if err := ioutil.WriteFile(pidFile, []byte(strconv.Itoa(pid)), 0644); err != nil {
+		return errorHere(err)
+	}
+	defer func() {
+		if getPidFromFile() == pid {
+			os.Remove(pidFile)
+		}
+	}()
+
 	if len(port) != 0 {
 		go func() {
-			gsLogger.Infoln("starting listening on tcp port", port)
+			gsLogger.Infoln("listening on tcp port", port)
 			err := sm.ListenRun(gserver, "tcp", ":"+port, sm.WithLogger(gsLogger))
-			errChan <- err
+			gserver.errRecovers <- unrecoverableError{err}
 		}()
 	}
 	go func() {
-		gsLogger.Infoln("starting listening on local unix")
+		gsLogger.Infoln("listening on local unix")
 		err := sm.ListenRun(gserver, "unix", workDir+"gshelld.sock", sm.WithLogger(gsLogger))
-		errChan <- err
+		gserver.errRecovers <- unrecoverableError{err}
 	}()
 
-	master, err := newgre("master")
-	if err != nil {
-		return err
+	for e := range gserver.errRecovers {
+		if e.Recover() {
+			gsLogger.Infoln("recovered:", e.String(), ":", e.Error())
+		} else {
+			gsLogger.Errorln("not recovered:", e.String(), ":", e.Error())
+			return e.Error()
+		}
 	}
-	gserver.gres["master"] = master
-	gsLogger.Infoln("gre master created")
-
-	greErr := <-master.errChan
-	serverErr := <-errChan
-
-	if greErr == nil && serverErr == nil {
-		return nil
-	}
-	return fmt.Errorf("server error: %v\ngre master error: %v", serverErr, greErr)
+	return nil
 }
 
 type reqRunMsg struct {
@@ -74,37 +196,50 @@ type reqRunMsg struct {
 }
 
 func (*reqRunMsg) IsExclusive() {}
-func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
-	gsLogger.Debugf("reqRunMsg: file: %v, args: %v, interactive: %v\n", req.File, req.Args, req.Interactive)
-	if req.GreName != "master" {
-		panic("ToDo: add named gre")
+func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	gsLogger.Debugf("reqRunMsg: file: %v, args: %v, interactive: %v", req.File, req.Args, req.Interactive)
+
+	gserver.RLock()
+	grec, ok := gserver.greConns[req.GreName]
+	gserver.RUnlock()
+	if !ok {
+		tgrec, err := setupgre(req.GreName)
+		if err != nil {
+			return err, io.EOF // reply err
+		}
+		grec = tgrec
 	}
 
-	c, err := net.Dial("unix", gserver.gres["master"].socket)
-	if err != nil {
-		gsLogger.Errorln("reqRunMsg: dial failed:", err)
-		return nil, err
-	}
-	defer c.Close()
-
-	var cmd interface{}
-	cmd = &cmdRunMsg{
+	cmd := &cmdRunMsg{
 		File:        req.File,
 		Args:        req.Args,
 		Interactive: req.Interactive,
 		ByteCode:    req.ByteCode,
 	}
+
+	if !req.Interactive {
+		if err := grec.Send(cmd); err != nil {
+			reply = fmt.Errorf("reqRunMsg: send cmd to gre %s failed: %v", req.GreName, err)
+			gsLogger.Errorln(reply)
+		}
+		return reply, io.EOF // ??????
+	}
+
+	c, err := net.Dial("unix", grec.socket)
+	if err != nil {
+		gsLogger.Errorln("reqRunMsg: dial failed:", err)
+		return nil, io.EOF
+	}
+	defer c.Close()
+
+	var icmd interface{} = cmd
 	enc := gob.NewEncoder(c)
-	if err := enc.Encode(&cmd); err != nil {
+	if err := enc.Encode(&icmd); err != nil {
 		gsLogger.Errorln("reqRunMsg: cmd not sent:", err)
 		return nil, io.EOF
 	}
 
-	if !req.Interactive {
-		return nil, io.EOF
-	}
-
-	gsLogger.Debugln("reqRunMsg: forwarding io")
+	gsLogger.Traceln("reqRunMsg: forwarding io")
 	done := make(chan struct{}, 2)
 	copy := func(dst io.Writer, src io.Reader) {
 		io.Copy(dst, src)
@@ -114,7 +249,7 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	go copy(conn.GetNetConn(), c)
 
 	<-done
-	gsLogger.Debugln("reqRunMsg: closing connection")
+	gsLogger.Traceln("reqRunMsg: closing connection")
 	return nil, io.EOF
 }
 

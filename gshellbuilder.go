@@ -28,13 +28,6 @@ SYNOPSIS
     gshell [OPTIONS] [COMMANDS]
 
 Options:
-    -s, --server [port]
-            Start gRE(gshell Runtime Environment) server for local
-            connection, also accept remote connection if [port]
-            is provided.
-            A gRE instance named "master" is created by the server
-            automatically upon the gRE server started.
-
     -c, --connect <hostname:port>
             Connect to the remote gRE server.
 
@@ -49,11 +42,16 @@ Options:
             execution of the following command if it has not been
             created by the remote/local gRE server.
 
-    -d, --debug     Set loglevel to debug
+    -d, --debug     Enable debug loglevel, -d -d makes more verbose log.
     -h, --help      Show this message.
     -v, --version   Show version information.
 
 Commands:
+    server [port]
+            Start gRE(gshell Runtime Environment) server for local
+            connection, also accept remote connection if [port]
+            is provided.
+
     compile <file.gsh>
             Compile <file.gsh> into byte code <file>.
 
@@ -104,8 +102,6 @@ func (sh *shell) initModules() {
 	sh.modules.AddMap(GetModuleMap(AllModuleNames()...))
 }
 
-// ToDo: add new scope ScopeExtend in upstream tengo project
-//symbol.Scope = ScopeExtend
 func (sh *shell) addFunction(name string, fn tengo.CallableFunc) {
 	symbol := sh.symbolTable.Define(name)
 	sh.globals[symbol.Index] = &tengo.UserFunction{
@@ -264,6 +260,10 @@ func ShellMain() error {
 
 	remotegREServerAddr := ""
 	greName := ""
+	loglevel := log.Linfo
+	if len(version) == 0 {
+		version = "development"
+	}
 
 	// options
 	for ; len(args) != 0; args = args[1:] {
@@ -275,21 +275,12 @@ func ShellMain() error {
 			fmt.Println(usage)
 			return nil
 		case "-v", "--version":
-			if len(version) == 0 {
-				version = "development"
-			}
 			fmt.Println(version)
 			return nil
 		case "-d", "--debug":
-			gsStream.SetLoglevel("*", log.Ldebug)
-			gcStream.SetLoglevel("*", log.Ldebug)
-			greStream.SetLoglevel("*", log.Ldebug)
-		case "-s", "--server": // -s, --server [port]
-			port := ""
-			if len(args) > 1 {
-				port = args[1]
+			if loglevel > log.Ltrace {
+				loglevel--
 			}
-			return runServer(port)
 		case "-c", "--connect": // -c, --connect <hostname:port>
 			if len(args) > 1 {
 				remotegREServerAddr = args[1]
@@ -305,8 +296,31 @@ func ShellMain() error {
 		}
 	}
 
+	gsStream.SetLoglevel("*", loglevel)
+	gcStream.SetLoglevel("*", loglevel)
+	greStream.SetLoglevel("*", loglevel)
+
 	cmd := args[0]
 	args = args[1:] // shift
+
+	if cmd == "server" { // server [port]
+		port := ""
+		if len(args) > 0 {
+			port = args[0]
+		}
+		return runServer(version, port)
+	}
+
+	if cmd == "rungre" { // rungre name
+		var err error
+		if len(args) > 0 {
+			name := args[0]
+			if name != "master" {
+				err = rungre(name)
+			}
+		}
+		return err
+	}
 
 	if cmd == "compile" { // compile <file.gsh>
 		if len(args) == 0 {
@@ -361,7 +375,9 @@ func ShellMain() error {
 		file := args[0]
 		inputFile, _ := filepath.Abs(file)
 		cmdRun := &cmdRun{greName, inputFile, args, interactive}
-		return sm.DialRun(cmdRun, network, address, sm.WithLogger(gcLogger))
+		return sm.DialRun(cmdRun, network, address,
+			sm.ErrorAsEOF(),
+			sm.WithLogger(gcLogger))
 	}
 	/*
 		if cmd == "ps" {

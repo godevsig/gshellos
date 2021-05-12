@@ -4,17 +4,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"path"
+	"runtime"
 
 	"github.com/d5/tengo/v2"
 )
 
 // Object is an alias of tengo.Object
 type Object = tengo.Object
-
-// List of symbol scopes
-const (
-	ScopeExtend tengo.SymbolScope = "EXTEND"
-)
 
 var (
 	// TrueValue represents a true value.
@@ -40,6 +37,51 @@ var (
 	// ErrNotConvertible is an error when failed to convert the input to/from an object.
 	ErrNotConvertible = errors.New("not convertible")
 )
+
+func errorHere(err interface{}) error {
+	_, file, line, _ := runtime.Caller(1)
+	return fmt.Errorf("(%s:%d): %v", path.Base(file), line, err)
+}
+
+type errorRecover interface {
+	Error() error
+	String() string
+	Recover() (recovered bool) // return true if the error has been recovered.
+}
+
+type unrecoverableError struct {
+	err error
+}
+
+func (e unrecoverableError) Error() error {
+	return e.err
+}
+
+func (e unrecoverableError) String() string {
+	return "unrecoverable error"
+}
+
+func (e unrecoverableError) Recover() bool {
+	return false
+}
+
+type customErrorRecover struct {
+	err         error
+	str         string
+	recoverFunc func() bool
+}
+
+func (e customErrorRecover) Error() error {
+	return e.err
+}
+
+func (e customErrorRecover) String() string {
+	return e.str
+}
+
+func (e customErrorRecover) Recover() bool {
+	return e.recoverFunc()
+}
 
 // modules are extension modules managed by this package.
 var (

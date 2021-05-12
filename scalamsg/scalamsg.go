@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 var (
@@ -72,6 +73,8 @@ func (f OnConnectFunc) OnConnect(conn Conn) error {
 
 // Logger is the logger interface.
 type Logger interface {
+	Tracef(format string, args ...interface{})
+	Traceln(args ...interface{})
 	Debugf(format string, args ...interface{})
 	Debugln(args ...interface{})
 	Infof(format string, args ...interface{})
@@ -86,6 +89,8 @@ type Logger interface {
 
 type null struct{}
 
+func (null) Tracef(format string, args ...interface{}) {}
+func (null) Traceln(args ...interface{})               {}
 func (null) Debugf(format string, args ...interface{}) {}
 func (null) Debugln(args ...interface{})               {}
 func (null) Infof(format string, args ...interface{})  {}
@@ -98,7 +103,27 @@ func (null) Fatalf(format string, args ...interface{}) {}
 func (null) Fatalln(args ...interface{})               {}
 
 type conf struct {
-	lgr Logger
+	lgr         Logger
+	dialTimeout time.Duration
+	errorAsEOF  bool
+	recvQlen    int
+	qWeight     int
+	scaleFactor int
+}
+
+func (cnf *conf) setPostDefault() {
+	if cnf.lgr == nil {
+		cnf.lgr = null{}
+	}
+	if cnf.recvQlen <= 0 {
+		cnf.recvQlen = defaultQlen
+	}
+	if cnf.qWeight <= 0 {
+		cnf.qWeight = defaultQWeight
+	}
+	if cnf.scaleFactor <= 0 {
+		cnf.scaleFactor = defaultScaleFactor
+	}
 }
 
 // Option is used to set options.
@@ -111,13 +136,47 @@ func WithLogger(lgr Logger) Option {
 	}
 }
 
+// WithRecvQlen sets the receive queue length.
+func WithRecvQlen(recvQlen int) Option {
+	return func(c *conf) {
+		c.recvQlen = recvQlen
+	}
+}
+
+// WithScaleFactor sets the scale factors:
+//  qWeight: smaller qWeight results higher message handling concurrency.
+//  scaleFactor: the maximum concurrency per CPU core.
+// You should know what you are doing with these parameters.
+func WithScaleFactor(qWeight, scaleFactor int) Option {
+	return func(c *conf) {
+		c.qWeight = qWeight
+		c.scaleFactor = scaleFactor
+	}
+}
+
+// WithDialTimeout sets the timeout when dialing.
+func WithDialTimeout(timout time.Duration) Option {
+	return func(c *conf) {
+		c.dialTimeout = timout
+	}
+}
+
+// ErrorAsEOF sets the flag with which any error returned by OnConnect()
+// or message's Handle() method is treated as io.EOF and triggers to close
+// the connection.
+func ErrorAsEOF() Option {
+	return func(c *conf) {
+		c.errorAsEOF = true
+	}
+}
+
 // Listener represents a server.
 type Listener struct {
+	conf
+	sync.Mutex
 	l      net.Listener
 	errall errs
-	sync.Mutex
-	conns map[*conn]struct{}
-	lgr   Logger
+	conns  map[*conn]struct{}
 }
 
 func (lnr *Listener) addConn(cn *conn) {
@@ -134,20 +193,18 @@ func (lnr *Listener) delConn(cn *conn) {
 
 // Listen listens the network address and starts serving.
 func Listen(network, address string, options ...Option) (*Listener, error) {
-	l, err := net.Listen(network, address)
-	if err != nil {
-		return nil, err
-	}
 	var cnf conf
 	for _, o := range options {
 		o(&cnf)
 	}
+	cnf.setPostDefault()
 
-	lnr := &Listener{l: l, conns: make(map[*conn]struct{})}
-	if cnf.lgr == nil {
-		cnf.lgr = null{}
+	l, err := net.Listen(network, address)
+	if err != nil {
+		return nil, err
 	}
-	lnr.lgr = cnf.lgr
+
+	lnr := &Listener{conf: cnf, l: l, conns: make(map[*conn]struct{})}
 	return lnr, nil
 }
 
@@ -180,6 +237,9 @@ func (lnr *Listener) logError(err error) {
 }
 
 // Run runs the server's OnConnect method upon each new connection is established.
+// Run will keep running unless:
+//  Signal such as SIGINT SIGHUP SIGTERM was captured.
+//  Close() method of the listener is called by user.
 // The returned error includes all occurred errors before the server is shutdown.
 func (lnr *Listener) Run(server Processor) (retErr error) {
 	defer func() {
@@ -194,7 +254,7 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	go func() {
 		sig := <-sigChan
-		lnr.logError(errorHere(fmt.Errorf("got signal: %s", sig.String())))
+		lnr.errall.addError(errorHere(fmt.Errorf("got signal: %s", sig.String())))
 		lnr.l.Close()
 	}()
 
@@ -209,19 +269,20 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 			}
 			lnr.logError(errorHere(err))
 		}
-		cn := newConn(ctx, c, lnr.lgr)
+		cn := newConn(ctx, c, lnr.conf)
 		wg.Add(1)
 		go func(cn *conn) {
 			lnr.addConn(cn)
 			defer func() {
-				cn.close()
+				cn.Close()
 				lnr.delConn(cn)
 				wg.Done()
 			}()
 			if err := server.OnConnect(cn); err != nil {
-				if errors.Is(err, io.EOF) {
-					cn.close()
-				} else {
+				if lnr.errorAsEOF || errors.Is(err, io.EOF) {
+					cn.Close()
+				}
+				if !errors.Is(err, io.EOF) {
 					lnr.logError(errorHere(err))
 				}
 			}
@@ -230,8 +291,10 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 			}
 		}(cn)
 	}
+	lnr.lgr.Traceln("listener closed, waiting for remaining work")
 	cancel()
 	wg.Wait()
+	lnr.lgr.Traceln("listener done")
 	return
 }
 
@@ -241,42 +304,43 @@ func ListenRun(server Processor, network string, address string, options ...Opti
 	if err != nil {
 		return err
 	}
-
 	return lnr.Run(server)
 }
 
 // Dialer represents a client.
 type Dialer struct {
+	conf
 	errall errs
+	c      net.Conn
 	conn   *conn
-	lgr    Logger
 }
 
-// Dial dials the network address and starts a background receiver
-// waiting for incoming messages.
+// Dial dials the network address.
 func Dial(network, address string, options ...Option) (*Dialer, error) {
-	c, err := net.Dial(network, address)
-	if err != nil {
-		return nil, err
-	}
 	var cnf conf
 	for _, o := range options {
 		o(&cnf)
 	}
+	cnf.setPostDefault()
 
-	dlr := &Dialer{}
-	if cnf.lgr == nil {
-		cnf.lgr = null{}
+	var c net.Conn
+	var err error
+	if cnf.dialTimeout != 0 {
+		c, err = net.DialTimeout(network, address, cnf.dialTimeout)
+	} else {
+		c, err = net.Dial(network, address)
 	}
-	dlr.lgr = cnf.lgr
+	if err != nil {
+		return nil, err
+	}
 
-	dlr.conn = newConn(context.Background(), c, dlr.lgr)
+	dlr := &Dialer{conf: cnf, c: c}
 	return dlr, nil
 }
 
 // Close closes the dialer.
 func (dlr *Dialer) Close() {
-	dlr.conn.close()
+	dlr.conn.Close()
 }
 
 // Errors returns all errors occurred in the Dialer so far.
@@ -289,14 +353,22 @@ func (dlr *Dialer) logError(err error) {
 	dlr.errall.addError(err)
 }
 
-// Run runs client's OnConnect method.
+// Run starts a background receiver waiting for incoming messages, and calls
+// client's OnConnect method. Run will keep running unless:
+//  The connection peer closed.
+//  The OnConnect() method of client returns io.EOF as error.
+//  The Handle() method of the received message returns io.EOF as error.
+//  Signal such as SIGINT SIGHUP SIGTERM was captured.
+//  Close() method of the dialer is called by user.
+// Option ErrorAsEOF() can change the io.EOF behavior.
 // The returned error includes all occurred errors before the client finishes.
 func (dlr *Dialer) Run(client Processor) (retErr error) {
+	dlr.conn = newConn(context.Background(), dlr.c, dlr.conf)
 	defer func() {
 		if len(dlr.errall.errs) != 0 {
 			retErr = &dlr.errall
 		}
-		dlr.conn.close()
+		dlr.conn.Close()
 	}()
 
 	// handle signal
@@ -305,13 +377,14 @@ func (dlr *Dialer) Run(client Processor) (retErr error) {
 	go func() {
 		sig := <-sigChan
 		dlr.errall.addError(errorHere(fmt.Errorf("got signal: %s", sig.String())))
-		dlr.conn.close()
+		dlr.conn.Close()
 	}()
 
 	if err := client.OnConnect(dlr.conn); err != nil {
-		if errors.Is(err, io.EOF) {
-			dlr.conn.close()
-		} else {
+		if dlr.errorAsEOF || errors.Is(err, io.EOF) {
+			dlr.conn.Close()
+		}
+		if !errors.Is(err, io.EOF) {
 			dlr.logError(errorHere(err))
 		}
 	}
