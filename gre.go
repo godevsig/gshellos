@@ -2,10 +2,17 @@ package gshellos
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/gob"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/d5/tengo/v2"
 	"github.com/godevsig/gshellos/log"
@@ -13,23 +20,30 @@ import (
 )
 
 var (
+	logDir    = workDir + "logs/"
 	greLogger *log.Logger
 	greStream = log.NewStream("gre")
+	ggre      *gre // a process can only have one gre instance by design
 )
 
 func init() {
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		panic(err)
+	}
 	// same file shared by multiple gshell processes in append mode.
 	greStream.SetOutput("file:" + workDir + "gre.log")
 }
 
 type gre struct {
+	sync.RWMutex
 	name   string
 	socket string
 	l      *sm.Listener
+	vms    map[string]*vmCtl
 }
 
 type session struct {
-	vm *tengo.VM
+	vc *vmCtl
 }
 
 func newgre(name string) (*gre, error) {
@@ -40,12 +54,14 @@ func newgre(name string) (*gre, error) {
 	gre := &gre{
 		name:   name,
 		socket: workDir + "gre-" + name + ".sock",
+		vms:    make(map[string]*vmCtl),
 	}
 	l, err := sm.Listen("unix", gre.socket, sm.WithLogger(greLogger))
 	if err != nil {
 		return nil, err
 	}
 	gre.l = l
+	ggre = gre
 	return gre, nil
 }
 
@@ -83,32 +99,96 @@ type cmdRunMsg struct {
 	ByteCode    []byte
 }
 
-func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
+func genVMID() string {
+	b := make([]byte, 6)
+	rand.Read(b)
+	id := hex.EncodeToString(b)
+	return id
+}
+
+func (gre *gre) addVM(vc *vmCtl) {
+	gre.Lock()
+	gre.vms[vc.id] = vc
+	gre.Unlock()
+}
+
+func (gre *gre) rmVM(vc *vmCtl) {
+	gre.Lock()
+	delete(gre.vms, vc.id)
+	gre.Unlock()
+}
+
+type vmCtl struct {
+	sync.Mutex
+	*tengo.VM
+	vmErr     error // returned error when VM exits
+	name      string
+	id        string
+	runMsg    *cmdRunMsg
+	stat      string // starting running exited
+	startTime time.Time
+	endTime   time.Time
+}
+
+type null struct{}
+
+func (null) Close() error                  { return nil }
+func (null) Write(buf []byte) (int, error) { return len(buf), nil }
+func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
+
+func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	greLogger.Debugf("cmdRunMsg: file: %v, args: %v, interactive: %v\n", cmd.File, cmd.Args, cmd.Interactive)
 	sh := newShell()
 	bytecode := &tengo.Bytecode{}
-	err = bytecode.Decode(bytes.NewReader(cmd.ByteCode), sh.modules)
+	err := bytecode.Decode(bytes.NewReader(cmd.ByteCode), sh.modules)
+	err = errors.New("test")
 	if err != nil {
-		greLogger.Errorln("cmdRunMsg: decode error:", err)
-		return
+		greLogger.Errorf("cmdRunMsg: decode %s error: %v", cmd.File, err)
+		return nil, errors.New("bad bytecode")
 	}
 
+	name := filepath.Base(cmd.File)
 	vm := tengo.NewVM(bytecode, sh.globals, -1)
 	vm.Args = cmd.Args
+	vc := &vmCtl{
+		VM:     vm,
+		name:   strings.TrimSuffix(name, filepath.Ext(name)),
+		id:     genVMID(),
+		runMsg: cmd,
+		stat:   "starting",
+	}
+
+	ggre.addVM(vc)
+
 	if cmd.Interactive {
 		session := conn.GetContext().(*session)
-		session.vm = vm
+		session.vc = vc
 		greLogger.Traceln("cmdRunMsg: sending redirectMsg")
 		return redirectMsg{}, nil
 	}
 
-	greLogger.Traceln("cmdRunMsg: non-interactive")
-	vmerr := vm.Run()
-	if vmerr != nil {
-		greLogger.Errorln("cmdRunMsg: vm run return error:", vmerr)
-	}
+	go func() {
+		output, err := os.Create(logDir + vc.id)
+		if err != nil {
+			greLogger.Errorln("create output file error:", err)
+			return
+		}
+		defer output.Close()
+		vm.In = null{}
+		vm.Out = output
+		greLogger.Traceln("cmdRunMsg: non-interactive")
+		vc.startTime = time.Now()
+		vc.stat = "running"
+		err = vm.Run()
+		vc.endTime = time.Now()
+		if err != nil {
+			fmt.Fprintln(output, err)
+		}
+		vc.vmErr = err
+		vc.stat = "exited"
+	}()
 
-	return nil, nil
+	return vc.id, nil
 }
 
 type redirectAckMsg struct{}
@@ -117,7 +197,7 @@ func (redirectAckMsg) IsExclusive() {}
 func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	greLogger.Traceln("redirectAckMsg: enter")
 	session := conn.GetContext().(*session)
-	vm := session.vm
+	vm := session.vc.VM
 	vm.In = conn.GetNetConn()
 	vm.Out = conn.GetNetConn()
 

@@ -86,6 +86,8 @@ type Conn interface {
 	// Recv receives an unknown message.
 	// Unknown messages are messages not implementing Message's Handle method.
 	// Note known messages are handled automatically.
+	// If the peer's message handlers return non-nil err, the error will be
+	// returned by Recv() as err.
 	Recv() (msg interface{}, err error)
 
 	// Close closes the Conn, and triggers the termination process of this Conn.
@@ -148,22 +150,29 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 			c.Unlock()
 		}
 
-		if reply != nil { // send reply first
-			c.RLock()
-			err := c.Send(reply)
-			c.RUnlock()
-			if err != nil {
-				c.logError(errorHere(err))
+		if errors.Is(err, io.EOF) {
+			eof = true
+			if reply != nil { // send reply first
+				c.RLock()
+				c.Send(reply)
+				c.RUnlock()
 			}
+			return
 		}
 		if err != nil {
-			if c.errorAsEOF || errors.Is(err, io.EOF) {
-				c.Close()
+			c.logError(errorHere(err))
+			if c.errorAsEOF {
 				eof = true
 			}
-			if !errors.Is(err, io.EOF) {
-				c.logError(errorHere(err))
-			}
+			em := ErrorMsg{Msg: reply, Err: err.Error()}
+			c.RLock()
+			c.Send(em)
+			c.RUnlock()
+		}
+		if reply != nil {
+			c.RLock()
+			c.Send(reply)
+			c.RUnlock()
 		}
 		return
 	}
@@ -182,6 +191,7 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 					return
 				case msg := <-msgs:
 					if eof := handlemsg(msg, false); eof {
+						c.Close()
 						return
 					}
 				}
@@ -204,6 +214,7 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 			} else if emsg, ok := msg.(ExclusiveMessage); ok {
 				c.lgr.Traceln("exclusive message received")
 				if eof := handlemsg(emsg, true); eof {
+					c.Close()
 					break
 				}
 			} else if mmsg, ok := msg.(Message); ok {
@@ -299,7 +310,12 @@ func (c *conn) RecvTimeout(timeout time.Duration) (msg interface{}, err error) {
 	case <-timeQ:
 		err = ErrRecvTimeout
 	case m := <-recvQ:
-		msg = m
+		if em, ok := m.(ErrorMsg); ok {
+			msg = em.Msg
+			err = errors.New(em.Err)
+		} else {
+			msg = m
+		}
 	}
 
 	if err != nil {
@@ -311,6 +327,8 @@ func (c *conn) RecvTimeout(timeout time.Duration) (msg interface{}, err error) {
 // Recv receives an unknown message.
 // Unknown messages are messages not implementing Message's Handle method.
 // Note known messages are handled automatically.
+// If the peer's message handlers return non-nil err, the error will be
+// returned by Recv() as err.
 func (c *conn) Recv() (msg interface{}, err error) {
 	return c.RecvTimeout(0)
 }

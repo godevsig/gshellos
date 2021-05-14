@@ -2,6 +2,7 @@ package gshellos
 
 import (
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -204,8 +205,10 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	gserver.RUnlock()
 	if !ok {
 		tgrec, err := setupgre(req.GreName)
+		//err = fmt.Errorf("reqRunMsg: setup gre %s failed: %v", req.GreName, err) // for test
 		if err != nil {
-			return err, io.EOF // reply err
+			gsLogger.Errorf("reqRunMsg: setup gre %s failed: %v", req.GreName, err)
+			return nil, errors.New("create gre failed")
 		}
 		grec = tgrec
 	}
@@ -219,10 +222,15 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 
 	if !req.Interactive {
 		if err := grec.Send(cmd); err != nil {
-			reply = fmt.Errorf("reqRunMsg: send cmd to gre %s failed: %v", req.GreName, err)
-			gsLogger.Errorln(reply)
+			gsLogger.Errorf("reqRunMsg: send cmd to gre %s failed: %v", req.GreName, err)
+			return nil, errors.New("send cmd to gre failed")
 		}
-		return reply, io.EOF // ??????
+		greRep, err := grec.Recv()
+		if err != nil {
+			gsLogger.Errorf("reqRunMsg: recv msg from gre %s failed: %v", req.GreName, err)
+			return nil, fmt.Errorf("cmd failed: %v", err)
+		}
+		return greRep, nil
 	}
 
 	c, err := net.Dial("unix", grec.socket)
