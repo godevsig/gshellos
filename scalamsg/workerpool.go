@@ -40,7 +40,10 @@ func (wp *WorkerPool) AddWorker(w Worker) {
 	wp.wg.Add(1)
 	go func() {
 		defer func() {
-			done = nil
+			if done != nil {
+				close(done)
+				done = nil
+			}
 			atomic.AddInt32(&wp.cnt, -1)
 			wp.wg.Done()
 		}()
@@ -58,24 +61,28 @@ func (wp *WorkerPool) RmWorker() {
 	for _, pc := range wp.workers {
 		if *pc != nil {
 			pdone = pc
+			break
 		}
 	}
 	if pdone == nil {
 		return
 	}
-	close(*pdone)
+	done := *pdone
 	*pdone = nil
+	close(done)
 }
 
 // Close closes and waits all the workers in the WorkerPool to exit.
 func (wp *WorkerPool) Close() {
 	wp.Lock()
-	defer wp.Unlock()
 	for _, pc := range wp.workers {
 		if *pc != nil {
-			close(*pc)
+			done := *pc
+			*pc = nil
+			close(done)
 		}
 	}
+	wp.Unlock()
 	wp.wg.Wait()
 }
 

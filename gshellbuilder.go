@@ -61,13 +61,11 @@ Commands:
 
     run [-i] <file[.gsh]> [args...]
             Run <file[.gsh]> in a new VM(virtual machine) with its name
-            set to <file> in the designated gRE and return VM ID.
-            A VM ID is a value in the format name-1234567, computed
-            from the file name and all its args. The same file name and
-            same args should produce the same VM ID.
+            set to base name of <file> in the designated gRE and return
+            VM ID which is a 12 digits hex value.
+
             If -i presents, gshell enters interactive mode, keep STDIN
             and STDOUT open until <file[.gsh]> finishes execution.
-
             If no -c presents, the local gRE server is used.
             If no -e presents, the default "master" gRE is used.
 
@@ -78,13 +76,18 @@ Management Commands of gRE:
 
     kill <ID1 ID2 ...|name1 name2 ...>
             Abort the execution of one or more VMs in the designated gRE.
-            If only name provided, it matches all VMs with the name.
 
-    outputs <ID>
-            Print the VM output by ID so far.
+    rm <ID1 ID2 ...|name1 name2 ...>
+            Remove one or more stopped VMs and associated files, running
+            VM can not be removed.
 
-    logs <ID>
-            Print the VM log by ID so far.
+    restart <ID1 ID2 ...|name1 name2 ...>
+            Restart one or more stopped VMs in the designated gRE,
+            no effect on a running VM.
+
+    logs <server|gre|ID>
+            Print the logs of the server or the designated gRE or the VM
+            by ID so far.
 
 gshell enters interactive mode if no options and no commands provided.
 
@@ -261,6 +264,7 @@ func ShellMain() error {
 	remotegREServerAddr := ""
 	greName := ""
 	loglevel := log.Linfo
+	logFlag := log.Ldefault
 	if len(version) == 0 {
 		version = "development"
 	}
@@ -278,8 +282,10 @@ func ShellMain() error {
 			fmt.Println(version)
 			return nil
 		case "-d", "--debug":
-			if loglevel > log.Ltrace {
-				loglevel--
+			loglevel--
+			if loglevel <= log.Ltrace {
+				loglevel = log.Ltrace
+				logFlag = log.Lfileline
 			}
 		case "-c", "--connect": // -c, --connect <hostname:port>
 			if len(args) > 1 {
@@ -297,8 +303,11 @@ func ShellMain() error {
 	}
 
 	gsStream.SetLoglevel("*", loglevel)
+	gsStream.SetFlag(logFlag)
 	gcStream.SetLoglevel("*", loglevel)
+	gcStream.SetFlag(logFlag)
 	greStream.SetLoglevel("*", loglevel)
+	greStream.SetFlag(logFlag)
 
 	cmd := args[0]
 	args = args[1:] // shift
