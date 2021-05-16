@@ -22,6 +22,7 @@ type cmdRun struct {
 	file        string
 	args        []string
 	interactive bool
+	autoRemove  bool
 }
 
 func (c *cmdRun) OnConnect(conn sm.Conn) error {
@@ -51,6 +52,7 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 		File:        c.file,
 		Args:        c.args,
 		Interactive: c.interactive,
+		AutoRemove:  c.autoRemove,
 		ByteCode:    b.Bytes(),
 	}
 
@@ -59,13 +61,12 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 		return err
 	}
 
-	reply, err := conn.Recv()
-	gcLogger.Debugln(reply, err)
-	if err != nil {
-		return err
-	}
-
 	if !c.interactive {
+		reply, err := conn.Recv()
+		gcLogger.Debugln(reply, err)
+		if err != nil {
+			return err
+		}
 		fmt.Println(reply)
 		return io.EOF
 	}

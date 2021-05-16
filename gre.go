@@ -96,6 +96,7 @@ type cmdRunMsg struct {
 	File        string
 	Args        []string
 	Interactive bool
+	AutoRemove  bool
 	ByteCode    []byte
 }
 
@@ -116,18 +117,20 @@ func (gre *gre) rmVM(vc *vmCtl) {
 	gre.Lock()
 	delete(gre.vms, vc.id)
 	gre.Unlock()
+	os.Remove(vc.outputFile.Name())
 }
 
 type vmCtl struct {
 	sync.Mutex
 	*tengo.VM
-	vmErr     error // returned error when VM exits
-	name      string
-	id        string
-	runMsg    *cmdRunMsg
-	stat      string // starting running exited
-	startTime time.Time
-	endTime   time.Time
+	vmErr      error // returned error when VM exits
+	name       string
+	id         string
+	runMsg     *cmdRunMsg
+	stat       string // starting running exited
+	startTime  time.Time
+	endTime    time.Time
+	outputFile *os.File
 }
 
 type null struct{}
@@ -141,7 +144,7 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	sh := newShell()
 	bytecode := &tengo.Bytecode{}
 	err := bytecode.Decode(bytes.NewReader(cmd.ByteCode), sh.modules)
-	err = errors.New("test")
+	//err = errors.New("test") // for test
 	if err != nil {
 		greLogger.Errorf("cmdRunMsg: decode %s error: %v", cmd.File, err)
 		return nil, errors.New("bad bytecode")
@@ -158,6 +161,13 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 		stat:   "starting",
 	}
 
+	output, err := os.Create(logDir + vc.id)
+	if err != nil {
+		greLogger.Errorln("cmdRunMsg: create output file error:", err)
+		return nil, errors.New("output file not created")
+	}
+	vc.outputFile = output
+
 	ggre.addVM(vc)
 
 	if cmd.Interactive {
@@ -168,11 +178,6 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	}
 
 	go func() {
-		output, err := os.Create(logDir + vc.id)
-		if err != nil {
-			greLogger.Errorln("create output file error:", err)
-			return
-		}
 		defer output.Close()
 		vm.In = null{}
 		vm.Out = output
@@ -186,6 +191,10 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 		}
 		vc.vmErr = err
 		vc.stat = "exited"
+		if cmd.AutoRemove {
+			greLogger.Traceln("remove vm ctl")
+			ggre.rmVM(vc)
+		}
 	}()
 
 	return vc.id, nil
@@ -197,14 +206,27 @@ func (redirectAckMsg) IsExclusive() {}
 func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	greLogger.Traceln("redirectAckMsg: enter")
 	session := conn.GetContext().(*session)
-	vm := session.vc.VM
-	vm.In = conn.GetNetConn()
-	vm.Out = conn.GetNetConn()
+	vc := session.vc
+	defer vc.outputFile.Close()
+	vm := vc.VM
 
-	vmerr := vm.Run()
-	if vmerr != nil {
-		fmt.Fprintln(conn.GetNetConn(), vmerr)
+	vm.In = conn.GetNetConn()
+	output := io.MultiWriter(conn.GetNetConn(), vc.outputFile)
+	vm.Out = output
+
+	vc.startTime = time.Now()
+	vc.stat = "running"
+	err = vm.Run()
+	vc.endTime = time.Now()
+	if err != nil {
+		fmt.Fprintln(output, err)
 	}
+	vc.vmErr = err
+	vc.stat = "exited"
+	if vc.runMsg.AutoRemove {
+		ggre.rmVM(vc)
+	}
+
 	greLogger.Traceln("redirectAckMsg: closing")
 	return nil, io.EOF
 }

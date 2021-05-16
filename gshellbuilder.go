@@ -59,13 +59,15 @@ Commands:
             Run <file[.gsh]> in a new VM(virtual machine) in standalone
             mode.
 
-    run [-i] <file[.gsh]> [args...]
+    run [-i --rm] <file[.gsh]> [args...]
             Run <file[.gsh]> in a new VM(virtual machine) with its name
             set to base name of <file> in the designated gRE and return
-            VM ID which is a 12 digits hex value.
+            a 12 hex digits VM ID.
 
-            If -i presents, gshell enters interactive mode, keep STDIN
-            and STDOUT open until <file[.gsh]> finishes execution.
+            -i    Enters interactive mode, keep STDIN and STDOUT
+            open until <file[.gsh]> finishes execution.
+            --rm  Automatically remove the VM when it exits.
+
             If no -c presents, the local gRE server is used.
             If no -e presents, the default "master" gRE is used.
 
@@ -367,23 +369,28 @@ func ShellMain() error {
 	}
 
 	if cmd == "run" { // run [-i] <file[.gsh]> [args...]
+		interactive := false
+		autoRemove := false
+		for len(args) != 0 && args[0][0] == '-' {
+			switch args[0] {
+			case "-i":
+				interactive = true
+			case "--rm":
+				autoRemove = true
+			default:
+				return fmt.Errorf("unknown option %s, see --help", args[0])
+			}
+			args = args[1:] // shift
+		}
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
+		file := args[0]
+		inputFile, _ := filepath.Abs(file)
 		if len(greName) == 0 {
 			greName = "master"
 		}
-		interactive := false
-		if args[0] == "-i" {
-			interactive = true
-			args = args[1:] // shift
-			if len(args) == 0 {
-				return errors.New("no file provided, see --help")
-			}
-		}
-		file := args[0]
-		inputFile, _ := filepath.Abs(file)
-		cmdRun := &cmdRun{greName, inputFile, args, interactive}
+		cmdRun := &cmdRun{greName, inputFile, args, interactive, autoRemove}
 		return sm.DialRun(cmdRun, network, address,
 			sm.ErrorAsEOF(),
 			sm.WithLogger(gcLogger))
