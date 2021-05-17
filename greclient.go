@@ -61,12 +61,13 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 		return err
 	}
 
+	reply, err := conn.Recv()
+	gcLogger.Debugln(reply, err)
+	if err != nil {
+		return err
+	}
+
 	if !c.interactive {
-		reply, err := conn.Recv()
-		gcLogger.Debugln(reply, err)
-		if err != nil {
-			return err
-		}
 		fmt.Println(reply)
 		return io.EOF
 	}

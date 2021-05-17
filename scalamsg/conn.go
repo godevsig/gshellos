@@ -81,21 +81,26 @@ type Conn interface {
 	Context
 
 	// Send sends an arbitrary message.
+	// If msg is an error, it will be received as err, not msg, see Recv().
 	Send(msg interface{}) error
 
-	// Recv receives an unknown message.
-	// Unknown messages are messages not implementing Message's Handle method.
-	// Note known messages are handled automatically.
+	// Recv receives an unknown message in auto mode(by default) or the next
+	// arbitrary message in raw mode.
+	// Known messages are messages that implement Handle method.
+	// In auto mode all known messages are handled automatically.
+	// In raw mode, no message will be automatically handled, so Recv receives
+	// all the messages.
+	//
 	// If the peer's message handlers return non-nil err, the error will be
-	// returned by Recv() as err.
+	// returned by Recv() as err. Receiving on closed connection will return
+	// ErrClosed.
 	Recv() (msg interface{}, err error)
 
 	// Close closes the Conn, and triggers the termination process of this Conn.
-	Close()
+	Close() error
 
-	// RecvTimeout receives an unknown message within timeout.
-	// It returns ErrRecvTimeout if timout happens, ErrClosed if the connection
-	// was closed.
+	// RecvTimeout is Recv with timeout, not supported in raw mode.
+	// It returns ErrRecvTimeout if timout happens in addition to Recv.
 	RecvTimeout(timeout time.Duration) (msg interface{}, err error)
 
 	// GetNetConn gets the raw network connection.
@@ -134,9 +139,11 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 		netConn:     netConn,
 		enc:         gob.NewEncoder(netConn),
 		dec:         gob.NewDecoder(netConn),
-		recvQ:       make(chan interface{}, cnf.recvQlen),
 		closeQ:      make(chan struct{}),
-		done:        make(chan struct{}),
+	}
+	if !cnf.raw {
+		c.recvQ = make(chan interface{}, cnf.recvQlen)
+		c.done = make(chan struct{})
 	}
 	c.lgr.Traceln("new connection established")
 
@@ -152,22 +159,12 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 
 		if errors.Is(err, io.EOF) {
 			eof = true
-			if reply != nil { // send reply first
-				c.RLock()
-				c.Send(reply)
-				c.RUnlock()
-			}
-			return
-		}
-		if err != nil {
-			c.logError(errorHere(err))
+		} else if err != nil {
+			//c.logError(errorHere(err))
 			if c.errorAsEOF {
 				eof = true
 			}
-			em := ErrorMsg{Msg: reply, Err: err.Error()}
-			c.RLock()
-			c.Send(em)
-			c.RUnlock()
+			reply = ErrorMsg{Msg: reply, Err: err.Error()}
 		}
 		if reply != nil {
 			c.RLock()
@@ -177,8 +174,8 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 		return
 	}
 
-	qlen := cnf.qWeight * cnf.scaleFactor * runtime.NumCPU()
 	receiver := func() {
+		qlen := cnf.qWeight * cnf.scaleFactor * runtime.NumCPU()
 		c.lgr.Traceln("receiver started")
 		msgs := make(chan Message, qlen)
 		worker := func(done <-chan struct{}) {
@@ -247,14 +244,17 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 		c.lgr.Traceln("receiver done")
 	}
 
-	go func() {
-		receiver()
-		c.done <- struct{}{}
-	}()
+	if !cnf.raw {
+		go func() { // auto mode by default
+			receiver()
+			c.done <- struct{}{}
+		}()
+	}
+
 	return c
 }
 
-func (c *conn) Close() {
+func (c *conn) Close() error {
 	c.Lock()
 	defer c.Unlock()
 	if c.closeQ != nil {
@@ -263,11 +263,14 @@ func (c *conn) Close() {
 		c.closeQ = nil
 		c.netConn.Close()
 	}
+	return nil
 }
 
 // Wait waits the connection to finish, returns all occurred errors if any.
 func (c *conn) wait() (err error) {
-	<-c.done
+	if !c.conf.raw {
+		<-c.done
+	}
 	if len(c.errall.errs) != 0 {
 		err = &c.errall
 	}
@@ -282,21 +285,21 @@ func (c *conn) Errors() (err error) {
 	return
 }
 
-// Send sends an arbitrary message.
 func (c *conn) Send(msg interface{}) error {
+	if err, ok := msg.(error); ok { // if msg is an error
+		msg = ErrorMsg{Err: err.Error()}
+	}
 	// to be able to decode directly into an interface variable,
 	// we need to encode it as reference of the interface
 	err := c.enc.Encode(&msg)
-	if err != nil {
-		c.logError(errorHere(err))
-	}
 	return err
 }
 
-// RecvTimeout receives an unknown message within timeout.
-// It returns ErrRecvTimeout if timout happens, ErrClosed if the connection
-// was closed.
 func (c *conn) RecvTimeout(timeout time.Duration) (msg interface{}, err error) {
+	if c.conf.raw {
+		return nil, errors.New("not supported in raw mode")
+	}
+
 	timeQ := nilQ
 	if timeout > 0 {
 		timeQ = time.After(timeout)
@@ -317,23 +320,29 @@ func (c *conn) RecvTimeout(timeout time.Duration) (msg interface{}, err error) {
 			msg = m
 		}
 	}
+	return
+}
 
+func (c *conn) Recv() (msg interface{}, err error) {
+	if !c.conf.raw {
+		return c.RecvTimeout(0)
+	}
+
+	err = c.dec.Decode(&msg)
 	if err != nil {
-		c.logError(errorHere(err))
+		if errors.Is(err, io.EOF) ||
+			strings.Contains(err.Error(), "use of closed network connection") {
+			return nil, ErrClosed
+		}
+		return nil, err
+	}
+	if em, ok := msg.(ErrorMsg); ok {
+		msg = em.Msg
+		err = errors.New(em.Err)
 	}
 	return
 }
 
-// Recv receives an unknown message.
-// Unknown messages are messages not implementing Message's Handle method.
-// Note known messages are handled automatically.
-// If the peer's message handlers return non-nil err, the error will be
-// returned by Recv() as err.
-func (c *conn) Recv() (msg interface{}, err error) {
-	return c.RecvTimeout(0)
-}
-
-// GetNetConn gets the raw network connection.
 func (c *conn) GetNetConn() net.Conn {
 	return c.netConn
 }

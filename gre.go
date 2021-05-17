@@ -171,6 +171,7 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	ggre.addVM(vc)
 
 	if cmd.Interactive {
+		conn.Send(vc.id)
 		session := conn.GetContext().(*session)
 		session.vc = vc
 		greLogger.Traceln("cmdRunMsg: sending redirectMsg")
