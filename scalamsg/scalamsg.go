@@ -27,6 +27,36 @@ var (
 	ErrRecvTimeout = errors.New("recv timeout")
 )
 
+type sigCleaner struct {
+	sync.Mutex
+	toDo []io.Closer
+}
+
+func (sc *sigCleaner) addToDo(c io.Closer) {
+	sc.Lock()
+	sc.toDo = append(sc.toDo, c)
+	sc.Unlock()
+}
+func (sc *sigCleaner) close() {
+	sc.Lock()
+	for _, c := range gsigCleaner.toDo {
+		c.Close()
+	}
+	sc.Unlock()
+}
+
+var gsigCleaner sigCleaner
+
+func init() {
+	// handle signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		gsigCleaner.close()
+	}()
+}
+
 func errorHere(err interface{}) error {
 	_, file, line, _ := runtime.Caller(1)
 	return fmt.Errorf("(%s:%d): %v", path.Base(file), line, err)
@@ -103,6 +133,7 @@ func (null) Fatalf(format string, args ...interface{}) {}
 func (null) Fatalln(args ...interface{})               {}
 
 type conf struct {
+	raw         bool
 	lgr         Logger
 	dialTimeout time.Duration
 	errorAsEOF  bool
@@ -128,6 +159,15 @@ func (cnf *conf) setPostDefault() {
 
 // Option is used to set options.
 type Option func(*conf)
+
+// RawMode sets scalamsg to run in raw mode.
+// In raw mode, no receiver is reading the connection and automatically
+// calling the message's Handle method.
+func RawMode() Option {
+	return func(c *conf) {
+		c.raw = true
+	}
+}
 
 // WithLogger sets logger.
 func WithLogger(lgr Logger) Option {
@@ -250,13 +290,7 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 	}()
 
 	// handle signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
-	go func() {
-		sig := <-sigChan
-		lnr.errall.addError(errorHere(fmt.Errorf("got signal: %s", sig.String())))
-		lnr.l.Close()
-	}()
+	gsigCleaner.addToDo(lnr.l)
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
@@ -372,24 +406,18 @@ func (dlr *Dialer) Run(client Processor) (retErr error) {
 	}()
 
 	// handle signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
-	go func() {
-		sig := <-sigChan
-		dlr.errall.addError(errorHere(fmt.Errorf("got signal: %s", sig.String())))
-		dlr.conn.Close()
-	}()
+	gsigCleaner.addToDo(dlr.conn)
 
 	if err := client.OnConnect(dlr.conn); err != nil {
 		if dlr.errorAsEOF || errors.Is(err, io.EOF) {
 			dlr.conn.Close()
 		}
 		if !errors.Is(err, io.EOF) {
-			dlr.logError(errorHere(err))
+			dlr.logError(fmt.Errorf("client OnConnect error: %v", err))
 		}
 	}
 	if err := dlr.conn.wait(); err != nil {
-		dlr.errall.addError(errorHere(err))
+		dlr.errall.addError(err)
 	}
 	return
 }

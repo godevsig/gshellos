@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -229,31 +228,37 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 		return grec.Recv()
 	}
 
-	c, err := net.Dial("unix", grec.socket)
+	onConnect := func(c sm.Conn) error {
+		if err := c.Send(cmd); err != nil {
+			gsLogger.Errorf("reqRunMsg: send cmd to gre %s failed: %v", req.GreName, err)
+			conn.Send(errors.New("send cmd to gre failed"))
+			return io.EOF
+		}
+		msg, err := c.Recv()
+		if err != nil {
+			gsLogger.Errorf("reqRunMsg: recv from gre %s failed: %v", req.GreName, err)
+			conn.Send(err)
+			return io.EOF
+		}
+		conn.Send(msg)
+		gsLogger.Traceln("reqRunMsg: forwarding io")
+		done := make(chan struct{}, 2)
+		copy := func(dst io.Writer, src io.Reader) {
+			io.Copy(dst, src)
+			done <- struct{}{}
+		}
+		go copy(c.GetNetConn(), conn.GetNetConn())
+		go copy(conn.GetNetConn(), c.GetNetConn())
+
+		<-done
+		gsLogger.Traceln("reqRunMsg: closing connection")
+		return io.EOF
+	}
+
+	err := sm.DialRun(sm.OnConnectFunc(onConnect), "unix", grec.socket, sm.RawMode(), sm.ErrorAsEOF())
 	if err != nil {
-		gsLogger.Errorln("reqRunMsg: dial failed:", err)
-		return nil, io.EOF
+		return nil, err
 	}
-	defer c.Close()
-
-	var icmd interface{} = cmd
-	enc := gob.NewEncoder(c)
-	if err := enc.Encode(&icmd); err != nil {
-		gsLogger.Errorln("reqRunMsg: cmd not sent:", err)
-		return nil, io.EOF
-	}
-
-	gsLogger.Traceln("reqRunMsg: forwarding io")
-	done := make(chan struct{}, 2)
-	copy := func(dst io.Writer, src io.Reader) {
-		io.Copy(dst, src)
-		done <- struct{}{}
-	}
-	go copy(c, conn.GetNetConn())
-	go copy(conn.GetNetConn(), c)
-
-	<-done
-	gsLogger.Traceln("reqRunMsg: closing connection")
 	return nil, io.EOF
 }
 
