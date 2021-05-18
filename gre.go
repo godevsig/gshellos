@@ -26,6 +26,12 @@ var (
 	ggre      *gre // a process can only have one gre instance by design
 )
 
+type null struct{}
+
+func (null) Close() error                  { return nil }
+func (null) Write(buf []byte) (int, error) { return len(buf), nil }
+func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
+
 func init() {
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		panic(err)
@@ -39,6 +45,7 @@ type gre struct {
 	name   string
 	socket string
 	l      *sm.Listener
+	vmids  []string // keep the order
 	vms    map[string]*vmCtl
 }
 
@@ -92,14 +99,6 @@ func (gre *gre) OnConnect(conn sm.Conn) error {
 	return nil
 }
 
-type cmdRunMsg struct {
-	File        string
-	Args        []string
-	Interactive bool
-	AutoRemove  bool
-	ByteCode    []byte
-}
-
 func genVMID() string {
 	b := make([]byte, 6)
 	rand.Read(b)
@@ -109,35 +108,70 @@ func genVMID() string {
 
 func (gre *gre) addVM(vc *vmCtl) {
 	gre.Lock()
-	gre.vms[vc.id] = vc
+	gre.vmids = append(gre.vmids, vc.ID)
+	gre.vms[vc.ID] = vc
 	gre.Unlock()
 }
 
 func (gre *gre) rmVM(vc *vmCtl) {
 	gre.Lock()
-	delete(gre.vms, vc.id)
+	delete(gre.vms, vc.ID)
+	vmids := make([]string, 0, len(gre.vmids)-1)
+	for _, vmid := range gre.vmids {
+		if vmid != vc.ID {
+			vmids = append(vmids, vmid)
+		}
+	}
+	gre.vmids = vmids
 	gre.Unlock()
 	os.Remove(vc.outputFile.Name())
 }
 
+type vmInfo struct {
+	VMErr     string
+	Name      string
+	ID        string
+	Args      []string
+	Stat      string // starting running exited
+	StartTime time.Time
+	EndTime   time.Time
+}
+
 type vmCtl struct {
 	sync.Mutex
+	vmInfo
 	*tengo.VM
 	vmErr      error // returned error when VM exits
-	name       string
-	id         string
 	runMsg     *cmdRunMsg
-	stat       string // starting running exited
-	startTime  time.Time
-	endTime    time.Time
 	outputFile *os.File
 }
 
-type null struct{}
+type cmdPsMsg struct{}
 
-func (null) Close() error                  { return nil }
-func (null) Write(buf []byte) (int, error) { return len(buf), nil }
-func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
+type greVMInfo struct {
+	Name    string
+	VMInfos []*vmInfo
+}
+
+func (cmd cmdPsMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	gvi := &greVMInfo{Name: ggre.name, VMInfos: make([]*vmInfo, 0, len(ggre.vmids))}
+	ggre.RLock()
+	for i := len(ggre.vmids) - 1; i >= 0; i-- { // in reverse order
+		vmid := ggre.vmids[i]
+		vc := ggre.vms[vmid]
+		gvi.VMInfos = append(gvi.VMInfos, &vc.vmInfo)
+	}
+	ggre.RUnlock()
+	return gvi, nil
+}
+
+type cmdRunMsg struct {
+	File        string
+	Args        []string
+	Interactive bool
+	AutoRemove  bool
+	ByteCode    []byte
+}
 
 func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	greLogger.Debugf("cmdRunMsg: file: %v, args: %v, interactive: %v\n", cmd.File, cmd.Args, cmd.Interactive)
@@ -155,13 +189,14 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	vm.Args = cmd.Args
 	vc := &vmCtl{
 		VM:     vm,
-		name:   strings.TrimSuffix(name, filepath.Ext(name)),
-		id:     genVMID(),
 		runMsg: cmd,
-		stat:   "starting",
 	}
+	vc.Name = strings.TrimSuffix(name, filepath.Ext(name))
+	vc.ID = genVMID()
+	vc.vmInfo.Args = cmd.Args
+	vc.Stat = "starting"
 
-	output, err := os.Create(logDir + vc.id)
+	output, err := os.Create(logDir + vc.ID)
 	if err != nil {
 		greLogger.Errorln("cmdRunMsg: create output file error:", err)
 		return nil, errors.New("output file not created")
@@ -171,7 +206,7 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	ggre.addVM(vc)
 
 	if cmd.Interactive {
-		conn.Send(vc.id)
+		conn.Send(vc.ID)
 		session := conn.GetContext().(*session)
 		session.vc = vc
 		greLogger.Traceln("cmdRunMsg: sending redirectMsg")
@@ -183,22 +218,23 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 		vm.In = null{}
 		vm.Out = output
 		greLogger.Traceln("cmdRunMsg: non-interactive")
-		vc.startTime = time.Now()
-		vc.stat = "running"
+		vc.StartTime = time.Now()
+		vc.Stat = "running"
 		err = vm.Run()
-		vc.endTime = time.Now()
+		vc.EndTime = time.Now()
 		if err != nil {
+			vc.vmErr = err
+			vc.VMErr = err.Error()
 			fmt.Fprintln(output, err)
 		}
-		vc.vmErr = err
-		vc.stat = "exited"
+		vc.Stat = "exited"
 		if cmd.AutoRemove {
 			greLogger.Traceln("remove vm ctl")
 			ggre.rmVM(vc)
 		}
 	}()
 
-	return vc.id, nil
+	return vc.ID, nil
 }
 
 type redirectAckMsg struct{}
@@ -215,15 +251,17 @@ func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	output := io.MultiWriter(conn.GetNetConn(), vc.outputFile)
 	vm.Out = output
 
-	vc.startTime = time.Now()
-	vc.stat = "running"
+	vc.StartTime = time.Now()
+	vc.Stat = "running"
 	err = vm.Run()
-	vc.endTime = time.Now()
+	vc.EndTime = time.Now()
 	if err != nil {
+		vc.vmErr = err
+		vc.VMErr = err.Error()
 		fmt.Fprintln(output, err)
 	}
-	vc.vmErr = err
-	vc.stat = "exited"
+
+	vc.Stat = "exited"
 	if vc.runMsg.AutoRemove {
 		ggre.rmVM(vc)
 	}
@@ -235,4 +273,6 @@ func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 func init() {
 	gob.Register(redirectAckMsg{})
 	gob.Register(&cmdRunMsg{})
+	gob.Register(cmdPsMsg{})
+	gob.Register(&greVMInfo{})
 }

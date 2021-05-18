@@ -41,6 +41,25 @@ type greConn struct {
 	sm.Conn // built-in conn to the gre
 }
 
+func (s *server) addGreConn(name string, grec *greConn) {
+	s.Lock()
+	s.greConns[name] = grec
+	s.Unlock()
+}
+
+func (s *server) rmGreConn(name string) {
+	s.Lock()
+	delete(s.greConns, name)
+	s.Unlock()
+}
+
+func (s *server) getGreConn(name string) *greConn {
+	s.RLock()
+	grec := s.greConns[name]
+	s.RUnlock()
+	return grec
+}
+
 func (s *server) OnConnect(conn sm.Conn) error {
 	gsLogger.Debugln("new connection", conn.GetNetConn().RemoteAddr().String())
 	return nil
@@ -59,9 +78,7 @@ func setupgre(name string) (*greConn, error) {
 		var err error
 		defer func() {
 			gsLogger.Errorf("%s gre terminated unexpectedly", name)
-			gserver.Lock()
-			delete(gserver.greConns, name)
-			gserver.Unlock()
+			gserver.rmGreConn(name)
 			gre.clean()
 			if perr := recover(); perr != nil {
 				gsLogger.Errorf("%s gre runtime panic: %v", name, perr)
@@ -81,9 +98,7 @@ func setupgre(name string) (*greConn, error) {
 	grecChan := make(chan *greConn)
 	onConnect := func(conn sm.Conn) error {
 		grec := &greConn{gre, conn}
-		gserver.Lock()
-		gserver.greConns[name] = grec
-		gserver.Unlock()
+		gserver.addGreConn(name, grec)
 		grecChan <- grec
 		return nil
 	}
@@ -91,9 +106,7 @@ func setupgre(name string) (*greConn, error) {
 	go func() {
 		var err error
 		defer func() {
-			gserver.Lock()
-			delete(gserver.greConns, name)
-			gserver.Unlock()
+			gserver.rmGreConn(name)
 			gsLogger.Infof("closing gre %s due to connection lost", name)
 			gre.close() // shut down the gre
 			if perr := recover(); perr != nil {
@@ -186,23 +199,61 @@ func runServer(version, port string) error {
 	return nil
 }
 
-type reqRunMsg struct {
-	GreName     string
-	File        string
-	Args        []string
-	Interactive bool
-	AutoRemove  bool
-	ByteCode    []byte
+type reqPsMsg = cmdPs
+
+func (req reqPsMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	getGreVMInfo := func(grec *greConn) (*greVMInfo, error) {
+		if err := grec.Send(cmdPsMsg{}); err != nil {
+			gsLogger.Errorf("reqPsMsg: send cmd to gre %s failed: %v", req.GreName, err)
+			return nil, err
+		}
+		gvi, err := grec.Recv()
+		if err != nil {
+			gsLogger.Errorf("reqPsMsg: recv from gre %s failed: %v", req.GreName, err)
+			return nil, err
+		}
+		return gvi.(*greVMInfo), nil
+	}
+
+	var gvis []*greVMInfo
+
+	if len(req.GreName) != 0 {
+		grec := gserver.getGreConn(req.GreName)
+		if grec == nil {
+			return nil, errors.New(req.GreName + "gre not present")
+		}
+		gvi, err := getGreVMInfo(grec)
+		if err != nil {
+			return nil, err
+		}
+		gvis = append(gvis, gvi)
+	} else {
+		gserver.RLock()
+		for _, grec := range gserver.greConns {
+			func() {
+				gserver.RUnlock()
+				defer gserver.RLock()
+				gvi, err := getGreVMInfo(grec)
+				if err != nil {
+					return
+				}
+				gvis = append(gvis, gvi)
+			}()
+		}
+		gserver.RUnlock()
+	}
+
+	return gvis, nil
 }
+
+type reqRunMsg = cmdRun
 
 func (*reqRunMsg) IsExclusive() {}
 func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	gsLogger.Debugf("reqRunMsg: file: %v, args: %v, interactive: %v", req.File, req.Args, req.Interactive)
 
-	gserver.RLock()
-	grec, ok := gserver.greConns[req.GreName]
-	gserver.RUnlock()
-	if !ok {
+	grec := gserver.getGreConn(req.GreName)
+	if grec == nil {
 		tgrec, err := setupgre(req.GreName)
 		//err = errors.New("test") // for test
 		if err != nil {
@@ -263,5 +314,5 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 }
 
 func init() {
-	gob.Register(&reqRunMsg{})
+	gob.Register([]*greVMInfo{})
 }
