@@ -368,6 +368,12 @@ func ShellMain() error {
 		address = remotegREServerAddr
 	}
 
+	clientRun := func(client sm.Processor) error {
+		return sm.DialRun(client, network, address,
+			sm.ErrorAsEOF(),
+			sm.WithLogger(gcLogger))
+	}
+
 	if cmd == "run" { // run [-i] <file[.gsh]> [args...]
 		interactive := false
 		autoRemove := false
@@ -390,15 +396,15 @@ func ShellMain() error {
 		if len(greName) == 0 {
 			greName = "master"
 		}
-		cmdRun := &cmdRun{greName, inputFile, args, interactive, autoRemove}
-		return sm.DialRun(cmdRun, network, address,
-			sm.ErrorAsEOF(),
-			sm.WithLogger(gcLogger))
+		cmdRun := &cmdRun{greName, inputFile, args, interactive, autoRemove, nil}
+		return clientRun(cmdRun)
+	}
+
+	if cmd == "ps" {
+		cmdPs := cmdPs{greName}
+		return clientRun(cmdPs)
 	}
 	/*
-		if cmd == "ps" {
-			return greClient.ps()
-		}
 		if cmd == "kill" {
 			return greClient.kill()
 		}

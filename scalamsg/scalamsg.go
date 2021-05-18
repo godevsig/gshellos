@@ -413,7 +413,7 @@ func (dlr *Dialer) Run(client Processor) (retErr error) {
 			dlr.conn.Close()
 		}
 		if !errors.Is(err, io.EOF) {
-			dlr.logError(fmt.Errorf("client OnConnect error: %v", err))
+			dlr.errall.addError(fmt.Errorf("client OnConnect error: %v", err))
 		}
 	}
 	if err := dlr.conn.wait(); err != nil {

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/godevsig/gshellos/log"
 	sm "github.com/godevsig/gshellos/scalamsg"
@@ -17,20 +18,66 @@ var (
 	gcLogger = gcStream.NewLogger("gre client", log.Linfo)
 )
 
+type cmdPs struct {
+	GreName string
+}
+
+func (c cmdPs) OnConnect(conn sm.Conn) error {
+	if err := conn.Send(c); err != nil {
+		gcLogger.Errorln("send cmd failed:", err)
+		return err
+	}
+	reply, err := conn.Recv()
+	if err != nil {
+		return err
+	}
+	gvis := reply.([]*greVMInfo)
+	for _, gvi := range gvis {
+		fmt.Println("gre:", gvi.Name)
+		fmt.Println("VM ID         NAME          CREATED              STATUS")
+		for _, vmi := range gvi.VMInfos {
+			name := vmi.Name
+			if len(name) > 12 {
+				name = name[:12]
+			}
+			created := vmi.StartTime.Format("2006/01/02 15:04:05")
+			stat := vmi.Stat
+			switch stat {
+			case "exited":
+				ret := ":OK"
+				if len(vmi.VMErr) != 0 {
+					ret = ":ERR"
+				}
+				stat = stat + ret
+				d := vmi.EndTime.Sub(vmi.StartTime)
+				stat = fmt.Sprintf("%-10s %v", stat, d)
+			case "running":
+				d := time.Since(vmi.StartTime)
+				stat = fmt.Sprintf("%-10s %v", stat, d)
+			}
+
+			fmt.Printf("%s  %-12s  %s  %s\n", vmi.ID, vmi.Name, created, stat)
+		}
+	}
+
+	return io.EOF
+}
+
 type cmdRun struct {
-	greName     string
-	file        string
-	args        []string
-	interactive bool
-	autoRemove  bool
+	GreName     string
+	File        string
+	Args        []string
+	Interactive bool
+	AutoRemove  bool
+	ByteCode    []byte
 }
 
 func (c *cmdRun) OnConnect(conn sm.Conn) error {
 	gcLogger.Debugln("connected to gre server")
 	sh := newShell()
 	var b bytes.Buffer
-	if filepath.Ext(c.file) == ".gsh" {
-		bytecode, err := sh.compile(c.file)
+	if filepath.Ext(c.File) == ".gsh" {
+		bytecode, err := sh.compile(c.File)
 		if err != nil {
 			return err
 		}
@@ -39,25 +86,17 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 			return err
 		}
 	} else {
-		f, err := os.Open(c.file)
+		f, err := os.Open(c.File)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
 		b.ReadFrom(f)
 	}
-
-	msg := &reqRunMsg{
-		GreName:     c.greName,
-		File:        c.file,
-		Args:        c.args,
-		Interactive: c.interactive,
-		AutoRemove:  c.autoRemove,
-		ByteCode:    b.Bytes(),
-	}
+	c.ByteCode = b.Bytes()
 
 	gcLogger.Debugln("sending run request")
-	if err := conn.Send(msg); err != nil {
+	if err := conn.Send(c); err != nil {
 		return err
 	}
 
@@ -67,8 +106,10 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 		return err
 	}
 
-	if !c.interactive {
-		fmt.Println(reply)
+	if !c.Interactive {
+		if !c.AutoRemove {
+			fmt.Println(reply)
+		}
 		return io.EOF
 	}
 	return nil
@@ -91,5 +132,7 @@ func (redirectMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 }
 
 func init() {
+	gob.Register(&cmdRun{})
 	gob.Register(redirectMsg{})
+	gob.Register(cmdPs{})
 }

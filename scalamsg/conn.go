@@ -160,7 +160,7 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 		if errors.Is(err, io.EOF) {
 			eof = true
 		} else if err != nil {
-			//c.logError(errorHere(err))
+			c.logError(errorHere(err))
 			if c.errorAsEOF {
 				eof = true
 			}
@@ -168,8 +168,11 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 		}
 		if reply != nil {
 			c.RLock()
-			c.Send(reply)
+			err := c.Send(reply)
 			c.RUnlock()
+			if err != nil {
+				c.logError(errorHere(err))
+			}
 		}
 		return
 	}
@@ -195,8 +198,6 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 			}
 		}
 		wp := NewWorkerPool()
-		wp.AddWorker(worker)
-		c.lgr.Traceln("worker added")
 		for {
 			var msg interface{}
 			if err := c.dec.Decode(&msg); err != nil {
