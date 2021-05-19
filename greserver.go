@@ -199,50 +199,89 @@ func runServer(version, port string) error {
 	return nil
 }
 
-type reqPsMsg = cmdPs
+// return specified gre or all gres
+func greConnsByName(greName string) (grecs []*greConn) {
+	if len(greName) != 0 {
+		grec := gserver.getGreConn(greName)
+		if grec != nil {
+			grecs = append(grecs, grec)
+		}
+	} else {
+		gserver.RLock()
+		for _, grec := range gserver.greConns {
+			grecs = append(grecs, grec)
+		}
+		gserver.RUnlock()
+	}
+	return
+}
 
-func (req reqPsMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+type reqKillMsg = cmdKill
+
+type greVMIDs struct {
+	Name  string
+	VMIDs []string
+}
+
+func (req reqKillMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	grecs := greConnsByName(req.GreName)
+	if len(grecs) == 0 {
+		return nil, errors.New("gre not found")
+	}
+
+	killIDPatten := func(grec *greConn) (*greVMIDs, error) {
+		if err := grec.Send(cmdKillMsg{req.IDPatten}); err != nil {
+			gsLogger.Errorf("killIDPatten: send cmd to gre %s failed: %v", grec.name, err)
+			return nil, err
+		}
+		ids, err := grec.Recv()
+		if err != nil {
+			gsLogger.Errorf("killIDPatten: recv from gre %s failed: %v", grec.name, err)
+			return nil, err
+		}
+		return &greVMIDs{grec.name, ids.([]string)}, nil
+	}
+
+	var killed []*greVMIDs
+	for _, grec := range grecs {
+		gvi, err := killIDPatten(grec)
+		if err != nil {
+			continue
+		}
+		killed = append(killed, gvi)
+	}
+	return killed, nil
+}
+
+type reqQueryMsg = cmdQuery
+
+func (req reqQueryMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	grecs := greConnsByName(req.GreName)
+	if len(grecs) == 0 {
+		return nil, errors.New("gre not found")
+	}
+
 	getGreVMInfo := func(grec *greConn) (*greVMInfo, error) {
-		if err := grec.Send(cmdPsMsg{}); err != nil {
-			gsLogger.Errorf("reqPsMsg: send cmd to gre %s failed: %v", req.GreName, err)
+		if err := grec.Send(cmdQueryMsg{req.IDPatten}); err != nil {
+			gsLogger.Errorf("getGreVMInfo: send cmd to gre %s failed: %v", grec.name, err)
 			return nil, err
 		}
 		gvi, err := grec.Recv()
 		if err != nil {
-			gsLogger.Errorf("reqPsMsg: recv from gre %s failed: %v", req.GreName, err)
+			gsLogger.Errorf("getGreVMInfo: recv from gre %s failed: %v", grec.name, err)
 			return nil, err
 		}
 		return gvi.(*greVMInfo), nil
 	}
 
 	var gvis []*greVMInfo
-
-	if len(req.GreName) != 0 {
-		grec := gserver.getGreConn(req.GreName)
-		if grec == nil {
-			return nil, errors.New(req.GreName + "gre not present")
-		}
+	for _, grec := range grecs {
 		gvi, err := getGreVMInfo(grec)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		gvis = append(gvis, gvi)
-	} else {
-		gserver.RLock()
-		for _, grec := range gserver.greConns {
-			func() {
-				gserver.RUnlock()
-				defer gserver.RLock()
-				gvi, err := getGreVMInfo(grec)
-				if err != nil {
-					return
-				}
-				gvis = append(gvis, gvi)
-			}()
-		}
-		gserver.RUnlock()
 	}
-
 	return gvis, nil
 }
 
@@ -315,4 +354,5 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 
 func init() {
 	gob.Register([]*greVMInfo{})
+	gob.Register([]*greVMIDs{})
 }

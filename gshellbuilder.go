@@ -38,10 +38,6 @@ Options:
             Gshell connects to the remote gRE server if -c provided,
             otherwise the local gRE server is used.
 
-            The named gRE instance will be created before the
-            execution of the following command if it has not been
-            created by the remote/local gRE server.
-
     -d, --debug     Enable debug loglevel, -d -d makes more verbose log.
     -h, --help      Show this message.
     -v, --version   Show version information.
@@ -64,28 +60,29 @@ Commands:
             set to base name of <file> in the designated gRE and return
             a 12 hex digits VM ID.
 
-            -i    Enters interactive mode, keep STDIN and STDOUT
+            -i    Enter interactive mode, keep STDIN and STDOUT
             open until <file[.gsh]> finishes execution.
             --rm  Automatically remove the VM when it exits.
 
             If no -c presents, the local gRE server is used.
             If no -e presents, the default "master" gRE is used.
 
-Management Commands of gRE:
-    ps
-            List all VM instances in all gREs in the local/remote gRE server.
-            If -e presents, only list the VMs in the designated gRE.
+            The named gRE instance will be created to run <file[.gsh]>
+            if it has not been created by the remote/local gRE server.
+
+Management Commands of gRE and VM:
+    ps [ID1 ID2 ...|name1 name2 ...]
+            List VM instances in the local/remote gRE server.
 
     kill <ID1 ID2 ...|name1 name2 ...>
-            Abort the execution of one or more VMs in the designated gRE.
+            Abort the execution of one or more VMs.
 
     rm <ID1 ID2 ...|name1 name2 ...>
             Remove one or more stopped VMs and associated files, running
             VM can not be removed.
 
     restart <ID1 ID2 ...|name1 name2 ...>
-            Restart one or more stopped VMs in the designated gRE,
-            no effect on a running VM.
+            Restart one or more stopped VMs, no effect on a running VM.
 
     logs <server|gre|ID>
             Print the logs of the server or the designated gRE or the VM
@@ -401,13 +398,19 @@ func ShellMain() error {
 	}
 
 	if cmd == "ps" {
-		cmdPs := cmdPs{greName}
+		cmdPs := cmdQuery{GreName: greName, IDPatten: args}
 		return clientRun(cmdPs)
 	}
-	/*
-		if cmd == "kill" {
-			return greClient.kill()
+
+	if cmd == "kill" {
+		if len(args) == 0 {
+			return errors.New("no vm id provided, see --help")
 		}
+		cmdKill := cmdKill{GreName: greName, IDPatten: args}
+		return clientRun(cmdKill)
+	}
+	/*
+
 		if cmd == "outputs" {
 			return greClient.outputs()
 		}

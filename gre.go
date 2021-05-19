@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/d5/tengo/v2"
@@ -127,6 +128,20 @@ func (gre *gre) rmVM(vc *vmCtl) {
 	os.Remove(vc.outputFile.Name())
 }
 
+const (
+	vmStatStarting int32 = iota
+	vmStatRunning
+	vmStatAborting
+	vmStatExited
+)
+
+var vmStatString = []string{
+	vmStatStarting: "starting",
+	vmStatRunning:  "running",
+	vmStatAborting: "aborting",
+	vmStatExited:   "exited",
+}
+
 type vmInfo struct {
 	VMErr     string
 	Name      string
@@ -138,28 +153,66 @@ type vmInfo struct {
 }
 
 type vmCtl struct {
-	sync.Mutex
+	//sync.Mutex
 	vmInfo
 	*tengo.VM
+	stat       int32
 	vmErr      error // returned error when VM exits
 	runMsg     *cmdRunMsg
 	outputFile *os.File
 }
-
-type cmdPsMsg struct{}
 
 type greVMInfo struct {
 	Name    string
 	VMInfos []*vmInfo
 }
 
-func (cmd cmdPsMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
-	gvi := &greVMInfo{Name: ggre.name, VMInfos: make([]*vmInfo, 0, len(ggre.vmids))}
+type cmdKillMsg struct {
+	IDPatten []string
+}
+
+func (cmd cmdKillMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	pattenStr := "^" + strings.Join(cmd.IDPatten, "$ ^") + "$"
+	var ids []string
+	ggre.RLock()
+	for vmid, vc := range ggre.vms {
+		if strings.Contains(pattenStr, "^"+vmid+"$") || // match vmid
+			strings.Contains(pattenStr, "^"+vc.Name+"$") { // match name
+			if vc.stat == vmStatRunning { // no need to atomic
+				vc.VM.Abort()
+				ids = append(ids, vmid)
+				//vc.Stat = "aborting"
+				atomic.CompareAndSwapInt32(&vc.stat, vmStatRunning, vmStatAborting)
+			}
+		}
+	}
+	ggre.RUnlock()
+	return ids, nil
+}
+
+type cmdQueryMsg struct {
+	IDPatten []string
+}
+
+func (cmd cmdQueryMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	gvi := &greVMInfo{Name: ggre.name}
+	pattenStr := ""
+	if len(cmd.IDPatten) == 0 { // list all
+		gvi.VMInfos = make([]*vmInfo, 0, len(ggre.vmids))
+	} else {
+		pattenStr = "^" + strings.Join(cmd.IDPatten, "$ ^") + "$"
+	}
+
 	ggre.RLock()
 	for i := len(ggre.vmids) - 1; i >= 0; i-- { // in reverse order
 		vmid := ggre.vmids[i]
 		vc := ggre.vms[vmid]
-		gvi.VMInfos = append(gvi.VMInfos, &vc.vmInfo)
+		if len(pattenStr) == 0 || // match all
+			strings.Contains(pattenStr, "^"+vmid+"$") || // match vmid
+			strings.Contains(pattenStr, "^"+vc.Name+"$") { // match name
+			vc.Stat = vmStatString[vc.stat]
+			gvi.VMInfos = append(gvi.VMInfos, &vc.vmInfo)
+		}
 	}
 	ggre.RUnlock()
 	return gvi, nil
@@ -194,7 +247,8 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	vc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 	vc.ID = genVMID()
 	vc.vmInfo.Args = cmd.Args
-	vc.Stat = "starting"
+	//vc.Stat = "starting"
+	atomic.StoreInt32(&vc.stat, vmStatStarting)
 
 	output, err := os.Create(logDir + vc.ID)
 	if err != nil {
@@ -219,7 +273,8 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 		vm.Out = output
 		greLogger.Traceln("cmdRunMsg: non-interactive")
 		vc.StartTime = time.Now()
-		vc.Stat = "running"
+		//vc.Stat = "running"
+		atomic.StoreInt32(&vc.stat, vmStatRunning)
 		err = vm.Run()
 		vc.EndTime = time.Now()
 		if err != nil {
@@ -227,7 +282,8 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 			vc.VMErr = err.Error()
 			fmt.Fprintln(output, err)
 		}
-		vc.Stat = "exited"
+		//vc.Stat = "exited"
+		atomic.StoreInt32(&vc.stat, vmStatExited)
 		if cmd.AutoRemove {
 			greLogger.Traceln("remove vm ctl")
 			ggre.rmVM(vc)
@@ -250,9 +306,9 @@ func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 	vm.In = conn.GetNetConn()
 	output := io.MultiWriter(conn.GetNetConn(), vc.outputFile)
 	vm.Out = output
-
+	//vc.Stat = "running"
+	atomic.StoreInt32(&vc.stat, vmStatRunning)
 	vc.StartTime = time.Now()
-	vc.Stat = "running"
 	err = vm.Run()
 	vc.EndTime = time.Now()
 	if err != nil {
@@ -260,8 +316,8 @@ func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 		vc.VMErr = err.Error()
 		fmt.Fprintln(output, err)
 	}
-
-	vc.Stat = "exited"
+	//vc.Stat = "exited"
+	atomic.StoreInt32(&vc.stat, vmStatExited)
 	if vc.runMsg.AutoRemove {
 		ggre.rmVM(vc)
 	}
@@ -273,6 +329,7 @@ func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 func init() {
 	gob.Register(redirectAckMsg{})
 	gob.Register(&cmdRunMsg{})
-	gob.Register(cmdPsMsg{})
+	gob.Register(cmdQueryMsg{})
+	gob.Register(cmdKillMsg{})
 	gob.Register(&greVMInfo{})
 }
