@@ -18,45 +18,94 @@ var (
 	gcLogger = gcStream.NewLogger("gre client", log.Linfo)
 )
 
-type cmdPs struct {
-	GreName string
+type cmdKill struct {
+	GreName  string
+	IDPatten []string
 }
 
-func (c cmdPs) OnConnect(conn sm.Conn) error {
+func (c cmdKill) OnConnect(conn sm.Conn) error {
 	if err := conn.Send(c); err != nil {
 		gcLogger.Errorln("send cmd failed:", err)
 		return err
 	}
 	reply, err := conn.Recv()
 	if err != nil {
+		gcLogger.Errorln("recv failed:", err)
+		return err
+	}
+	killed := reply.([]*greVMIDs)
+	for _, gvi := range killed {
+		fmt.Println(gvi)
+	}
+	return io.EOF
+}
+
+type cmdQuery struct {
+	GreName  string
+	IDPatten []string
+}
+
+func (c cmdQuery) OnConnect(conn sm.Conn) error {
+	if err := conn.Send(c); err != nil {
+		gcLogger.Errorln("send cmd failed:", err)
+		return err
+	}
+	reply, err := conn.Recv()
+	if err != nil {
+		gcLogger.Errorln("recv failed:", err)
 		return err
 	}
 	gvis := reply.([]*greVMInfo)
-	for _, gvi := range gvis {
-		fmt.Println("gre:", gvi.Name)
-		fmt.Println("VM ID         NAME          CREATED              STATUS")
-		for _, vmi := range gvi.VMInfos {
-			name := vmi.Name
-			if len(name) > 12 {
-				name = name[:12]
-			}
-			created := vmi.StartTime.Format("2006/01/02 15:04:05")
-			stat := vmi.Stat
-			switch stat {
-			case "exited":
-				ret := ":OK"
-				if len(vmi.VMErr) != 0 {
-					ret = ":ERR"
+	if len(c.IDPatten) != 0 { // info
+		for _, gvi := range gvis {
+			fmt.Println("===")
+			fmt.Println("gre:", gvi.Name)
+			for _, vmi := range gvi.VMInfos {
+				fmt.Println("ID      :", vmi.ID)
+				fmt.Println("NAME    :", vmi.Name)
+				fmt.Println("ARGS    :", vmi.Args[1:])
+				fmt.Println("STATUS  :", vmi.Stat)
+				startTime := ""
+				if !vmi.StartTime.IsZero() {
+					startTime = fmt.Sprint(vmi.StartTime)
 				}
-				stat = stat + ret
-				d := vmi.EndTime.Sub(vmi.StartTime)
-				stat = fmt.Sprintf("%-10s %v", stat, d)
-			case "running":
-				d := time.Since(vmi.StartTime)
-				stat = fmt.Sprintf("%-10s %v", stat, d)
+				fmt.Println("START AT:", startTime)
+				endTime := ""
+				if !vmi.EndTime.IsZero() {
+					endTime = fmt.Sprint(vmi.EndTime)
+				}
+				fmt.Println("END AT  :", endTime)
+				fmt.Printf("ERROR   : %v\n\n", vmi.VMErr)
 			}
+		}
+	} else { // ps
+		for _, gvi := range gvis {
+			fmt.Println("===")
+			fmt.Println("gre:", gvi.Name)
+			fmt.Println("VM ID         NAME          START AT             STATUS")
+			for _, vmi := range gvi.VMInfos {
+				name := vmi.Name
+				if len(name) > 12 {
+					name = name[:12]
+				}
+				created := vmi.StartTime.Format("2006/01/02 15:04:05")
+				stat := vmi.Stat
+				switch stat {
+				case "exited":
+					ret := ":OK"
+					if len(vmi.VMErr) != 0 {
+						ret = ":ERR"
+					}
+					stat = stat + ret
+					d := vmi.EndTime.Sub(vmi.StartTime)
+					stat = fmt.Sprintf("%-10s %v", stat, d)
+				case "running":
+					d := time.Since(vmi.StartTime)
+					stat = fmt.Sprintf("%-10s %v", stat, d)
+				}
 
-			fmt.Printf("%s  %-12s  %s  %s\n", vmi.ID, vmi.Name, created, stat)
+				fmt.Printf("%s  %-12s  %s  %s\n", vmi.ID, vmi.Name, created, stat)
+			}
 		}
 	}
 
@@ -134,5 +183,6 @@ func (redirectMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
 func init() {
 	gob.Register(&cmdRun{})
 	gob.Register(redirectMsg{})
-	gob.Register(cmdPs{})
+	gob.Register(cmdQuery{})
+	gob.Register(cmdKill{})
 }
