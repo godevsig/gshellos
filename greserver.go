@@ -216,41 +216,41 @@ func greConnsByName(greName string) (grecs []*greConn) {
 	return
 }
 
-type reqKillMsg = cmdKill
+type reqPattenActionMsg = cmdPattenAction
 
 type greVMIDs struct {
 	Name  string
 	VMIDs []string
 }
 
-func (req reqKillMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+func (req reqPattenActionMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	grecs := greConnsByName(req.GreName)
 	if len(grecs) == 0 {
 		return nil, errors.New("gre not found")
 	}
 
-	killIDPatten := func(grec *greConn) (*greVMIDs, error) {
-		if err := grec.Send(cmdKillMsg{req.IDPatten}); err != nil {
-			gsLogger.Errorf("killIDPatten: send cmd to gre %s failed: %v", grec.name, err)
+	pattenAction := func(grec *greConn) (*greVMIDs, error) {
+		if err := grec.Send(cmdPattenActionMsg{req.IDPatten, req.Cmd}); err != nil {
+			gsLogger.Errorf("pattenAction: send cmd to gre %s failed: %v", grec.name, err)
 			return nil, err
 		}
 		ids, err := grec.Recv()
 		if err != nil {
-			gsLogger.Errorf("killIDPatten: recv from gre %s failed: %v", grec.name, err)
+			gsLogger.Errorf("pattenAction: recv from gre %s failed: %v", grec.name, err)
 			return nil, err
 		}
 		return &greVMIDs{grec.name, ids.([]string)}, nil
 	}
 
-	var killed []*greVMIDs
+	var ids []*greVMIDs
 	for _, grec := range grecs {
-		gvi, err := killIDPatten(grec)
+		gvi, err := pattenAction(grec)
 		if err != nil {
 			continue
 		}
-		killed = append(killed, gvi)
+		ids = append(ids, gvi)
 	}
-	return killed, nil
+	return ids, nil
 }
 
 type reqQueryMsg = cmdQuery
