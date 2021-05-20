@@ -84,9 +84,9 @@ Management Commands of gRE and VM:
     restart <ID1 ID2 ...|name1 name2 ...>
             Restart one or more stopped VMs, no effect on a running VM.
 
-    logs <server|gre|ID>
+    tailf <server|gre|ID>
             Print the logs of the server or the designated gRE or the VM
-            by ID so far.
+            by ID.
 
 gshell enters interactive mode if no options and no commands provided.
 
@@ -402,13 +402,14 @@ func ShellMain() error {
 		return clientRun(cmdPs)
 	}
 
-	if cmd == "kill" {
+	if cmd == "kill" || cmd == "rm" || cmd == "restart" {
 		if len(args) == 0 {
 			return errors.New("no vm id provided, see --help")
 		}
-		cmdKill := cmdKill{GreName: greName, IDPatten: args}
-		return clientRun(cmdKill)
+		cmdAction := cmdPattenAction{GreName: greName, IDPatten: args, Cmd: cmd}
+		return clientRun(cmdAction)
 	}
+
 	/*
 
 		if cmd == "outputs" {

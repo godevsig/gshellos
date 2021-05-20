@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/godevsig/gshellos/log"
@@ -18,12 +19,13 @@ var (
 	gcLogger = gcStream.NewLogger("gre client", log.Linfo)
 )
 
-type cmdKill struct {
+type cmdPattenAction struct {
 	GreName  string
 	IDPatten []string
+	Cmd      string
 }
 
-func (c cmdKill) OnConnect(conn sm.Conn) error {
+func (c cmdPattenAction) OnConnect(conn sm.Conn) error {
 	if err := conn.Send(c); err != nil {
 		gcLogger.Errorln("send cmd failed:", err)
 		return err
@@ -33,10 +35,25 @@ func (c cmdKill) OnConnect(conn sm.Conn) error {
 		gcLogger.Errorln("recv failed:", err)
 		return err
 	}
-	killed := reply.([]*greVMIDs)
-	for _, gvi := range killed {
-		fmt.Println(gvi)
+	ids := reply.([]*greVMIDs)
+	var info string
+	switch c.Cmd {
+	case "kill":
+		info = "killed"
+	case "rm":
+		info = "removed"
+	case "restart":
+		info = "restarted"
 	}
+	var sb strings.Builder
+	for _, gvi := range ids {
+		fmt.Fprintf(&sb, strings.Join(gvi.VMIDs, "\n"))
+	}
+	if sb.Len() > 0 {
+		fmt.Println(sb.String())
+		fmt.Println(info)
+	}
+
 	return io.EOF
 }
 
@@ -61,21 +78,24 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 			fmt.Println("===")
 			fmt.Println("gre:", gvi.Name)
 			for _, vmi := range gvi.VMInfos {
-				fmt.Println("ID      :", vmi.ID)
-				fmt.Println("NAME    :", vmi.Name)
-				fmt.Println("ARGS    :", vmi.Args[1:])
-				fmt.Println("STATUS  :", vmi.Stat)
+				fmt.Println("ID        :", vmi.ID)
+				fmt.Println("NAME      :", vmi.Name)
+				fmt.Println("ARGS      :", vmi.Args[1:])
+				fmt.Println("STATUS    :", vmi.Stat)
+				if vmi.RestartedNum != 0 {
+					fmt.Println("RESTARTED :", vmi.RestartedNum)
+				}
 				startTime := ""
 				if !vmi.StartTime.IsZero() {
 					startTime = fmt.Sprint(vmi.StartTime)
 				}
-				fmt.Println("START AT:", startTime)
+				fmt.Println("START AT  :", startTime)
 				endTime := ""
 				if !vmi.EndTime.IsZero() {
 					endTime = fmt.Sprint(vmi.EndTime)
 				}
-				fmt.Println("END AT  :", endTime)
-				fmt.Printf("ERROR   : %v\n\n", vmi.VMErr)
+				fmt.Println("END AT    :", endTime)
+				fmt.Printf("ERROR     : %v\n\n", vmi.VMErr)
 			}
 		}
 	} else { // ps
@@ -184,5 +204,5 @@ func init() {
 	gob.Register(&cmdRun{})
 	gob.Register(redirectMsg{})
 	gob.Register(cmdQuery{})
-	gob.Register(cmdKill{})
+	gob.Register(cmdPattenAction{})
 }
