@@ -19,6 +19,20 @@ var (
 	gcLogger = gcStream.NewLogger("gre client", log.Linfo)
 )
 
+type cmdTailf struct {
+	Target string
+}
+
+func (c cmdTailf) OnConnect(conn sm.Conn) error {
+	if err := conn.Send(c); err != nil {
+		gcLogger.Errorln("send cmd failed:", err)
+		return err
+	}
+	io.Copy(os.Stdout, conn.GetNetConn())
+	gcLogger.Traceln("cmdTailf: done")
+	return io.EOF
+}
+
 type cmdPattenAction struct {
 	GreName  string
 	IDPatten []string
@@ -75,10 +89,9 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 	gvis := reply.([]*greVMInfo)
 	if len(c.IDPatten) != 0 { // info
 		for _, gvi := range gvis {
-			fmt.Println("===")
-			fmt.Println("gre:", gvi.Name)
 			for _, vmi := range gvi.VMInfos {
 				fmt.Println("ID        :", vmi.ID)
+				fmt.Println("IN GRE    :", gvi.Name)
 				fmt.Println("NAME      :", vmi.Name)
 				fmt.Println("ARGS      :", vmi.Args[1:])
 				fmt.Println("STATUS    :", vmi.Stat)
@@ -100,9 +113,7 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 		}
 	} else { // ps
 		for _, gvi := range gvis {
-			fmt.Println("===")
-			fmt.Println("gre:", gvi.Name)
-			fmt.Println("VM ID         NAME          START AT             STATUS")
+			fmt.Println("VM ID         IN GRE        NAME          START AT             STATUS")
 			for _, vmi := range gvi.VMInfos {
 				name := vmi.Name
 				if len(name) > 12 {
@@ -124,7 +135,7 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 					stat = fmt.Sprintf("%-10s %v", stat, d)
 				}
 
-				fmt.Printf("%s  %-12s  %s  %s\n", vmi.ID, vmi.Name, created, stat)
+				fmt.Printf("%s  %-12s  %-12s  %s  %s\n", vmi.ID, gvi.Name, vmi.Name, created, stat)
 			}
 		}
 	}
@@ -205,4 +216,5 @@ func init() {
 	gob.Register(redirectMsg{})
 	gob.Register(cmdQuery{})
 	gob.Register(cmdPattenAction{})
+	gob.Register(cmdTailf{})
 }
