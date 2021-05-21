@@ -58,7 +58,7 @@ Commands:
     run [-i --rm] <file[.gsh]> [args...]
             Run <file[.gsh]> in a new VM(virtual machine) with its name
             set to base name of <file> in the designated gRE and return
-            a 12 hex digits VM ID.
+            a 12 hex digits VMID.
 
             -i    Enter interactive mode, keep STDIN and STDOUT
             open until <file[.gsh]> finishes execution.
@@ -71,22 +71,21 @@ Commands:
             if it has not been created by the remote/local gRE server.
 
 Management Commands of gRE and VM:
-    ps [ID1 ID2 ...|name1 name2 ...]
+    ps [VMID1 VMID2 ...|name1 name2 ...]
             List VM instances in the local/remote gRE server.
 
-    kill <ID1 ID2 ...|name1 name2 ...>
+    kill <VMID1 VMID2 ...|name1 name2 ...>
             Abort the execution of one or more VMs.
 
-    rm <ID1 ID2 ...|name1 name2 ...>
+    rm <VMID1 VMID2 ...|name1 name2 ...>
             Remove one or more stopped VMs and associated files, running
             VM can not be removed.
 
-    restart <ID1 ID2 ...|name1 name2 ...>
+    restart <VMID1 VMID2 ...|name1 name2 ...>
             Restart one or more stopped VMs, no effect on a running VM.
 
-    tailf <server|gre|ID>
-            Print the logs of the server or the designated gRE or the VM
-            by ID.
+    tailf <server|gre|VMID>
+            Print logs of the server/gRE or print outputs of the VM by VMID.
 
 gshell enters interactive mode if no options and no commands provided.
 
@@ -410,14 +409,16 @@ func ShellMain() error {
 		return clientRun(cmdAction)
 	}
 
-	/*
+	if cmd == "tailf" {
+		if len(args) == 0 {
+			return errors.New("no target provided, see --help")
+		}
+		cmdTailf := cmdTailf{Target: args[0]}
+		return sm.DialRun(cmdTailf, network, address,
+			sm.RawMode(),
+			sm.ErrorAsEOF(),
+			sm.WithLogger(gcLogger))
+	}
 
-		if cmd == "outputs" {
-			return greClient.outputs()
-		}
-		if cmd == "logs" {
-			return greClient.logs()
-		}
-	*/
 	return fmt.Errorf("unknown command %s, see --help", cmd)
 }

@@ -3,6 +3,7 @@ package gshellos
 import (
 	"encoding/gob"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -213,6 +214,46 @@ func greConnsByName(greName string) (grecs []*greConn) {
 		}
 		gserver.RUnlock()
 	}
+	return
+}
+
+type reqTailfMsg = cmdTailf
+
+type endlessReader struct {
+	r io.Reader
+}
+
+func (er endlessReader) Read(p []byte) (n int, err error) {
+	for i := 0; i < 30; i++ {
+		n, err = er.r.Read(p)
+		if err != io.EOF {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	p[n] = 0 // fake read
+	return n + 1, nil
+}
+
+func (req reqTailfMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	retErr = io.EOF
+	var file string
+	switch req.Target {
+	case "server":
+		file = workDir + "server.log"
+	case "gre":
+		file = workDir + "gre.log"
+	default:
+		file = workDir + "logs/" + req.Target
+	}
+
+	f, err := os.Open(file)
+	if err != nil {
+		fmt.Fprintln(conn.GetNetConn(), req.Target+" not found")
+		return
+	}
+	io.Copy(conn.GetNetConn(), endlessReader{f})
+	gsLogger.Traceln("reqTailfMsg: done")
 	return
 }
 
