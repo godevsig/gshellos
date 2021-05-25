@@ -256,13 +256,15 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 }
 
 func (c *conn) Close() error {
-	c.Lock()
-	defer c.Unlock()
-	if c.closeQ != nil {
-		c.lgr.Traceln("closing connection")
-		close(c.closeQ)
-		c.closeQ = nil
-		c.netConn.Close()
+	if c != nil {
+		c.Lock()
+		defer c.Unlock()
+		if c.closeQ != nil {
+			c.lgr.Traceln("closing connection")
+			close(c.closeQ)
+			c.closeQ = nil
+			c.netConn.Close()
+		}
 	}
 	return nil
 }

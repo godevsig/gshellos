@@ -133,13 +133,15 @@ func (null) Fatalf(format string, args ...interface{}) {}
 func (null) Fatalln(args ...interface{})               {}
 
 type conf struct {
-	raw         bool
-	lgr         Logger
-	dialTimeout time.Duration
-	errorAsEOF  bool
-	recvQlen    int
-	qWeight     int
-	scaleFactor int
+	raw           bool
+	lgr           Logger
+	dialTimeout   time.Duration
+	errorAsEOF    bool
+	recvQlen      int
+	qWeight       int
+	scaleFactor   int
+	redialTimeout int
+	waitTimeout   int
 }
 
 func (cnf *conf) setPostDefault() {
@@ -166,6 +168,23 @@ type Option func(*conf)
 func RawMode() Option {
 	return func(c *conf) {
 		c.raw = true
+	}
+}
+
+// AutoWait sets the dialer to wait the server up to waitTimeout seconds
+// if server is not currently available.
+func AutoWait(waitTimeout int) Option {
+	return func(c *conf) {
+		c.waitTimeout = waitTimeout
+	}
+}
+
+// AutoRedial sets the dialer to automatically redial the server up to
+// redialTimeout seconds if the connection becomes disconnected.
+// The client's OnConnect method will be called again after redial succeeds.
+func AutoRedial(redialTimeout int) Option {
+	return func(c *conf) {
+		c.redialTimeout = redialTimeout
 	}
 }
 
@@ -238,6 +257,7 @@ func Listen(network, address string, options ...Option) (*Listener, error) {
 		o(&cnf)
 	}
 	cnf.setPostDefault()
+	cnf.lgr.Debugf("conf: %v", cnf)
 
 	l, err := net.Listen(network, address)
 	if err != nil {
@@ -344,9 +364,34 @@ func ListenRun(server Processor, network string, address string, options ...Opti
 // Dialer represents a client.
 type Dialer struct {
 	conf
-	errall errs
-	c      net.Conn
-	conn   *conn
+	network string
+	address string
+	errall  errs
+	c       net.Conn
+	conn    *conn
+}
+
+func (dlr *Dialer) dial() error {
+	timeout := true
+	if dlr.conf.waitTimeout != 0 {
+		timeout = false
+		time.AfterFunc(time.Duration(dlr.conf.waitTimeout)*time.Second, func() { timeout = true })
+	}
+	var c net.Conn
+	var err error
+	for {
+		if dlr.conf.dialTimeout != 0 {
+			c, err = net.DialTimeout(dlr.network, dlr.address, dlr.conf.dialTimeout)
+		} else {
+			c, err = net.Dial(dlr.network, dlr.address)
+		}
+		if err == nil || timeout {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	dlr.c = c
+	return err
 }
 
 // Dial dials the network address.
@@ -356,25 +401,18 @@ func Dial(network, address string, options ...Option) (*Dialer, error) {
 		o(&cnf)
 	}
 	cnf.setPostDefault()
-
-	var c net.Conn
-	var err error
-	if cnf.dialTimeout != 0 {
-		c, err = net.DialTimeout(network, address, cnf.dialTimeout)
-	} else {
-		c, err = net.Dial(network, address)
-	}
-	if err != nil {
+	cnf.lgr.Debugf("conf: %v", cnf)
+	dlr := &Dialer{conf: cnf, network: network, address: address}
+	if err := dlr.dial(); err != nil {
 		return nil, err
 	}
-
-	dlr := &Dialer{conf: cnf, c: c}
 	return dlr, nil
 }
 
 // Close closes the dialer.
-func (dlr *Dialer) Close() {
+func (dlr *Dialer) Close() error {
 	dlr.conn.Close()
+	return nil
 }
 
 // Errors returns all errors occurred in the Dialer so far.
@@ -397,28 +435,62 @@ func (dlr *Dialer) logError(err error) {
 // Option ErrorAsEOF() can change the io.EOF behavior.
 // The returned error includes all occurred errors before the client finishes.
 func (dlr *Dialer) Run(client Processor) (retErr error) {
-	dlr.conn = newConn(context.Background(), dlr.c, dlr.conf)
 	defer func() {
 		if len(dlr.errall.errs) != 0 {
 			retErr = &dlr.errall
 		}
-		dlr.conn.Close()
+		dlr.Close()
 	}()
 
 	// handle signal
-	gsigCleaner.addToDo(dlr.conn)
+	gsigCleaner.addToDo(dlr)
 
-	if err := client.OnConnect(dlr.conn); err != nil {
-		if dlr.errorAsEOF || errors.Is(err, io.EOF) {
-			dlr.conn.Close()
+	run := func() {
+		dlr.lgr.Traceln("client running")
+		dlr.conn = newConn(context.Background(), dlr.c, dlr.conf)
+		if err := client.OnConnect(dlr.conn); err != nil {
+			if dlr.errorAsEOF || errors.Is(err, io.EOF) {
+				dlr.conn.Close()
+			}
+			if !errors.Is(err, io.EOF) {
+				dlr.errall.addError(fmt.Errorf("error: %v", err))
+			}
 		}
-		if !errors.Is(err, io.EOF) {
-			dlr.errall.addError(fmt.Errorf("client OnConnect error: %v", err))
+		if err := dlr.conn.wait(); err != nil {
+			dlr.errall.addError(err)
 		}
+		dlr.lgr.Traceln("client exited")
 	}
-	if err := dlr.conn.wait(); err != nil {
-		dlr.errall.addError(err)
+
+	redial := func() (err error) {
+		timeout := false
+		time.AfterFunc(time.Duration(dlr.conf.redialTimeout)*time.Second, func() { timeout = true })
+		for {
+			err = dlr.dial()
+			if err == nil || timeout {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		return
 	}
+
+	for {
+		run()
+		if dlr.conf.redialTimeout == 0 { // no auto redial
+			break
+		}
+		if len(dlr.errall.errs) != 0 {
+			dlr.lgr.Errorln(&dlr.errall)
+			dlr.errall = errs{}
+		}
+		if err := redial(); err != nil {
+			dlr.logError(fmt.Errorf("redial failed: %w", err))
+			break
+		}
+		dlr.lgr.Infoln("rerun client")
+	}
+
 	return
 }
 
