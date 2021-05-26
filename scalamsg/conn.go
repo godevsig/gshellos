@@ -160,7 +160,7 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 		if errors.Is(err, io.EOF) {
 			eof = true
 		} else if err != nil {
-			c.logError(errorHere(err))
+			c.lgr.Warnln(errorHere(err))
 			if c.errorAsEOF {
 				eof = true
 			}

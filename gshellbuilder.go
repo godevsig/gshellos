@@ -22,70 +22,71 @@ var version string
 
 const (
 	usage = `gshell is an interpreter in Golang style syntax and a supervision
-tool to manage .gsh apps.
+tool to manage .gsh apps running in gshell VM(tengo based virtual machine).
 
 SYNOPSIS
     gshell [OPTIONS] [COMMANDS]
 
 Options:
     -c, --connect <hostname:port>
-            Connect to the remote gRE server.
-
+            Connect to the remote gre server instead of local gre server.
     -e, --gre <name>
-            Specify the name of gRE(gshell Runtime Environment)
-            in which the commands will be running.
-
-            Gshell connects to the remote gRE server if -c provided,
-            otherwise the local gRE server is used.
-
+            Specify the name of gre(gshell runtime environment) instance.
     -d, --debug     Enable debug loglevel, -d -d makes more verbose log.
     -h, --help      Show this message.
     -v, --version   Show version information.
 
-Commands:
+Server and gre management commands:
     server [port]
-            Start gRE(gshell Runtime Environment) server for local
-            connection, also accept remote connection if [port]
-            is provided.
+            Start gre server for local connection, also accept remote
+            connection if [port] is provided.
+    gre stop [-f]
+            Terminate the named gre(by -e) instacne.
+            -f    force terminate even if there are still running VMs
+    gre save <file>
+            Save all .gsh apps in the named gre(by -e) to <file>.
+    gre load <file>
+            Load .gsh apps from <file> to the named gre(by -e) and run them.
+    gre suspend
+            Suspend the execution of the named gre(by -e). All the running VMs
+            in that gre will be suspended.
+    gre resume
+            Resume the execution of the named gre(by -e). All the running VMs
+            in that gre will be resumed to run.
+    gre priority <maximum|high|normal|low|minimum>
+            Set the priority of the named gre(by -e). Default is normal.
 
+The default "master" gre only supports save and load command.
+
+Standalone commands:
     compile <file.gsh>
             Compile <file.gsh> into byte code <file>.
-
     exec <file[.gsh]> [args...]
-            Run <file[.gsh]> in a new VM(virtual machine) in standalone
-            mode.
+            Run <file[.gsh]> in a local standalone VM.
 
+Management commands of gre VM:
     run [-i --rm] <file[.gsh]> [args...]
-            Run <file[.gsh]> in a new VM(virtual machine) with its name
-            set to base name of <file> in the designated gRE and return
-            a 12 hex digits VMID.
-
+            Run <file[.gsh]> in a new VM with its name set to base name of
+            <file> in the designated gre and return a 12 hex digits VMID.
             -i    Enter interactive mode, keep STDIN and STDOUT
             open until <file[.gsh]> finishes execution.
             --rm  Automatically remove the VM when it exits.
-
-            If no -c presents, the local gRE server is used.
-            If no -e presents, the default "master" gRE is used.
-
-            The named gRE instance will be created to run <file[.gsh]>
-            if it has not been created by the remote/local gRE server.
-
-Management Commands of gRE and VM:
+            If no -e presents, the default "master" gre is used.
+            The named gre instance will be created to run <file[.gsh]>
+            if it has not been created by the remote/local gre server.
     ps [VMID1 VMID2 ...|name1 name2 ...]
-            List VM instances in the local/remote gRE server.
-
+            List VM instances in the local/remote gre server.
     kill <VMID1 VMID2 ...|name1 name2 ...>
             Abort the execution of one or more VMs.
-
     rm <VMID1 VMID2 ...|name1 name2 ...>
             Remove one or more stopped VMs and associated files, running
             VM can not be removed.
-
     restart <VMID1 VMID2 ...|name1 name2 ...>
             Restart one or more stopped VMs, no effect on a running VM.
 
+Debugging commands:
     tailf <server|gre|VMID>
-            Print logs of the server/gRE or print outputs of the VM by VMID.
+            Print logs of the server/gre or print outputs of the VM by VMID.
 
 gshell enters interactive mode if no options and no commands provided.
 
@@ -247,6 +248,8 @@ func newShell() *shell {
 	return sh
 }
 
+var savedOptions string
+
 // ShellMain is the main entry of gshell
 func ShellMain() error {
 	args := os.Args
@@ -280,6 +283,7 @@ func ShellMain() error {
 			fmt.Println(version)
 			return nil
 		case "-d", "--debug":
+			savedOptions += "-d "
 			loglevel--
 			if loglevel <= log.Ltrace {
 				loglevel = log.Ltrace
@@ -300,12 +304,14 @@ func ShellMain() error {
 		}
 	}
 
-	gsStream.SetLoglevel("*", loglevel)
-	gsStream.SetFlag(logFlag)
-	gcStream.SetLoglevel("*", loglevel)
-	gcStream.SetFlag(logFlag)
-	greStream.SetLoglevel("*", loglevel)
-	greStream.SetFlag(logFlag)
+	if loglevel != log.Linfo {
+		gsStream.SetLoglevel("*", loglevel)
+		gsStream.SetFlag(logFlag)
+		gcStream.SetLoglevel("*", loglevel)
+		gcStream.SetFlag(logFlag)
+		greStream.SetLoglevel("*", loglevel)
+		greStream.SetFlag(logFlag)
+	}
 
 	cmd := args[0]
 	args = args[1:] // shift
@@ -316,17 +322,6 @@ func ShellMain() error {
 			port = args[0]
 		}
 		return runServer(version, port)
-	}
-
-	if cmd == "rungre" { // rungre name
-		var err error
-		if len(args) > 0 {
-			name := args[0]
-			if name != "master" {
-				err = rungre(name)
-			}
-		}
-		return err
 	}
 
 	if cmd == "compile" { // compile <file.gsh>
@@ -370,6 +365,56 @@ func ShellMain() error {
 			sm.WithLogger(gcLogger))
 	}
 
+	if cmd == "gre" {
+		if len(args) == 0 {
+			return errors.New("need gre sub-command, see --help")
+		}
+		if len(greName) == 0 {
+			return errors.New("no gre name provided, need -e option")
+		}
+
+		subcmd := args[0]
+		if greName == "master" {
+			if subcmd != "save" && subcmd != "load" {
+				return errors.New("master gre only supports save and load")
+			}
+		}
+		args = args[1:] // shift
+		var paras string
+		switch subcmd {
+		case "__start":
+			if greName != "master" {
+				return rungre(greName)
+			}
+			return nil
+		case "stop":
+			if len(args) != 0 && args[0] == "-f" {
+				paras = "-f"
+			}
+		case "save", "load":
+			if len(args) == 0 {
+				return errors.New("no file provided, see --help")
+			}
+			paras = args[0]
+		case "suspend", "resume":
+		case "priority":
+			if len(args) == 0 {
+				return errors.New("no priority provided, see --help")
+			}
+			switch args[0] {
+			case "maximum", "high", "normal", "low", "minimum":
+				paras = args[0]
+			default:
+				return errors.New("wrong priority, see --help")
+			}
+		default:
+			return errors.New("unknown subcmd: " + subcmd)
+		}
+
+		greCmd := &greCmd{greName, subcmd, paras}
+		return clientRun(greCmd)
+	}
+
 	if cmd == "run" { // run [-i] <file[.gsh]> [args...]
 		interactive := false
 		autoRemove := false
@@ -397,7 +442,7 @@ func ShellMain() error {
 	}
 
 	if cmd == "ps" {
-		cmdPs := cmdQuery{GreName: greName, IDPatten: args}
+		cmdPs := cmdQuery{GreName: greName, IDPattern: args}
 		return clientRun(cmdPs)
 	}
 
@@ -405,7 +450,7 @@ func ShellMain() error {
 		if len(args) == 0 {
 			return errors.New("no vm id provided, see --help")
 		}
-		cmdAction := cmdPattenAction{GreName: greName, IDPatten: args, Cmd: cmd}
+		cmdAction := cmdPatternAction{GreName: greName, IDPattern: args, Cmd: cmd}
 		return clientRun(cmdAction)
 	}
 
