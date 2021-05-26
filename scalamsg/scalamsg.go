@@ -39,7 +39,7 @@ func (sc *sigCleaner) addToDo(c io.Closer) {
 }
 func (sc *sigCleaner) close() {
 	sc.Lock()
-	for _, c := range gsigCleaner.toDo {
+	for _, c := range sc.toDo {
 		c.Close()
 	}
 	sc.Unlock()
@@ -47,12 +47,17 @@ func (sc *sigCleaner) close() {
 
 var gsigCleaner sigCleaner
 
+var gSigRecord os.Signal
+
 func init() {
 	// handle signal
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	go func() {
-		<-sigChan
+		sig := <-sigChan
+		if gSigRecord == nil {
+			gSigRecord = sig
+		}
 		gsigCleaner.close()
 	}()
 }
@@ -269,8 +274,12 @@ func Listen(network, address string, options ...Option) (*Listener, error) {
 }
 
 // Close closes the listener.
-func (lnr *Listener) Close() {
+func (lnr *Listener) Close() error {
+	if gSigRecord != nil {
+		lnr.logError(errors.New("signal: " + gSigRecord.String()))
+	}
 	lnr.l.Close()
+	return nil
 }
 
 // Errors returns all errors occurred in the listener so far.
@@ -310,7 +319,7 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 	}()
 
 	// handle signal
-	gsigCleaner.addToDo(lnr.l)
+	gsigCleaner.addToDo(lnr)
 
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(context.Background())
@@ -411,6 +420,9 @@ func Dial(network, address string, options ...Option) (*Dialer, error) {
 
 // Close closes the dialer.
 func (dlr *Dialer) Close() error {
+	if gSigRecord != nil {
+		dlr.logError(errors.New("signal: " + gSigRecord.String()))
+	}
 	dlr.conn.Close()
 	return nil
 }
@@ -439,7 +451,7 @@ func (dlr *Dialer) Run(client Processor) (retErr error) {
 		if len(dlr.errall.errs) != 0 {
 			retErr = &dlr.errall
 		}
-		dlr.Close()
+		dlr.conn.Close()
 	}()
 
 	// handle signal
@@ -453,7 +465,7 @@ func (dlr *Dialer) Run(client Processor) (retErr error) {
 				dlr.conn.Close()
 			}
 			if !errors.Is(err, io.EOF) {
-				dlr.errall.addError(fmt.Errorf("error: %v", err))
+				dlr.errall.addError(err)
 			}
 		}
 		if err := dlr.conn.wait(); err != nil {

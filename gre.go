@@ -74,11 +74,8 @@ func newgre(name string) (*gre, error) {
 }
 
 func (gre *gre) run() error {
+	defer os.Remove(gre.socket)
 	return gre.l.Run(gre)
-}
-
-func (gre *gre) clean() {
-	os.Remove(gre.socket)
 }
 
 func (gre *gre) close() {
@@ -98,6 +95,13 @@ func (gre *gre) OnConnect(conn sm.Conn) error {
 	ctx := &session{}
 	conn.SetContext(ctx)
 	return nil
+}
+
+type getProcess struct{}
+
+func (req getProcess) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	pid := os.Getpid()
+	return pid, nil
 }
 
 func genVMID() string {
@@ -184,13 +188,13 @@ type greVMInfo struct {
 	VMInfos []*vmInfo
 }
 
-type cmdPattenActionMsg struct {
-	IDPatten []string
-	Cmd      string
+type cmdPatternActionMsg struct {
+	IDPattern []string
+	Cmd       string
 }
 
-func (cmd cmdPattenActionMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
-	pattenStr := "^" + strings.Join(cmd.IDPatten, "$ ^") + "$"
+func (cmd cmdPatternActionMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
+	pattenStr := "^" + strings.Join(cmd.IDPattern, "$ ^") + "$"
 	var vcs []*vmCtl
 	ggre.RLock()
 	for vmid, vc := range ggre.vms {
@@ -352,6 +356,7 @@ func init() {
 	gob.Register(redirectAckMsg{})
 	gob.Register(&cmdRunMsg{})
 	gob.Register(cmdQueryMsg{})
-	gob.Register(cmdPattenActionMsg{})
+	gob.Register(cmdPatternActionMsg{})
 	gob.Register(&greVMInfo{})
+	gob.Register(getProcess{})
 }

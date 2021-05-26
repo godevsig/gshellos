@@ -16,7 +16,7 @@ import (
 
 var (
 	gcStream = log.NewStream("greClient")
-	gcLogger = gcStream.NewLogger("gre client", log.Linfo)
+	gcLogger = gcStream.NewLogger("gre client", log.Lfatal)
 )
 
 type cmdTailf struct {
@@ -33,20 +33,20 @@ func (c cmdTailf) OnConnect(conn sm.Conn) error {
 	return io.EOF
 }
 
-type cmdPattenAction struct {
-	GreName  string
-	IDPatten []string
-	Cmd      string
+type cmdPatternAction struct {
+	GreName   string
+	IDPattern []string
+	Cmd       string
 }
 
-func (c cmdPattenAction) OnConnect(conn sm.Conn) error {
+func (c cmdPatternAction) OnConnect(conn sm.Conn) error {
 	if err := conn.Send(c); err != nil {
 		gcLogger.Errorln("send cmd failed:", err)
 		return err
 	}
 	reply, err := conn.Recv()
 	if err != nil {
-		gcLogger.Errorln("recv failed:", err)
+		gcLogger.Errorln("recv error:", err)
 		return err
 	}
 	ids := reply.([]*greVMIDs)
@@ -72,8 +72,8 @@ func (c cmdPattenAction) OnConnect(conn sm.Conn) error {
 }
 
 type cmdQuery struct {
-	GreName  string
-	IDPatten []string
+	GreName   string
+	IDPattern []string
 }
 
 func (c cmdQuery) OnConnect(conn sm.Conn) error {
@@ -83,11 +83,11 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 	}
 	reply, err := conn.Recv()
 	if err != nil {
-		gcLogger.Errorln("recv failed:", err)
+		gcLogger.Errorln("recv error:", err)
 		return err
 	}
 	gvis := reply.([]*greVMInfo)
-	if len(c.IDPatten) != 0 { // info
+	if len(c.IDPattern) != 0 { // info
 		for _, gvi := range gvis {
 			for _, vmi := range gvi.VMInfos {
 				fmt.Println("ID        :", vmi.ID)
@@ -112,13 +112,16 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 			}
 		}
 	} else { // ps
+		fmt.Println("VM ID         IN GRE        NAME          START AT             STATUS")
+		trimName := func(name string) string {
+			if len(name) > 12 {
+				name = name[:9] + "..."
+			}
+			return name
+		}
 		for _, gvi := range gvis {
-			fmt.Println("VM ID         IN GRE        NAME          START AT             STATUS")
 			for _, vmi := range gvi.VMInfos {
-				name := vmi.Name
-				if len(name) > 12 {
-					name = name[:12]
-				}
+
 				created := vmi.StartTime.Format("2006/01/02 15:04:05")
 				stat := vmi.Stat
 				switch stat {
@@ -135,11 +138,31 @@ func (c cmdQuery) OnConnect(conn sm.Conn) error {
 					stat = fmt.Sprintf("%-10s %v", stat, d)
 				}
 
-				fmt.Printf("%s  %-12s  %-12s  %s  %s\n", vmi.ID, gvi.Name, vmi.Name, created, stat)
+				fmt.Printf("%s  %-12s  %-12s  %s  %s\n", vmi.ID, trimName(gvi.Name), trimName(vmi.Name), created, stat)
 			}
 		}
 	}
 
+	return io.EOF
+}
+
+type greCmd struct {
+	GreName string
+	Cmd     string
+	Paras   string
+}
+
+func (c greCmd) OnConnect(conn sm.Conn) error {
+	if err := conn.Send(c); err != nil {
+		gcLogger.Errorln("send cmd failed:", err)
+		return err
+	}
+	reply, err := conn.Recv()
+	if err != nil {
+		gcLogger.Errorln("recv error:", err)
+		return err
+	}
+	fmt.Println(reply)
 	return io.EOF
 }
 
@@ -215,6 +238,7 @@ func init() {
 	gob.Register(&cmdRun{})
 	gob.Register(redirectMsg{})
 	gob.Register(cmdQuery{})
-	gob.Register(cmdPattenAction{})
+	gob.Register(cmdPatternAction{})
 	gob.Register(cmdTailf{})
+	gob.Register(greCmd{})
 }
