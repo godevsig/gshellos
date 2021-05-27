@@ -334,7 +334,7 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 		}
 		cn := newConn(ctx, c, lnr.conf)
 		wg.Add(1)
-		go func(cn *conn) {
+		go func() {
 			lnr.addConn(cn)
 			defer func() {
 				cn.Close()
@@ -352,7 +352,7 @@ func (lnr *Listener) Run(server Processor) (retErr error) {
 			if err := cn.wait(); err != nil {
 				lnr.errall.addError(errorHere(err))
 			}
-		}(cn)
+		}()
 	}
 	lnr.lgr.Traceln("listener closed, waiting for remaining work")
 	cancel()

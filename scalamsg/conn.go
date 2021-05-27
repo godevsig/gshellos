@@ -167,6 +167,7 @@ func newConn(ctx context.Context, netConn net.Conn, cnf conf) *conn {
 			reply = ErrorMsg{Msg: reply, Err: err.Error()}
 		}
 		if reply != nil {
+			c.lgr.Traceln("sending back reply")
 			c.RLock()
 			err := c.Send(reply)
 			c.RUnlock()
@@ -295,6 +296,9 @@ func (c *conn) Send(msg interface{}) error {
 	// to be able to decode directly into an interface variable,
 	// we need to encode it as reference of the interface
 	err := c.enc.Encode(&msg)
+	if err != nil {
+		c.lgr.Warnln(errorHere(err))
+	}
 	return err
 }
 
