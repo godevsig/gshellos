@@ -51,7 +51,8 @@ type gre struct {
 }
 
 type session struct {
-	vc *vmCtl
+	var1 string
+	var2 int
 }
 
 func newgre(name string) (*gre, error) {
@@ -116,6 +117,7 @@ func (gre *gre) addVM(vc *vmCtl) {
 	gre.vmids = append(gre.vmids, vc.ID)
 	gre.vms[vc.ID] = vc
 	gre.Unlock()
+	greLogger.Traceln("vm " + vc.ID + " added")
 }
 
 func (gre *gre) rmVM(vc *vmCtl) {
@@ -130,6 +132,7 @@ func (gre *gre) rmVM(vc *vmCtl) {
 	gre.vmids = vmids
 	gre.Unlock()
 	os.Remove(vc.outputFile)
+	greLogger.Traceln("vm " + vc.ID + " removed")
 }
 
 const (
@@ -222,12 +225,17 @@ func (cmd cmdPatternActionMsg) Handle(conn sm.Conn) (reply interface{}, retErr e
 			}
 		case "restart":
 			if vc.stat == vmStatExited {
+				vm := vc.VM
+				vm.In = null{}
+				logFile, err := os.Create(vc.outputFile)
+				if err != nil {
+					greLogger.Errorln(errorHere(err))
+					break
+				}
+				vm.Out = logFile
+				vc := vc
 				go func() {
-					vm := vc.VM
-					if logFile, err := os.Create(vc.outputFile); err == nil {
-						vm.Out = logFile
-						defer logFile.Close()
-					}
+					defer logFile.Close()
 					vc.RestartedNum++
 					vc.runVM()
 				}()
@@ -308,21 +316,24 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	ggre.addVM(vc)
 
 	if cmd.Interactive {
-		conn.Send(vc.ID)
-		session := conn.GetContext().(*session)
-		session.vc = vc
-		greLogger.Traceln("cmdRunMsg: sending redirectMsg")
-		return redirectMsg{}, nil
+		greLogger.Traceln("cmdRunMsg: interactive")
+		defer output.Close()
+		vm.In = conn.GetNetConn()
+		vm.Out = multiWriter(conn.GetNetConn(), output)
+		vc.runVM()
+		if cmd.AutoRemove {
+			ggre.rmVM(vc)
+		}
+		return nil, io.EOF
 	}
 
 	go func() {
+		greLogger.Traceln("cmdRunMsg: non-interactive")
 		defer output.Close()
 		vm.In = null{}
 		vm.Out = output
-		greLogger.Traceln("cmdRunMsg: non-interactive")
 		vc.runVM()
 		if cmd.AutoRemove {
-			greLogger.Traceln("remove vm ctl")
 			ggre.rmVM(vc)
 		}
 	}()
@@ -330,30 +341,7 @@ func (cmd *cmdRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	return vc.ID, nil
 }
 
-type redirectAckMsg struct{}
-
-func (redirectAckMsg) IsExclusive() {}
-func (redirectAckMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
-	greLogger.Traceln("redirectAckMsg: enter")
-	session := conn.GetContext().(*session)
-	vc := session.vc
-	vm := vc.VM
-	vm.In = conn.GetNetConn()
-	vm.Out = conn.GetNetConn()
-	if logFile, err := os.Create(vc.outputFile); err == nil {
-		vm.Out = io.MultiWriter(conn.GetNetConn(), logFile)
-		defer logFile.Close()
-	}
-	vc.runVM()
-	if vc.runMsg.AutoRemove {
-		ggre.rmVM(vc)
-	}
-	greLogger.Traceln("redirectAckMsg: closing")
-	return nil, io.EOF
-}
-
 func init() {
-	gob.Register(redirectAckMsg{})
 	gob.Register(&cmdRunMsg{})
 	gob.Register(cmdQueryMsg{})
 	gob.Register(cmdPatternActionMsg{})
