@@ -32,6 +32,8 @@ Options:
             Connect to the remote gre server instead of local gre server.
     -e, --gre <name>
             Specify the name of gre(gshell runtime environment) instance.
+    -u, --upstream <hostname:port>
+            Set the upstream gshell server address.
     -d, --debug     Enable debug loglevel, -d -d makes more verbose log.
     -h, --help      Show this message.
     -v, --version   Show version information.
@@ -47,6 +49,10 @@ Server and gre management commands:
             Save all .gsh apps in the named gre(by -e) to <file>.
     gre load <file>
             Load .gsh apps from <file> to the named gre(by -e) and run them.
+    gre pull <[hostname:port://]name>
+            Pull the [remote] gre <name> and combine it to the named gre(by -e).
+    gre push <[hostname:port://]name>
+            Push the named gre(by -e) and combine it to the [remote] gre <name>.
     gre suspend
             Suspend the execution of the named gre(by -e). All the running VMs
             in that gre will be suspended.
@@ -438,7 +444,10 @@ func ShellMain() error {
 			greName = "master"
 		}
 		cmdRun := &cmdRun{greName, inputFile, args, interactive, autoRemove, nil}
-		return clientRun(cmdRun)
+		return sm.DialRun(cmdRun, network, address,
+			sm.ErrorAsEOF(),
+			sm.RawMode(),
+			sm.WithLogger(gcLogger))
 	}
 
 	if cmd == "ps" {
