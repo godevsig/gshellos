@@ -15,7 +15,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
-	"time"
 
 	"github.com/godevsig/gshellos/log"
 	sm "github.com/godevsig/gshellos/scalamsg"
@@ -90,12 +89,10 @@ func setupgre(name string) (*greCtl, error) {
 		args := savedOptions + "-e " + name + " gre " + "__start"
 		cmd := exec.Command(os.Args[0], strings.Split(args, " ")...)
 		gsLogger.Debugln("starting:", cmd.String())
-		err = cmd.Start()
-		if err != nil {
-			err = fmt.Errorf("start %s gre failed: %w", name, err)
-			gserver.errRecovers <- unrecoverableError{err}
-			return nil, err
-		}
+		go func() {
+			stdoutStderr, err := cmd.CombinedOutput()
+			gserver.errRecovers <- unrecoverableError{fmt.Errorf("%s gre %v: %v", name, err, stdoutStderr)}
+		}()
 
 		dlr, err = sm.Dial("unix", addr, sm.WithLogger(greConnLogger), sm.AutoWait(10))
 		if err != nil {
@@ -263,22 +260,6 @@ func greCtlsByName(greName string) (grecs []*greCtl) {
 }
 
 type reqTailfMsg = cmdTailf
-
-type endlessReader struct {
-	r io.Reader
-}
-
-func (er endlessReader) Read(p []byte) (n int, err error) {
-	for i := 0; i < 30; i++ {
-		n, err = er.r.Read(p)
-		if err != io.EOF {
-			return
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	p[n] = 0 // fake read
-	return n + 1, nil
-}
 
 func (req reqTailfMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 	retErr = io.EOF
@@ -491,14 +472,8 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 			conn.Send(errors.New("send cmd to gre failed"))
 			return io.EOF
 		}
-		msg, err := c.Recv()
-		if err != nil {
-			gsLogger.Errorf("reqRunMsg: recv from gre %s failed: %v", req.GreName, err)
-			conn.Send(err)
-			return io.EOF
-		}
-		conn.Send(msg)
-		gsLogger.Traceln("reqRunMsg: forwarding io")
+
+		gsLogger.Traceln("reqRunMsg: start forwarding io")
 		done := make(chan struct{}, 2)
 		copy := func(dst io.Writer, src io.Reader) {
 			io.Copy(dst, src)
@@ -508,7 +483,7 @@ func (req *reqRunMsg) Handle(conn sm.Conn) (reply interface{}, retErr error) {
 		go copy(conn.GetNetConn(), c.GetNetConn())
 
 		<-done
-		gsLogger.Traceln("reqRunMsg: closing connection")
+		gsLogger.Traceln("reqRunMsg: end forwarding io")
 		return io.EOF
 	}
 

@@ -61,10 +61,13 @@ func (c cmdPatternAction) OnConnect(conn sm.Conn) error {
 	}
 	var sb strings.Builder
 	for _, gvi := range ids {
-		fmt.Fprintf(&sb, strings.Join(gvi.VMIDs, "\n"))
+		str := strings.Join(gvi.VMIDs, "\n")
+		if len(str) != 0 {
+			fmt.Fprintln(&sb, str)
+		}
 	}
 	if sb.Len() > 0 {
-		fmt.Println(sb.String())
+		fmt.Print(sb.String())
 		fmt.Println(info)
 	}
 
@@ -176,7 +179,7 @@ type cmdRun struct {
 }
 
 func (c *cmdRun) OnConnect(conn sm.Conn) error {
-	gcLogger.Debugln("connected to gre server")
+	gcLogger.Traceln("connected to gre server")
 	sh := newShell()
 	var b bytes.Buffer
 	if filepath.Ext(c.File) == ".gsh" {
@@ -198,45 +201,30 @@ func (c *cmdRun) OnConnect(conn sm.Conn) error {
 	}
 	c.ByteCode = b.Bytes()
 
-	gcLogger.Debugln("sending run request")
+	gcLogger.Traceln("sending run request")
 	if err := conn.Send(c); err != nil {
 		return err
 	}
 
-	reply, err := conn.Recv()
-	gcLogger.Debugln(reply, err)
-	if err != nil {
-		return err
-	}
-
 	if !c.Interactive {
-		if !c.AutoRemove {
-			fmt.Println(reply)
+		reply, err := conn.Recv()
+		if err != nil {
+			return err
 		}
+		fmt.Println(reply)
 		return io.EOF
 	}
-	return nil
-}
 
-type redirectMsg struct{}
-
-func (redirectMsg) IsExclusive() {}
-func (redirectMsg) Handle(conn sm.Conn) (reply interface{}, err error) {
-	gcLogger.Debugln("enter interactive io")
-	if err := conn.Send(redirectAckMsg{}); err != nil {
-		fmt.Println(err)
-		return nil, io.EOF
-	}
+	gcLogger.Traceln("enter interactive io")
 	netconn := conn.GetNetConn()
 	go io.Copy(netconn, os.Stdin)
 	io.Copy(os.Stdout, netconn)
-	gcLogger.Debugln("exit interactive io")
-	return
+	gcLogger.Traceln("exit interactive io")
+	return nil
 }
 
 func init() {
 	gob.Register(&cmdRun{})
-	gob.Register(redirectMsg{})
 	gob.Register(cmdQuery{})
 	gob.Register(cmdPatternAction{})
 	gob.Register(cmdTailf{})
