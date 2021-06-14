@@ -35,8 +35,13 @@ coverage: dep ## Generate global code coverage report
 dep: ## Get the dependencies
 	@mkdir -p bin .test
 
-build: dep ## Build the binary file to bin dir
+build: release
+
+release: dep ## Build release binary file to bin dir
 	@go build -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
+
+debug: dep ## Build debug binary file to bin dir
+	@go build -ldflags="$(LDFLAGS)" -o bin -tags debug ./cmd/gshell 
 
 clean: ## Remove previous build and test files
 	@rm -rf bin `find -name "\.test"`

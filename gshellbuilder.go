@@ -19,6 +19,7 @@ import (
 )
 
 var version string
+var debugService func(lg *log.Logger)
 
 const (
 	usage = `gshell is an interpreter in Golang style syntax and a supervision
@@ -327,6 +328,9 @@ func ShellMain() error {
 		if len(args) > 0 {
 			port = args[0]
 		}
+		if debugService != nil {
+			go debugService(gsLogger)
+		}
 		return runServer(version, port)
 	}
 
@@ -390,6 +394,9 @@ func ShellMain() error {
 		switch subcmd {
 		case "__start":
 			if greName != "master" {
+				if debugService != nil {
+					go debugService(greLogger)
+				}
 				return rungre(greName)
 			}
 			return nil
