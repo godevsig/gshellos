@@ -1,5 +1,5 @@
-github.com/godevsig/tengo/v2 v2.7.1-0.20210506172030-b6d2abac2c68 h1:KJsMkHIguICz9/GVXOzIVvpOgCX8KxUoGw6vwwhRFyg=
-github.com/godevsig/tengo/v2 v2.7.1-0.20210506172030-b6d2abac2c68/go.mod h1:XRGjEs5I9jYIKTxly6HCF8oiiilk5E/RYXOZ5b0DZC8=
+github.com/godevsig/tengo/v2 v2.7.1-0.20210531170827-4cfaeebd5228 h1:lt7StW+PXxEUwhy4uxIruNNZILjjR9I/Spj/9Hov3U4=
+github.com/godevsig/tengo/v2 v2.7.1-0.20210531170827-4cfaeebd5228/go.mod h1:XRGjEs5I9jYIKTxly6HCF8oiiilk5E/RYXOZ5b0DZC8=
 github.com/mattn/go-runewidth v0.0.3 h1:a+kO+98RDGEfo6asOGMmpodZq4FNtnGP54yps8BzLR4=
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/peterh/liner v1.2.1 h1:O4BlKaq/LWu6VRWmol4ByWfzx6MfXc5Op5HETyIy5yg=
