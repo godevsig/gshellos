@@ -7,4 +7,4 @@ require (
 	github.com/peterh/liner v1.2.1
 )
 
-replace github.com/d5/tengo/v2 => github.com/godevsig/tengo/v2 v2.7.1-0.20210506172030-b6d2abac2c68
+replace github.com/d5/tengo/v2 => github.com/godevsig/tengo/v2 v2.7.1-0.20210531170827-4cfaeebd5228
