@@ -1,6 +1,14 @@
+github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4 h1:iBbhlt5YmtL9QXsMVf/XPXgYBQLifn38Cdjc0J/+uYg=
+github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4/go.mod h1:hiVxq5OP2bUGBRNS3Z/bt/reCLFNbdcST6gISi1fiOM=
+github.com/godevsig/adaptiveservice v0.0.0-20210828074940-02f18ce24a4f h1:50ihYehicLQZcMbr8g4zd8DPlcOG1tUhjcJcnlRFRag=
+github.com/godevsig/adaptiveservice v0.0.0-20210828074940-02f18ce24a4f/go.mod h1:blZoCvk1rWn0dQgYNQhR3pKnCfPAkZl2hdK55If3wcM=
+github.com/godevsig/gotiny v0.0.4-0.20210826165942-af63eabe2674 h1:/YsMYhOqiFhaMA2gRceyxBKH1FgLY4Y2Oj+qbBJExTU=
+github.com/godevsig/gotiny v0.0.4-0.20210826165942-af63eabe2674/go.mod h1:QdEauSzqdF5tbLIVtGYO6sqOhUKVPSZGd5x7xK5oeS4=
 github.com/godevsig/tengo/v2 v2.7.1-0.20210531170827-4cfaeebd5228 h1:lt7StW+PXxEUwhy4uxIruNNZILjjR9I/Spj/9Hov3U4=
 github.com/godevsig/tengo/v2 v2.7.1-0.20210531170827-4cfaeebd5228/go.mod h1:XRGjEs5I9jYIKTxly6HCF8oiiilk5E/RYXOZ5b0DZC8=
 github.com/mattn/go-runewidth v0.0.3 h1:a+kO+98RDGEfo6asOGMmpodZq4FNtnGP54yps8BzLR4=
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
+github.com/niubaoshu/goutils v0.0.0-20180828035119-e8e576f66c2b h1:T7vmCmpGIvqlOOp5SXatALP+HYc/40ZHbxmgy+p+sN0=
+github.com/niubaoshu/goutils v0.0.0-20180828035119-e8e576f66c2b/go.mod h1:aDwH4aWrEBXw/uvtSvwNwxdtnsx++aP8c8ad4AmlRCg=
 github.com/peterh/liner v1.2.1 h1:O4BlKaq/LWu6VRWmol4ByWfzx6MfXc5Op5HETyIy5yg=
 github.com/peterh/liner v1.2.1/go.mod h1:CRroGNssyjTd/qIG2FyxByd2S8JEAZXBl4qUrZf8GS0=
