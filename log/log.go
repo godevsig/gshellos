@@ -304,10 +304,10 @@ func (s *Stream) GetLogger(name string) *Logger {
 // NewLogger returns a logger instance.
 // In a project where all logs go to the same destination, using builtin DefaultStream is enough.
 // In case multiple destinations are needed, use "named" stream returned by NewStream().
-//  stream is the stream that the logger instance belongs to.
-//  name is the identifier of the logger, which is assembled to each log entry.
-//  defaultLoglevel sets the default loglevel of the returned logger instance.
-// Unless the name matches preconfigured namePattern, in which case loglevel sets to preconfigured loglevel.
+// stream is the stream that the logger instance belongs to.
+// name is the identifier of the logger, which is assembled to each log entry.
+// defaultLoglevel sets the default loglevel of the returned logger instance, unless the name
+// matches preconfigured namePattern, in which case loglevel sets to preconfigured loglevel.
 // See Stream.SetLoglevel().
 // Returns nil if stream is nil or name is empty.
 func (s *Stream) NewLogger(name string, defaultLoglevel Loglevel) *Logger {

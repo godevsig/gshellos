@@ -3,102 +3,37 @@ package gshellos
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/d5/tengo/v2"
 	"github.com/d5/tengo/v2/parser"
 	"github.com/d5/tengo/v2/stdlib"
+	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/gshellos/lined"
 	"github.com/godevsig/gshellos/log"
-	sm "github.com/godevsig/gshellos/scalamsg"
 )
 
-var version string
-var debugService func(lg *log.Logger)
-
-const (
-	usage = `gshell is an interpreter in Golang style syntax and a supervision
-tool to manage .gsh apps running in gshell VM(tengo based virtual machine).
-
-SYNOPSIS
-    gshell [OPTIONS] [COMMANDS]
-
-Options:
-    -c, --connect <hostname:port>
-            Connect to the remote gre server instead of local gre server.
-    -e, --gre <name>
-            Specify the name of gre(gshell runtime environment) instance.
-    -u, --upstream <hostname:port>
-            Set the upstream gshell server address.
-    -d, --debug     Enable debug loglevel, -d -d makes more verbose log.
-    -h, --help      Show this message.
-    -v, --version   Show version information.
-
-Server and gre management commands:
-    server [port]
-            Start gre server for local connection, also accept remote
-            connection if [port] is provided.
-    gre stop [-f]
-            Terminate the named gre(by -e) instacne.
-            -f    force terminate even if there are still running VMs
-    gre save <file>
-            Save all .gsh apps in the named gre(by -e) to <file>.
-    gre load <file>
-            Load .gsh apps from <file> to the named gre(by -e) and run them.
-    gre pull <[hostname:port://]name>
-            Pull the [remote] gre <name> and combine it to the named gre(by -e).
-    gre push <[hostname:port://]name>
-            Push the named gre(by -e) and combine it to the [remote] gre <name>.
-    gre suspend
-            Suspend the execution of the named gre(by -e). All the running VMs
-            in that gre will be suspended.
-    gre resume
-            Resume the execution of the named gre(by -e). All the running VMs
-            in that gre will be resumed to run.
-    gre priority <maximum|high|normal|low|minimum>
-            Set the priority of the named gre(by -e). Default is normal.
-
-The default "master" gre only supports save and load command.
-
-Standalone commands:
-    compile <file.gsh>
-            Compile <file.gsh> into byte code <file>.
-    exec <file[.gsh]> [args...]
-            Run <file[.gsh]> in a local standalone VM.
-
-Management commands of gre VM:
-    run [-i --rm] <file[.gsh]> [args...]
-            Run <file[.gsh]> in a new VM with its name set to base name of
-            <file> in the designated gre and return a 12 hex digits VMID.
-            -i    Enter interactive mode, keep STDIN and STDOUT
-            open until <file[.gsh]> finishes execution.
-            --rm  Automatically remove the VM when it exits.
-            If no -e presents, the default "master" gre is used.
-            The named gre instance will be created to run <file[.gsh]>
-            if it has not been created by the remote/local gre server.
-    ps [VMID1 VMID2 ...|name1 name2 ...]
-            List VM instances in the local/remote gre server.
-    kill <VMID1 VMID2 ...|name1 name2 ...>
-            Abort the execution of one or more VMs.
-    rm <VMID1 VMID2 ...|name1 name2 ...>
-            Remove one or more stopped VMs and associated files, running
-            VM can not be removed.
-    restart <VMID1 VMID2 ...|name1 name2 ...>
-            Restart one or more stopped VMs, no effect on a running VM.
-
-Debugging commands:
-    tailf <server|gre|VMID>
-            Print logs of the server/gre or print outputs of the VM by VMID.
-
-gshell enters interactive mode if no options and no commands provided.
-
-Maintained by godevsig, see https://github.com/godevsig`
+var (
+	version           string
+	workDir           = "/var/tmp/gshell/"
+	logDir            = workDir + "logs/"
+	debugService      func(lg *log.Logger)
+	godevsigPublisher = "godevsig.org"
 )
+
+func init() {
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		panic(err)
+	}
+}
 
 type shell struct {
 	modules     *tengo.ModuleMap
@@ -255,86 +190,206 @@ func newShell() *shell {
 	return sh
 }
 
-var savedOptions string
-
-// ShellMain is the main entry of gshell
-func ShellMain() error {
-	args := os.Args
-
-	// no arg, shell mode
-	if len(args) == 1 {
-		sh := newShell()
-		sh.runREPL()
-		return nil
+func getSelfID(opts []as.Option) (selfID string, err error) {
+	opts = append(opts, as.WithScope(as.ScopeProcess|as.ScopeOS))
+	c := as.NewClient(opts...).SetDiscoverTimeout(0)
+	conn := <-c.Discover(as.BuiltinPublisher, "providerInfo")
+	if conn == nil {
+		err = as.ErrServiceNotFound
+		return
 	}
-	args = args[1:] // shift
+	defer conn.Close()
 
-	remotegREServerAddr := ""
-	greName := ""
-	loglevel := log.Linfo
-	logFlag := log.Ldefault
-	if len(version) == 0 {
-		version = "development"
+	err = conn.SendRecv(&as.ReqProviderInfo{}, &selfID)
+	return
+}
+
+func trimName(name string, size int) string {
+	if len(name) > size {
+		name = name[:size-3] + "..."
 	}
+	return name
+}
 
-	// options
-	for ; len(args) != 0; args = args[1:] {
-		if args[0][0] != '-' {
-			break // not option
+type subCmd struct {
+	*flag.FlagSet
+	action func() error
+}
+
+var cmds []subCmd
+var loglevel = flag.String("loglevel", "error", "debug/info/warn/error")
+
+func newLogger(logStream *log.Stream, loggerName string) *log.Logger {
+	level := log.Linfo
+	switch *loglevel {
+	case "debug":
+		level = log.Ldebug
+		logStream.SetFlag(log.Lfileline)
+	case "warn":
+		level = log.Lwarn
+	case "error":
+		level = log.Lerror
+	}
+	logStream.SetLoglevel("*", level)
+	return logStream.NewLogger(loggerName, log.Linfo)
+}
+
+func newCmd(name, usage, help string) string {
+	head := fmt.Sprintf("%s %s", name, usage)
+	return fmt.Sprintf("%s\n\t%s", head, help)
+}
+
+func addDeamonCmd() {
+	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "start gshell daemon"), flag.ExitOnError)
+	rootRegistry := cmd.Bool("root", false, "enable root registry service")
+	registryAddr := cmd.String("registry", "", "root registry address")
+	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
+
+	action := func() error {
+		if len(*registryAddr) == 0 {
+			return errors.New("root registry address not set")
 		}
-		switch args[0] {
-		case "-h", "--help":
-			fmt.Println(usage)
-			return nil
-		case "-v", "--version":
-			fmt.Println(version)
-			return nil
-		case "-d", "--debug":
-			savedOptions += "-d "
-			loglevel--
-			if loglevel <= log.Ltrace {
-				loglevel = log.Ltrace
-				logFlag = log.Lfileline
-			}
-		case "-c", "--connect": // -c, --connect <hostname:port>
-			if len(args) > 1 {
-				remotegREServerAddr = args[1]
-				args = args[1:] // shift
-			}
-		case "-e", "--gre": // -e, --gre <name>
-			if len(args) > 1 {
-				greName = args[1]
-				args = args[1:] // shift
-			}
-		default:
-			return fmt.Errorf("unknown option %s, see --help", args[0])
+		if len(*lanBroadcastPort) == 0 {
+			return errors.New("lan broadcast port not set")
 		}
-	}
 
-	if loglevel != log.Linfo {
-		gsStream.SetLoglevel("*", loglevel)
-		gsStream.SetFlag(logFlag)
-		gcStream.SetLoglevel("*", loglevel)
-		gcStream.SetFlag(logFlag)
-		greStream.SetLoglevel("*", loglevel)
-		greStream.SetFlag(logFlag)
-	}
+		logStream := log.NewStream("daemon")
+		logStream.SetOutput("file:" + workDir + "daemon.log")
+		lg := newLogger(logStream, "daemon")
 
-	cmd := args[0]
-	args = args[1:] // shift
+		opts := []as.Option{
+			as.WithRegistryAddr(*registryAddr),
+			as.WithLogger(lg),
+		}
+		s := as.NewServer(opts...).
+			SetPublisher(godevsigPublisher).
+			SetBroadcastPort(*lanBroadcastPort).
+			EnableAutoReverseProxy().
+			EnableServiceLister()
+		if *rootRegistry {
+			s.EnableRootRegistry()
+		}
 
-	if cmd == "server" { // server [port]
-		port := ""
-		if len(args) > 0 {
-			port = args[0]
+		gd := &daemon{
+			lg: lg,
+		}
+		if err := s.Publish("gshellDaemon",
+			daemonKnownMsgs,
+			as.OnNewStreamFunc(gd.onNewStream),
+		); err != nil {
+			return err
 		}
 		if debugService != nil {
-			go debugService(gsLogger)
+			go debugService(lg)
 		}
-		return runServer(version, port)
-	}
 
-	if cmd == "compile" { // compile <file.gsh>
+		return s.Serve()
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+func addListCmd() {
+	cmd := flag.NewFlagSet(newCmd("list", "[options]", "list services in all scopes"), flag.ExitOnError)
+	verbose := cmd.Bool("v", false, "show verbose info")
+	publisher := cmd.String("p", "*", "publisher name, can be wildcard")
+	service := cmd.String("s", "*", "service name, can be wildcard")
+
+	action := func() error {
+		opts := []as.Option{
+			as.WithLogger(newLogger(log.DefaultStream, "main")),
+		}
+		selfID, err := getSelfID(opts)
+		if err != nil {
+			return err
+		}
+
+		c := as.NewClient(opts...)
+		conn := <-c.Discover(as.BuiltinPublisher, "serviceLister")
+		if conn == nil {
+			return as.ErrServiceNotFound
+		}
+		defer conn.Close()
+
+		msg := as.ListService{TargetScope: as.ScopeAll, Publisher: *publisher, Service: *service}
+		var scopes [4][]*as.ServiceInfo
+		if err := conn.SendRecv(&msg, &scopes); err != nil {
+			return err
+		}
+		if *verbose {
+			for _, services := range scopes {
+				for _, svc := range services {
+					if svc.ProviderID == selfID {
+						svc.ProviderID = "self"
+					}
+					fmt.Printf("PUBLISHER: %s\n", svc.Publisher)
+					fmt.Printf("SERVICE  : %s\n", svc.Service)
+					fmt.Printf("PROVIDER : %s\n", svc.ProviderID)
+					addr := svc.Addr
+					if addr[len(addr)-1] == 'P' {
+						addr = addr[:len(addr)-1] + "(proxied)"
+					}
+					fmt.Printf("ADDRESS  : %s\n\n", addr)
+				}
+			}
+		} else {
+			list := make(map[string]*as.Scope)
+			for i, services := range scopes {
+				for _, svc := range services {
+					if svc.ProviderID == selfID {
+						svc.ProviderID = "self"
+					}
+					k := svc.Publisher + "_" + svc.Service + "_" + svc.ProviderID
+					p, has := list[k]
+					if !has {
+						v := as.Scope(0)
+						p = &v
+						list[k] = p
+					}
+					*p = *p | 1<<i
+				}
+			}
+			names := make([]string, 0, len(list))
+			for name := range list {
+				names = append(names, name)
+			}
+			sort.Strings(names)
+			fmt.Println("PUBLISHER           SERVICE             PROVIDER      WLOP(SCOPE)")
+			for _, svc := range names {
+				p := list[svc]
+				if p == nil {
+					panic("nil p")
+				}
+				ss := strings.Split(svc, "_")
+				fmt.Printf("%-18s  %-18s  %-12s  %4b\n", trimName(ss[0], 18), trimName(ss[1], 18), ss[2], *p)
+			}
+		}
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+func addIDCmd() {
+	cmd := flag.NewFlagSet(newCmd("id", "", "print self provider ID"), flag.ExitOnError)
+
+	action := func() error {
+		opts := []as.Option{
+			as.WithLogger(newLogger(log.DefaultStream, "main")),
+		}
+		selfID, err := getSelfID(opts)
+		if err != nil {
+			return err
+		}
+		fmt.Println(selfID)
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+func addCompileCmd() {
+	cmd := flag.NewFlagSet(newCmd("compile", "<file.gsh>", "compile <file.gsh> to byte code <file>"), flag.ExitOnError)
+
+	action := func() error {
+		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
@@ -347,139 +402,416 @@ func ShellMain() error {
 		outputFile := strings.TrimSuffix(inputFile, filepath.Ext(inputFile))
 		return sh.compileAndSave(inputFile, outputFile)
 	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
 
-	if cmd == "exec" { // exec <file[.gsh]> [args...]
+func addExecCmd() {
+	cmd := flag.NewFlagSet(newCmd("exec", "<file[.gsh]> [args...]", "run <file[.gsh]> in a local standalone VM"), flag.ExitOnError)
+
+	action := func() error {
+		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
+
 		file := args[0]
 		inputFile, _ := filepath.Abs(file)
-		os.Args = args // pass os.Args down
+		os.Args = args[1:] // pass os.Args down
 		sh := newShell()
 		if filepath.Ext(inputFile) == ".gsh" {
 			return sh.compileAndExec(inputFile)
 		}
 		return sh.execCompiled(inputFile)
 	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
 
-	network := "unix"
-	address := workDir + "gshelld.sock"
-	if len(remotegREServerAddr) != 0 {
-		network = "tcp"
-		address = remotegREServerAddr
+func addStartCmd() {
+	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "start named gre"), flag.ExitOnError)
+	greName := cmd.String("e", "", "create new gre(gshell runtime environment)")
+
+	action := func() error {
+		if len(*greName) == 0 {
+			return errors.New("no gre name, see --help")
+		}
+
+		logStream := log.NewStream("gre")
+		logStream.SetOutput("file:" + workDir + "gre.log")
+		lg := newLogger(logStream, "gre-"+*greName)
+		opts := []as.Option{
+			as.WithScope(as.ScopeOS),
+			as.WithLogger(lg),
+		}
+
+		s := as.NewServer(opts...).SetPublisher(godevsigPublisher)
+		gre := &gre{
+			name: *greName,
+			lg:   lg,
+			vms:  make(map[string]*vmCtl),
+		}
+
+		if err := s.Publish("gre-"+*greName,
+			greKnownMsgs,
+			as.OnNewStreamFunc(gre.onNewStream),
+		); err != nil {
+			return err
+		}
+		if debugService != nil {
+			go debugService(lg)
+		}
+		return s.Serve()
 	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
 
-	clientRun := func(client sm.Processor) error {
-		return sm.DialRun(client, network, address,
-			sm.ErrorAsEOF(),
-			sm.WithLogger(gcLogger))
-	}
+func addRunCmd() {
+	cmd := flag.NewFlagSet(newCmd("run", "[options] <file[.gsh]> [args...]", "run <file[.gsh]> in a new VM in gre"), flag.ExitOnError)
+	providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
+	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment) in which the VM runs")
+	interactive := cmd.Bool("i", false, "enter interactive mode")
+	autoRemove := cmd.Bool("rm", false, "automatically remove the VM when it exits")
 
-	if cmd == "gre" {
-		if len(args) == 0 {
-			return errors.New("need gre sub-command, see --help")
-		}
-		if len(greName) == 0 {
-			return errors.New("no gre name provided, need -e option")
-		}
-
-		subcmd := args[0]
-		if greName == "master" {
-			if subcmd != "save" && subcmd != "load" {
-				return errors.New("master gre only supports save and load")
-			}
-		}
-		args = args[1:] // shift
-		var paras string
-		switch subcmd {
-		case "__start":
-			if greName != "master" {
-				if debugService != nil {
-					go debugService(greLogger)
-				}
-				return rungre(greName)
-			}
-			return nil
-		case "stop":
-			if len(args) != 0 && args[0] == "-f" {
-				paras = "-f"
-			}
-		case "save", "load":
-			if len(args) == 0 {
-				return errors.New("no file provided, see --help")
-			}
-			paras = args[0]
-		case "suspend", "resume":
-		case "priority":
-			if len(args) == 0 {
-				return errors.New("no priority provided, see --help")
-			}
-			switch args[0] {
-			case "maximum", "high", "normal", "low", "minimum":
-				paras = args[0]
-			default:
-				return errors.New("wrong priority, see --help")
-			}
-		default:
-			return errors.New("unknown subcmd: " + subcmd)
-		}
-
-		greCmd := &greCmd{greName, subcmd, paras}
-		return clientRun(greCmd)
-	}
-
-	if cmd == "run" { // run [-i] <file[.gsh]> [args...]
-		interactive := false
-		autoRemove := false
-		for len(args) != 0 && args[0][0] == '-' {
-			switch args[0] {
-			case "-i":
-				interactive = true
-			case "--rm":
-				autoRemove = true
-			default:
-				return fmt.Errorf("unknown option %s, see --help", args[0])
-			}
-			args = args[1:] // shift
-		}
+	action := func() error {
+		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
+
 		file := args[0]
-		inputFile, _ := filepath.Abs(file)
-		if len(greName) == 0 {
-			greName = "master"
+		inputFile, err := filepath.Abs(file)
+		if err != nil {
+			return err
 		}
-		cmdRun := &cmdRun{greName, inputFile, args, interactive, autoRemove, nil}
-		return sm.DialRun(cmdRun, network, address,
-			sm.ErrorAsEOF(),
-			sm.RawMode(),
-			sm.WithLogger(gcLogger))
-	}
-
-	if cmd == "ps" {
-		cmdPs := cmdQuery{GreName: greName, IDPattern: args}
-		return clientRun(cmdPs)
-	}
-
-	if cmd == "kill" || cmd == "rm" || cmd == "restart" {
-		if len(args) == 0 {
-			return errors.New("no vm id provided, see --help")
+		sh := newShell()
+		var b bytes.Buffer
+		if filepath.Ext(inputFile) == ".gsh" {
+			bytecode, err := sh.compile(inputFile)
+			if err != nil {
+				return err
+			}
+			err = bytecode.Encode(&b)
+			if err != nil {
+				return err
+			}
+		} else {
+			f, err := os.Open(inputFile)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			b.ReadFrom(f)
 		}
-		cmdAction := cmdPatternAction{GreName: greName, IDPattern: args, Cmd: cmd}
-		return clientRun(cmdAction)
-	}
+		byteCode := b.Bytes()
+		cmd := cmdRun{
+			greCmdRun: greCmdRun{
+				File:        inputFile,
+				Args:        args[1:],
+				Interactive: *interactive,
+				AutoRemove:  *autoRemove,
+				ByteCode:    byteCode,
+			},
+			GreName: *greName,
+		}
 
-	if cmd == "tailf" {
+		lg := newLogger(log.DefaultStream, "main")
+		opts := []as.Option{
+			as.WithLogger(lg),
+		}
+		c := as.NewClient(opts...)
+		var conn as.Connection
+		if *providerID == "self" { // local
+			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
+		} else { // remote
+			conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
+		}
+		if conn == nil {
+			return as.ErrServiceNotFound
+		}
+		defer conn.Close()
+
+		if err := conn.Send(&cmd); err != nil {
+			return err
+		}
+
+		if !*interactive {
+			var vmid string
+			if err := conn.Recv(&vmid); err != nil {
+				return err
+			}
+			fmt.Println(vmid)
+			return nil
+		}
+
+		lg.Debugln("enter interactive io")
+		go io.Copy(conn, os.Stdin)
+		io.Copy(os.Stdout, conn)
+		lg.Debugln("exit interactive io")
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+func addPsCmd() {
+	cmd := flag.NewFlagSet(newCmd("ps", "[options] [VMIDs ...|names ...]", "show VM instances by VM ID or name"), flag.ExitOnError)
+	providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
+	greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
+
+	action := func() error {
+		lg := newLogger(log.DefaultStream, "main")
+		opts := []as.Option{
+			as.WithLogger(lg),
+		}
+		c := as.NewClient(opts...)
+		var conn as.Connection
+		if *providerID == "self" { // local
+			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
+		} else { // remote
+			conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
+		}
+		if conn == nil {
+			return as.ErrServiceNotFound
+		}
+		defer conn.Close()
+
+		msg := cmdQuery{GreName: *greName, IDPattern: cmd.Args()}
+		var gvis []*greVMInfo
+		if err := conn.SendRecv(&msg, &gvis); err != nil {
+			return err
+		}
+
+		if len(msg.IDPattern) != 0 { // info
+			for _, gvi := range gvis {
+				for _, vmi := range gvi.VMInfos {
+					fmt.Println("ID        :", vmi.ID)
+					fmt.Println("IN GRE    :", gvi.Name)
+					fmt.Println("NAME      :", vmi.Name)
+					fmt.Println("ARGS      :", vmi.Args)
+					fmt.Println("STATUS    :", vmi.Stat)
+					if vmi.RestartedNum != 0 {
+						fmt.Println("RESTARTED :", vmi.RestartedNum)
+					}
+					startTime := ""
+					if !vmi.StartTime.IsZero() {
+						startTime = fmt.Sprint(vmi.StartTime)
+					}
+					fmt.Println("START AT  :", startTime)
+					endTime := ""
+					if !vmi.EndTime.IsZero() {
+						endTime = fmt.Sprint(vmi.EndTime)
+					}
+					fmt.Println("END AT    :", endTime)
+					fmt.Printf("ERROR     : %v\n\n", vmi.VMErr)
+				}
+			}
+		} else { // ps
+			fmt.Println("VM ID         IN GRE        NAME          START AT             STATUS")
+			trimName := func(name string) string {
+				if len(name) > 12 {
+					name = name[:9] + "..."
+				}
+				return name
+			}
+			for _, gvi := range gvis {
+				for _, vmi := range gvi.VMInfos {
+
+					created := vmi.StartTime.Format("2006/01/02 15:04:05")
+					stat := vmi.Stat
+					switch stat {
+					case "exited":
+						ret := ":OK"
+						if len(vmi.VMErr) != 0 {
+							ret = ":ERR"
+						}
+						stat = stat + ret
+						d := vmi.EndTime.Sub(vmi.StartTime)
+						stat = fmt.Sprintf("%-10s %v", stat, d)
+					case "running":
+						d := time.Since(vmi.StartTime)
+						stat = fmt.Sprintf("%-10s %v", stat, d)
+					}
+
+					fmt.Printf("%s  %-12s  %-12s  %s  %s\n", vmi.ID, trimName(gvi.Name), trimName(vmi.Name), created, stat)
+				}
+			}
+		}
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+func addPatternCmds() {
+	for _, cmdStrs := range [][]string{
+		{"kill", "[options] [VMIDs ...|names ...]", "abort the execution of one or more VMs"},
+		{"rm", "[options] [VMIDs ...|names ...]", "remove one or more stopped VMs, running VM can not be removed"},
+		{"restart", "[options] [VMIDs ...|names ...]", "restart one or more stopped VMs, no effect on a running VM"},
+	} {
+		cmdStrs := cmdStrs
+		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
+		providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
+		greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
+
+		action := func() error {
+			lg := newLogger(log.DefaultStream, "main")
+			opts := []as.Option{
+				as.WithLogger(lg),
+			}
+			c := as.NewClient(opts...)
+			var conn as.Connection
+			if *providerID == "self" { // local
+				conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
+			} else { // remote
+				conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
+			}
+			if conn == nil {
+				return as.ErrServiceNotFound
+			}
+			defer conn.Close()
+
+			msg := cmdPatternAction{GreName: *greName, IDPattern: cmd.Args(), Cmd: cmdStrs[0]}
+			var vmids []*greVMIDs
+			if err := conn.SendRecv(&msg, &vmids); err != nil {
+				return err
+			}
+
+			var info string
+			switch msg.Cmd {
+			case "kill":
+				info = "killed"
+			case "rm":
+				info = "removed"
+			case "restart":
+				info = "restarted"
+			}
+			var sb strings.Builder
+			for _, gvi := range vmids {
+				str := strings.Join(gvi.VMIDs, "\n")
+				if len(str) != 0 {
+					fmt.Fprintln(&sb, str)
+				}
+			}
+			if sb.Len() > 0 {
+				fmt.Print(sb.String())
+				fmt.Println(info)
+			}
+			return nil
+		}
+		cmds = append(cmds, subCmd{cmd, action})
+	}
+}
+
+func addTailfCmd() {
+	cmd := flag.NewFlagSet(newCmd("tailf", "[options] <daemon|gre|VMID>", "print logs of the daemon/gre or print outputs of the VM by VMID"), flag.ExitOnError)
+	providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
+
+	action := func() error {
+		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no target provided, see --help")
 		}
-		cmdTailf := cmdTailf{Target: args[0]}
-		return sm.DialRun(cmdTailf, network, address,
-			sm.RawMode(),
-			sm.ErrorAsEOF(),
-			sm.WithLogger(gcLogger))
+		target := args[0]
+		lg := newLogger(log.DefaultStream, "main")
+		opts := []as.Option{
+			as.WithLogger(lg),
+		}
+		c := as.NewClient(opts...)
+		var conn as.Connection
+		if *providerID == "self" { // local
+			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
+		} else { // remote
+			conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
+		}
+		if conn == nil {
+			return as.ErrServiceNotFound
+		}
+		defer conn.Close()
+
+		msg := cmdTailf{Target: target}
+		if err := conn.Send(&msg); err != nil {
+			return err
+		}
+		io.Copy(os.Stdout, conn)
+		lg.Debugln("cmdTailf: done")
+
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+// ShellMain is the main entry of gshell
+func ShellMain() error {
+	// no arg, shell mode
+	if len(os.Args) == 1 {
+		sh := newShell()
+		sh.runREPL()
+		return nil
 	}
 
-	return fmt.Errorf("unknown command %s, see --help", cmd)
+	addDeamonCmd()
+	addListCmd()
+	addIDCmd()
+	addCompileCmd()
+	addExecCmd()
+	addStartCmd()
+	addRunCmd()
+	addPsCmd()
+	addPatternCmds()
+	addTailfCmd()
+
+	if len(version) == 0 {
+		version = "development"
+	}
+
+	usage := func() {
+		fmt.Println("COMMANDS:")
+		for _, cmd := range cmds {
+			name := cmd.Name()
+			if !strings.HasPrefix(name, "__") {
+				fmt.Println("  " + name)
+			}
+		}
+	}
+
+	switch os.Args[1] {
+	case "-h", "--help":
+		help := `gshell is an interpreter in Golang style syntax and a supervision tool to
+manage .gsh apps running in gshell VM(tengo based virtual machine).
+
+Each .gsh file runs in a separate new VM so one VM's crash does not impact others.
+VMs run in gshell runtime environment(gre), which is essentially a share memory
+space in which the communications between VMs are fast.
+
+gshell daemon command starts a daemon which is supposed to run at each system
+so that gshell run command can run .gsh file in a remote system with specified
+provider ID, this remote run also works for NAT network.
+
+gshell enters interactive mode if no options and no commands provided.
+`
+		fmt.Println(help)
+		fmt.Println("Usage: [OPTIONS] COMMAND ...")
+		fmt.Println("OPTIONS:")
+		flag.PrintDefaults()
+		usage()
+		return nil
+	case "-v", "--version":
+		fmt.Println(version)
+		return nil
+	default:
+		flag.Parse()
+		args := flag.Args()
+		if len(args) == 0 {
+			return errors.New("no command provided, see --help")
+		}
+		str := args[0]
+		for _, cmd := range cmds {
+			if str == strings.Split(cmd.Name(), " ")[0] {
+				cmd.SetOutput(os.Stdout)
+				cmd.Parse(args[1:])
+				if err := cmd.action(); err != nil {
+					return err
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("unknown command: %s, see --help", str)
+	}
 }

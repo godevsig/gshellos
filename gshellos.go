@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"path"
-	"runtime"
 	"time"
 
 	"github.com/d5/tengo/v2"
@@ -38,52 +36,9 @@ var (
 	ErrInvalidType = errors.New("invalid type")
 	// ErrNotConvertible is an error when failed to convert the input to/from an object.
 	ErrNotConvertible = errors.New("not convertible")
+	// ErrBrokenGre is an error where the specified gre has problem to run.
+	ErrBrokenGre = errors.New("broken gre")
 )
-
-func errorHere(err interface{}) error {
-	_, file, line, _ := runtime.Caller(1)
-	return fmt.Errorf("(%s:%d): %v", path.Base(file), line, err)
-}
-
-type errorRecover interface {
-	Error() error
-	String() string
-	Recover() (recovered bool) // return true if the error has been recovered.
-}
-
-type unrecoverableError struct {
-	err error
-}
-
-func (e unrecoverableError) Error() error {
-	return e.err
-}
-
-func (e unrecoverableError) String() string {
-	return "unrecoverable error"
-}
-
-func (e unrecoverableError) Recover() bool {
-	return false
-}
-
-type customErrorRecover struct {
-	err         error
-	str         string
-	recoverFunc func() bool
-}
-
-func (e customErrorRecover) Error() error {
-	return e.err
-}
-
-func (e customErrorRecover) String() string {
-	return e.str
-}
-
-func (e customErrorRecover) Recover() bool {
-	return e.recoverFunc()
-}
 
 // modules are extension modules managed by this package.
 var (
@@ -170,22 +125,20 @@ type writerStat struct {
 }
 type mWriter struct {
 	writers []*writerStat
+	eofNum  int
 }
 
 func (mw *mWriter) Write(p []byte) (n int, err error) {
-	eofNum := 0
 	for _, w := range mw.writers {
 		if w.eof {
-			eofNum++
 			continue
 		}
-		_, terr := w.w.Write(p)
-		if terr != nil {
+		if _, err := w.w.Write(p); err != nil {
 			w.eof = true
-			eofNum++
+			mw.eofNum++
 		}
 	}
-	if eofNum == len(mw.writers) {
+	if mw.eofNum == len(mw.writers) {
 		return 0, io.EOF
 	}
 	return len(p), nil
@@ -199,3 +152,9 @@ func multiWriter(writers ...io.Writer) io.Writer {
 	}
 	return mw
 }
+
+type null struct{}
+
+func (null) Close() error                  { return nil }
+func (null) Write(buf []byte) (int, error) { return len(buf), nil }
+func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
