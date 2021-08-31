@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/d5/tengo/v2 v2.7.0
-	github.com/godevsig/adaptiveservice v0.0.0-20210828074940-02f18ce24a4f
+	github.com/godevsig/adaptiveservice v0.0.0-20210831161717-29bec916d9c5
 	github.com/peterh/liner v1.2.1
 )
 

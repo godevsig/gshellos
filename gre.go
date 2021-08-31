@@ -146,7 +146,7 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	vc.vmInfo.Args = msg.Args
 	atomic.StoreInt32(&vc.stat, vmStatStarting)
 
-	vc.outputFile = logDir + vc.ID
+	vc.outputFile = workDir + "/logs/" + vc.ID
 	output, err := os.Create(vc.outputFile)
 	if err != nil {
 		gre.lg.Errorln("greCmdRun: create output file error:", err)

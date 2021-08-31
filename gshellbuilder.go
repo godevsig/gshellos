@@ -23,17 +23,10 @@ import (
 
 var (
 	version           string
-	workDir           = "/var/tmp/gshell/"
-	logDir            = workDir + "logs/"
+	workDir           = "/var/tmp/gshell"
 	debugService      func(lg *log.Logger)
 	godevsigPublisher = "godevsig.org"
 )
-
-func init() {
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		panic(err)
-	}
-}
 
 type shell struct {
 	modules     *tengo.ModuleMap
@@ -254,7 +247,7 @@ func addDeamonCmd() {
 		}
 
 		logStream := log.NewStream("daemon")
-		logStream.SetOutput("file:" + workDir + "daemon.log")
+		logStream.SetOutput("file:" + workDir + "/logs/daemon.log")
 		lg := newLogger(logStream, "daemon")
 
 		opts := []as.Option{
@@ -436,7 +429,7 @@ func addStartCmd() {
 		}
 
 		logStream := log.NewStream("gre")
-		logStream.SetOutput("file:" + workDir + "gre.log")
+		logStream.SetOutput("file:" + workDir + "/logs/gre.log")
 		lg := newLogger(logStream, "gre-"+*greName)
 		opts := []as.Option{
 			as.WithScope(as.ScopeOS),
@@ -561,7 +554,7 @@ func addPsCmd() {
 		opts := []as.Option{
 			as.WithLogger(lg),
 		}
-		c := as.NewClient(opts...)
+		c := as.NewClient(opts...).SetDiscoverTimeout(0)
 		var conn as.Connection
 		if *providerID == "self" { // local
 			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
@@ -655,7 +648,7 @@ func addPatternCmds() {
 			opts := []as.Option{
 				as.WithLogger(lg),
 			}
-			c := as.NewClient(opts...)
+			c := as.NewClient(opts...).SetDiscoverTimeout(0)
 			var conn as.Connection
 			if *providerID == "self" { // local
 				conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
@@ -746,6 +739,8 @@ func ShellMain() error {
 		return nil
 	}
 
+	flag.StringVar(&workDir, "wd", workDir, "set working directory")
+
 	addDeamonCmd()
 	addListCmd()
 	addIDCmd()
@@ -797,6 +792,9 @@ gshell enters interactive mode if no options and no commands provided.
 		return nil
 	default:
 		flag.Parse()
+		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
+			panic(err)
+		}
 		args := flag.Args()
 		if len(args) == 0 {
 			return errors.New("no command provided, see --help")

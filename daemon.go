@@ -152,11 +152,11 @@ func (msg *cmdTailf) Handle(stream as.ContextStream) (reply interface{}) {
 	var file string
 	switch msg.Target {
 	case "daemon":
-		file = workDir + "daemon.log"
+		file = workDir + "/logs/daemon.log"
 	case "gre":
-		file = workDir + "gre.log"
+		file = workDir + "/logs/gre.log"
 	default:
-		file = workDir + "logs/" + msg.Target
+		file = workDir + "/logs/" + msg.Target
 	}
 
 	f, err := os.Open(file)
