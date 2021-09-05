@@ -31,7 +31,7 @@ func (gd *daemon) setupgre(name string) as.Connection {
 		return conn
 	}
 
-	args := "-loglevel " + *loglevel + " __start " + "-e " + name
+	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-e " + name
 	cmd := exec.Command(os.Args[0], strings.Split(args, " ")...)
 	buf := &bytes.Buffer{}
 	cmd.Stdout = buf
@@ -169,11 +169,22 @@ func (msg *cmdTailf) Handle(stream as.ContextStream) (reply interface{}) {
 	return
 }
 
+type cmdInfo struct{}
+
+func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Version: %s\n", version)
+	fmt.Fprintf(&b, "Build tags: %s\n", buildTags)
+
+	return b.String()
+}
+
 var daemonKnownMsgs = []as.KnownMessage{
 	(*cmdRun)(nil),
 	(*cmdQuery)(nil),
 	(*cmdPatternAction)(nil),
 	(*cmdTailf)(nil),
+	cmdInfo{},
 }
 
 func init() {
@@ -183,4 +194,5 @@ func init() {
 	as.RegisterType((*cmdPatternAction)(nil))
 	as.RegisterType([]*greVMIDs(nil))
 	as.RegisterType((*cmdTailf)(nil))
+	as.RegisterType(cmdInfo{})
 }
