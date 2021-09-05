@@ -2,7 +2,8 @@ SHELL=bash
 
 PKG_LIST := $(shell go list ./...)
 GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
-LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)'
+BLDTAGS := stdlib,adaptiveservice
+LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)' -X 'github.com/godevsig/gshellos.buildTags=$(BLDTAGS)'
 
 .PHONY: all dep format build clean test coverage lint vet race help
 
@@ -32,16 +33,20 @@ coverage: dep ## Generate global code coverage report
 	@go tool cover -func=.test/final_coverage.out | tee .test/final_coverage.log
 	@tail .test/final_coverage.log -n1 | awk -F"\t*| *|%" '{if ($$3<${COVER_GOAL}) {print "Coverage goal: ${COVER_GOAL}% not reached"; exit 1}}'
 
-dep: ## Get the dependencies
+dep:
 	@mkdir -p bin .test
 
-build: release
+build: dep
+	@go build -tags $(BLDTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
-release: dep ## Build release binary file to bin dir
-	@go build -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
+debug: BLDTAGS := $(BLDTAGS),debug
+debug: build ## Build debug binary to bin dir
 
-debug: dep ## Build debug binary file to bin dir
-	@go build -ldflags="$(LDFLAGS)" -o bin -tags debug ./cmd/gshell 
+lite: BLDTAGS := $(BLDTAGS)
+lite: build ## Build lite release binary to bin dir
+
+full: BLDTAGS := $(BLDTAGS),echart,database
+full: build ## Build full release binary to bin dir
 
 clean: ## Remove previous build and test files
 	@rm -rf bin `find -name "\.test"`

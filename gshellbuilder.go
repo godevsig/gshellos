@@ -1,64 +1,73 @@
 package gshellos
 
 import (
-	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path/filepath"
+	"os/signal"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/d5/tengo/v2"
-	"github.com/d5/tengo/v2/parser"
-	"github.com/d5/tengo/v2/stdlib"
 	as "github.com/godevsig/adaptiveservice"
+	"github.com/godevsig/gshellos/extension"
 	"github.com/godevsig/gshellos/lined"
 	"github.com/godevsig/gshellos/log"
+	"github.com/traefik/yaegi/interp"
+	"github.com/traefik/yaegi/stdlib"
 )
 
 var (
 	version           string
+	buildTags         string
 	workDir           = "/var/tmp/gshell"
+	loglevel          = "error"
+	providerID        = "self"
 	debugService      func(lg *log.Logger)
 	godevsigPublisher = "godevsig.org"
 )
 
 type shell struct {
-	modules     *tengo.ModuleMap
-	symbolTable *tengo.SymbolTable
-	globals     []tengo.Object
+	*interp.Interpreter
 }
 
-func (sh *shell) initModules() {
-	sh.modules = stdlib.GetModuleMap(stdlib.AllModuleNames()...)
-	sh.modules.AddMap(GetModuleMap(AllModuleNames()...))
-}
-
-func (sh *shell) addFunction(name string, fn tengo.CallableFunc) {
-	symbol := sh.symbolTable.Define(name)
-	sh.globals[symbol.Index] = &tengo.UserFunction{
-		Name:  name,
-		Value: fn,
+func newShell(opt interp.Options) *shell {
+	os.Setenv("YAEGI_SPECIAL_STDIO", "1")
+	i := interp.New(opt)
+	if err := i.Use(stdlib.Symbols); err != nil {
+		panic(err)
 	}
-}
-
-func (sh *shell) preCompile() {
-	sh.symbolTable = tengo.NewSymbolTable()
-	sh.globals = make([]tengo.Object, tengo.GlobalsSize)
-
-	for _, v := range globalFuncs {
-		sh.addFunction(v.name, v.fn)
+	if err := i.Use(extension.Symbols); err != nil {
+		panic(err)
 	}
+	i.ImportUsed()
+	sh := &shell{Interpreter: i}
+	return sh
 }
 
 func (sh *shell) runREPL() {
-	fileSet := parser.NewFileSet()
-	var constants []tengo.Object
+	ctx, cancel := context.WithCancel(context.Background())
+	end := make(chan struct{}) // channel to terminate the REPL
+	defer close(end)
+	sig := make(chan os.Signal, 1) // channel to trap interrupt signal (Ctrl-C)
+
+	signal.Notify(sig, os.Interrupt)
+	defer signal.Stop(sig)
+
+	go func() {
+		for {
+			select {
+			case <-sig:
+				cancel()
+				ctx, cancel = context.WithCancel(context.Background())
+			case <-end:
+				return
+			}
+		}
+	}()
 
 	led := lined.NewEditor(lined.Cfg{
 		Prompt: ">> ",
@@ -71,116 +80,41 @@ func (sh *shell) runREPL() {
 			break
 		}
 		if len(line) != 0 {
-			srcFile := fileSet.AddFile("repl", -1, len(line))
-			p := parser.NewParser(srcFile, []byte(line), nil)
-			file, err := p.ParseFile()
+			_, err := sh.EvalWithContext(ctx, line)
 			if err != nil {
 				fmt.Println(err)
-				continue
 			}
-
-			c := tengo.NewCompiler(srcFile, sh.symbolTable, constants, sh.modules, nil)
-			if err := c.Compile(file); err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			bytecode := c.Bytecode()
-			bytecode.RemoveDuplicates()
-			machine := tengo.NewVM(bytecode, sh.globals, -1)
-			if err := machine.Run(); err != nil {
-				fmt.Println(err)
-				continue
-			}
-			constants = bytecode.Constants
 		}
 	}
 }
 
-func (sh *shell) compile(inputFile string) (bytecode *tengo.Bytecode, err error) {
-	src, err := ioutil.ReadFile(inputFile)
-	if err != nil {
-		return
+func rmShebang(b []byte) []byte {
+	if len(b) >= 2 {
+		if string(b[:2]) == "#!" {
+			copy(b, "//")
+		}
 	}
-	if len(src) > 1 && string(src[:2]) == "#!" {
-		copy(src, "//")
-	}
-
-	fileSet := parser.NewFileSet()
-	srcFile := fileSet.AddFile(filepath.Base(inputFile), -1, len(src))
-
-	p := parser.NewParser(srcFile, src, nil)
-	file, err := p.ParseFile()
-	if err != nil {
-		return
-	}
-
-	c := tengo.NewCompiler(srcFile, sh.symbolTable, nil, sh.modules, nil)
-	c.EnableFileImport(true)
-	c.SetImportDir(filepath.Dir(inputFile))
-
-	if err = c.Compile(file); err != nil {
-		return
-	}
-
-	bytecode = c.Bytecode()
-	bytecode.RemoveDuplicates()
-	return
+	return b
 }
 
-func (sh *shell) compileAndSave(inputFile, outputFile string) (err error) {
-	bytecode, err := sh.compile(inputFile)
-	if err != nil {
-		return
-	}
-
-	out, err := os.Create(outputFile)
-	if err != nil {
-		return
-	}
-	defer out.Close()
-
-	err = bytecode.Encode(out)
-	if err != nil {
-		return
-	}
-	fmt.Println(outputFile)
-	return
+func isFile(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsRegular()
 }
 
-func (sh *shell) compileAndExec(inputFile string) (err error) {
-	bytecode, err := sh.compile(inputFile)
-	if err != nil {
-		return
+func (sh *shell) runFile(path string) error {
+	if isFile(path) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		_, err = sh.Eval(string(rmShebang(b)))
+		return err
 	}
 
-	machine := tengo.NewVM(bytecode, sh.globals, -1)
-	err = machine.Run()
-	return
-}
-
-func (sh *shell) execCompiled(inputFile string) (err error) {
-	data, err := ioutil.ReadFile(inputFile)
-	if err != nil {
-		return
-	}
-
-	bytecode := &tengo.Bytecode{}
-	err = bytecode.Decode(bytes.NewReader(data), sh.modules)
-	if err != nil {
-		return
-	}
-
-	machine := tengo.NewVM(bytecode, sh.globals, -1)
-	err = machine.Run()
-	return
-}
-
-func newShell() *shell {
-	sh := &shell{}
-	sh.initModules()
-	sh.preCompile()
-	return sh
+	_, err := sh.EvalPath(path)
+	return err
 }
 
 func getSelfID(opts []as.Option) (selfID string, err error) {
@@ -210,11 +144,10 @@ type subCmd struct {
 }
 
 var cmds []subCmd
-var loglevel = flag.String("loglevel", "error", "debug/info/warn/error")
 
 func newLogger(logStream *log.Stream, loggerName string) *log.Logger {
 	level := log.Linfo
-	switch *loglevel {
+	switch loglevel {
 	case "debug":
 		level = log.Ldebug
 		logStream.SetFlag(log.Lfileline)
@@ -233,7 +166,7 @@ func newCmd(name, usage, help string) string {
 }
 
 func addDeamonCmd() {
-	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "start gshell daemon"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "start local gshell daemon"), flag.ExitOnError)
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
 	registryAddr := cmd.String("registry", "", "root registry address")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
@@ -378,28 +311,8 @@ func addIDCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func addCompileCmd() {
-	cmd := flag.NewFlagSet(newCmd("compile", "<file.gsh>", "compile <file.gsh> to byte code <file>"), flag.ExitOnError)
-
-	action := func() error {
-		args := cmd.Args()
-		if len(args) == 0 {
-			return errors.New("no file provided, see --help")
-		}
-		file := args[0]
-		inputFile, _ := filepath.Abs(file)
-		if filepath.Ext(inputFile) != ".gsh" {
-			return errors.New("wrong file suffix, see --help")
-		}
-		sh := newShell()
-		outputFile := strings.TrimSuffix(inputFile, filepath.Ext(inputFile))
-		return sh.compileAndSave(inputFile, outputFile)
-	}
-	cmds = append(cmds, subCmd{cmd, action})
-}
-
 func addExecCmd() {
-	cmd := flag.NewFlagSet(newCmd("exec", "<file[.gsh]> [args...]", "run <file[.gsh]> in a local standalone VM"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("exec", "<file.go> [args...]", "run <file.go> in a local VM"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -408,13 +321,9 @@ func addExecCmd() {
 		}
 
 		file := args[0]
-		inputFile, _ := filepath.Abs(file)
-		os.Args = args[1:] // pass os.Args down
-		sh := newShell()
-		if filepath.Ext(inputFile) == ".gsh" {
-			return sh.compileAndExec(inputFile)
-		}
-		return sh.execCompiled(inputFile)
+		os.Args = args // pass os.Args down
+		sh := newShell(interp.Options{})
+		return sh.runFile(file)
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }
@@ -457,10 +366,19 @@ func addStartCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
+func getConn(lg *log.Logger) (conn as.Connection) {
+	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+	if providerID == "self" { // local
+		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
+	} else { // remote
+		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
+	}
+	return
+}
+
 func addRunCmd() {
-	cmd := flag.NewFlagSet(newCmd("run", "[options] <file[.gsh]> [args...]", "run <file[.gsh]> in a new VM in gre"), flag.ExitOnError)
-	providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
-	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment) in which the VM runs")
+	cmd := flag.NewFlagSet(newCmd("run", "[options] <file.go> [args...]", "run <file.go> in a new VM in specified gre on local/remote system"), flag.ExitOnError)
+	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment)")
 	interactive := cmd.Bool("i", false, "enter interactive mode")
 	autoRemove := cmd.Bool("rm", false, "automatically remove the VM when it exits")
 
@@ -471,52 +389,23 @@ func addRunCmd() {
 		}
 
 		file := args[0]
-		inputFile, err := filepath.Abs(file)
+		byteCode, err := os.ReadFile(file)
 		if err != nil {
 			return err
 		}
-		sh := newShell()
-		var b bytes.Buffer
-		if filepath.Ext(inputFile) == ".gsh" {
-			bytecode, err := sh.compile(inputFile)
-			if err != nil {
-				return err
-			}
-			err = bytecode.Encode(&b)
-			if err != nil {
-				return err
-			}
-		} else {
-			f, err := os.Open(inputFile)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			b.ReadFrom(f)
-		}
-		byteCode := b.Bytes()
 		cmd := cmdRun{
 			greCmdRun: greCmdRun{
-				File:        inputFile,
-				Args:        args[1:],
+				File:        file,
+				Args:        args,
 				Interactive: *interactive,
 				AutoRemove:  *autoRemove,
-				ByteCode:    byteCode,
+				ByteCode:    rmShebang(byteCode),
 			},
 			GreName: *greName,
 		}
 
 		lg := newLogger(log.DefaultStream, "main")
-		opts := []as.Option{
-			as.WithLogger(lg),
-		}
-		c := as.NewClient(opts...)
-		var conn as.Connection
-		if *providerID == "self" { // local
-			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
-		} else { // remote
-			conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
-		}
+		conn := getConn(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -545,22 +434,12 @@ func addRunCmd() {
 }
 
 func addPsCmd() {
-	cmd := flag.NewFlagSet(newCmd("ps", "[options] [VMIDs ...|names ...]", "show VM instances by VM ID or name"), flag.ExitOnError)
-	providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
+	cmd := flag.NewFlagSet(newCmd("ps", "[options] [VMIDs ...|names ...]", "show VM instances by VM ID or name on local/remote system"), flag.ExitOnError)
 	greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
 
 	action := func() error {
 		lg := newLogger(log.DefaultStream, "main")
-		opts := []as.Option{
-			as.WithLogger(lg),
-		}
-		c := as.NewClient(opts...).SetDiscoverTimeout(0)
-		var conn as.Connection
-		if *providerID == "self" { // local
-			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
-		} else { // remote
-			conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
-		}
+		conn := getConn(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -634,27 +513,17 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"kill", "[options] [VMIDs ...|names ...]", "abort the execution of one or more VMs"},
-		{"rm", "[options] [VMIDs ...|names ...]", "remove one or more stopped VMs, running VM can not be removed"},
-		{"restart", "[options] [VMIDs ...|names ...]", "restart one or more stopped VMs, no effect on a running VM"},
+		{"kill", "[options] [VMIDs ...|names ...]", "abort the execution of one or more VMs on local/remote system"},
+		{"rm", "[options] [VMIDs ...|names ...]", "remove one or more stopped VMs on local/remote system"},
+		{"restart", "[options] [VMIDs ...|names ...]", "restart one or more stopped VMs on local/remote system"},
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
-		providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
 		greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
 
 		action := func() error {
 			lg := newLogger(log.DefaultStream, "main")
-			opts := []as.Option{
-				as.WithLogger(lg),
-			}
-			c := as.NewClient(opts...).SetDiscoverTimeout(0)
-			var conn as.Connection
-			if *providerID == "self" { // local
-				conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
-			} else { // remote
-				conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
-			}
+			conn := getConn(lg)
 			if conn == nil {
 				return as.ErrServiceNotFound
 			}
@@ -692,9 +561,30 @@ func addPatternCmds() {
 	}
 }
 
+func addInfoCmd() {
+	cmd := flag.NewFlagSet(newCmd("info", "", "show gshell info on local/remote system"), flag.ExitOnError)
+
+	action := func() error {
+		lg := newLogger(log.DefaultStream, "main")
+		conn := getConn(lg)
+		if conn == nil {
+			return as.ErrServiceNotFound
+		}
+		defer conn.Close()
+
+		var info string
+		if err := conn.SendRecv(cmdInfo{}, &info); err != nil {
+			return err
+		}
+		fmt.Print(info)
+
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
 func addTailfCmd() {
-	cmd := flag.NewFlagSet(newCmd("tailf", "[options] <daemon|gre|VMID>", "print logs of the daemon/gre or print outputs of the VM by VMID"), flag.ExitOnError)
-	providerID := cmd.String("p", "self", "specify the system to run the command by provider ID")
+	cmd := flag.NewFlagSet(newCmd("tailf", "[options] <daemon|gre|VMID>", "print logs on local/remote system"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -703,16 +593,7 @@ func addTailfCmd() {
 		}
 		target := args[0]
 		lg := newLogger(log.DefaultStream, "main")
-		opts := []as.Option{
-			as.WithLogger(lg),
-		}
-		c := as.NewClient(opts...)
-		var conn as.Connection
-		if *providerID == "self" { // local
-			conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
-		} else { // remote
-			conn = <-c.Discover(godevsigPublisher, "gshellDaemon", *providerID)
-		}
+		conn := getConn(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -734,22 +615,23 @@ func addTailfCmd() {
 func ShellMain() error {
 	// no arg, shell mode
 	if len(os.Args) == 1 {
-		sh := newShell()
-		sh.runREPL()
+		newShell(interp.Options{}).runREPL()
 		return nil
 	}
 
 	flag.StringVar(&workDir, "wd", workDir, "set working directory")
+	flag.StringVar(&loglevel, "loglevel", loglevel, "debug/info/warn/error")
+	flag.StringVar(&providerID, "p", providerID, "provider ID to specify a remote system")
 
 	addDeamonCmd()
 	addListCmd()
 	addIDCmd()
-	addCompileCmd()
 	addExecCmd()
 	addStartCmd()
 	addRunCmd()
 	addPsCmd()
 	addPatternCmds()
+	addInfoCmd()
 	addTailfCmd()
 
 	if len(version) == 0 {
@@ -768,16 +650,11 @@ func ShellMain() error {
 
 	switch os.Args[1] {
 	case "-h", "--help":
-		help := `gshell is an interpreter in Golang style syntax and a supervision tool to
-manage .gsh apps running in gshell VM(tengo based virtual machine).
+		help := `gshell is a supervision tool to run .go apps by a VM(yaegi interpreter) in
+gshell runtime environment(gre), which is essentially a shared memory space.
 
-Each .gsh file runs in a separate new VM so one VM's crash does not impact others.
-VMs run in gshell runtime environment(gre), which is essentially a share memory
-space in which the communications between VMs are fast.
-
-gshell daemon command starts a daemon which is supposed to run at each system
-so that gshell run command can run .gsh file in a remote system with specified
-provider ID, this remote run also works for NAT network.
+gshell daemon starts a daemon which is supposed to run on each system so that
+gshell run/ps/kill... commands can run on a remote system with specified provider ID.
 
 gshell enters interactive mode if no options and no commands provided.
 `

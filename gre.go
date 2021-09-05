@@ -1,7 +1,7 @@
 package gshellos
 
 import (
-	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -14,9 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/d5/tengo/v2"
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/gshellos/log"
+	"github.com/traefik/yaegi/interp"
 )
 
 type gre struct {
@@ -88,7 +88,10 @@ type vmInfo struct {
 
 type vmCtl struct {
 	vmInfo
-	*tengo.VM
+	cancel     context.CancelFunc
+	stdin      io.Reader
+	stdout     io.Writer
+	args       []string
 	stat       int32
 	vmErr      error // returned error when VM exits
 	runMsg     *greCmdRun
@@ -96,15 +99,22 @@ type vmCtl struct {
 }
 
 func (vc *vmCtl) runVM() {
-	vm := vc.VM
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vc.cancel = cancel
+	sh := newShell(interp.Options{
+		Stdin:  vc.stdin,
+		Stdout: vc.stdout,
+		Args:   vc.args,
+	})
 	atomic.StoreInt32(&vc.stat, vmStatRunning)
 	vc.StartTime = time.Now()
-	err := vm.Run()
+	_, err := sh.EvalWithContext(ctx, string(vc.runMsg.ByteCode))
 	vc.EndTime = time.Now()
 	if err != nil {
 		vc.vmErr = err
 		vc.VMErr = err.Error()
-		fmt.Fprintln(vm.Out, err)
+		fmt.Fprintln(vc.stdout, err)
 	}
 	atomic.StoreInt32(&vc.stat, vmStatExited)
 }
@@ -126,21 +136,8 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gre := stream.GetContext().(*gre)
 	gre.lg.Debugf("greCmdRun: file: %v, args: %v, interactive: %v\n", msg.File, msg.Args, msg.Interactive)
 
-	sh := newShell()
-	bytecode := &tengo.Bytecode{}
-	err := bytecode.Decode(bytes.NewReader(msg.ByteCode), sh.modules)
-	if err != nil {
-		gre.lg.Errorf("greCmdRun: decode %s error: %v", msg.File, err)
-		return errors.New("bad bytecode")
-	}
-
 	name := filepath.Base(msg.File)
-	vm := tengo.NewVM(bytecode, sh.globals, -1)
-	vm.Args = msg.Args
-	vc := &vmCtl{
-		VM:     vm,
-		runMsg: msg,
-	}
+	vc := &vmCtl{args: msg.Args, runMsg: msg}
 	vc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 	vc.ID = genVMID()
 	vc.vmInfo.Args = msg.Args
@@ -157,8 +154,8 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	if msg.Interactive {
 		gre.lg.Debugln("greCmdRun: interactive")
 		defer output.Close()
-		vm.In = stream
-		vm.Out = multiWriter(stream, output)
+		vc.stdin = stream
+		vc.stdout = multiWriter(stream, output)
 		vc.runVM()
 		if msg.AutoRemove {
 			gre.rmVM(vc)
@@ -169,8 +166,8 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	go func() {
 		gre.lg.Debugln("greCmdRun: non-interactive")
 		defer output.Close()
-		vm.In = null{}
-		vm.Out = output
+		vc.stdin = null{}
+		vc.stdout = output
 		vc.runVM()
 		if msg.AutoRemove {
 			gre.rmVM(vc)
@@ -232,7 +229,7 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "kill":
 			if vc.stat == vmStatRunning { // no need to atomic
-				vc.VM.Abort()
+				vc.cancel()
 				atomic.CompareAndSwapInt32(&vc.stat, vmStatRunning, vmStatAborting)
 				ids = append(ids, vc.ID)
 			}
@@ -243,14 +240,13 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 			}
 		case "restart":
 			if vc.stat == vmStatExited {
-				vm := vc.VM
-				vm.In = null{}
+				vc.stdin = null{}
 				logFile, err := os.Create(vc.outputFile)
 				if err != nil {
 					gre.lg.Errorf("output file not created: %v", err)
 					break
 				}
-				vm.Out = logFile
+				vc.stdout = logFile
 				vc := vc
 				go func() {
 					defer logFile.Close()

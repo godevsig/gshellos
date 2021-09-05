@@ -5,7 +5,6 @@ import (
 	"os"
 
 	gs "github.com/godevsig/gshellos"
-	_ "github.com/godevsig/gshellos/extension" // register all extensions
 )
 
 func main() {
