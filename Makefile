@@ -2,7 +2,7 @@ SHELL=bash
 
 PKG_LIST := $(shell go list ./...)
 GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
-BLDTAGS := stdlib,adaptiveservice
+BLDTAGS := stdbase,adaptiveservice
 LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)' -X 'github.com/godevsig/gshellos.buildTags=$(BLDTAGS)'
 
 .PHONY: all dep format build clean test coverage lint vet race help
@@ -43,9 +43,16 @@ debug: BLDTAGS := $(BLDTAGS),debug
 debug: build ## Build debug binary to bin dir
 
 lite: BLDTAGS := $(BLDTAGS)
+lite: LDFLAGS += -s -w
 lite: build ## Build lite release binary to bin dir
 
-full: BLDTAGS := $(BLDTAGS),echart,database
+normal: BLDTAGS := $(BLDTAGS),stdcommon
+normal: build ## Build normal release binary to bin dir
+
+FULLTAGS := $(BLDTAGS),stdcommon
+FULLTAGS := $(FULLTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
+FULLTAGS := $(FULLTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdruntime,stdtext,stdunicode
+full: BLDTAGS := $(FULLTAGS)
 full: build ## Build full release binary to bin dir
 
 clean: ## Remove previous build and test files

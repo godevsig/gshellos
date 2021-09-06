@@ -16,8 +16,8 @@ import (
 	"github.com/godevsig/gshellos/extension"
 	"github.com/godevsig/gshellos/lined"
 	"github.com/godevsig/gshellos/log"
+	"github.com/godevsig/gshellos/stdlib"
 	"github.com/traefik/yaegi/interp"
-	"github.com/traefik/yaegi/stdlib"
 )
 
 var (

@@ -1,5 +1,4 @@
 // Package extension provides wrappers to selected packages to be imported natively in Yaegi.
-// Generate wrapper: e.g. extract -name extension -tag adaptiveservice github.com/godevsig/adaptiveservice
 package extension
 
 import "reflect"
@@ -12,3 +11,5 @@ func init() {
 		"Symbols": reflect.ValueOf(Symbols),
 	}
 }
+
+//go:generate ../cmd/extract/extract -name extension -tag adaptiveservice github.com/godevsig/adaptiveservice
