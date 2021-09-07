@@ -187,6 +187,48 @@ var daemonKnownMsgs = []as.KnownMessage{
 	cmdInfo{},
 }
 
+type codeRepoSvc struct {
+	sh       *shell
+	repoInfo []string
+	httpGet  func(url string) ([]byte, error)
+}
+
+type codeRepoAddr struct{}
+
+func (msg codeRepoAddr) Handle(stream as.ContextStream) (reply interface{}) {
+	crs := stream.GetContext().(*codeRepoSvc)
+	return strings.Join(crs.repoInfo[:3], "/") + " " + crs.repoInfo[3]
+}
+
+type getFileContent struct {
+	File string
+}
+
+func (msg getFileContent) Handle(stream as.ContextStream) (reply interface{}) {
+	crs := stream.GetContext().(*codeRepoSvc)
+	repoInfo := crs.repoInfo
+
+	var addr string
+	if repoInfo[0] == "github.com" {
+		addr = fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoInfo[1], repoInfo[2], repoInfo[3], msg.File)
+	} else if strings.Contains(repoInfo[0], "gitlab") {
+		addr = fmt.Sprintf("https://%s/%s/%s/-/raw/%s/%s", repoInfo[0], repoInfo[1], repoInfo[2], repoInfo[3], msg.File)
+	} else {
+		return fmt.Errorf("%s not supported", repoInfo[0])
+	}
+
+	body, err := crs.httpGet(addr)
+	if err != nil {
+		return err
+	}
+	return body
+}
+
+var codeRepoKnownMsgs = []as.KnownMessage{
+	codeRepoAddr{},
+	getFileContent{},
+}
+
 func init() {
 	as.RegisterType((*cmdRun)(nil))
 	as.RegisterType((*cmdQuery)(nil))
@@ -195,4 +237,6 @@ func init() {
 	as.RegisterType([]*greVMIDs(nil))
 	as.RegisterType((*cmdTailf)(nil))
 	as.RegisterType(cmdInfo{})
+	as.RegisterType(codeRepoAddr{})
+	as.RegisterType(getFileContent{})
 }
