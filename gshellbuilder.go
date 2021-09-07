@@ -1,22 +1,17 @@
 package gshellos
 
 import (
-	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"sort"
 	"strings"
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/gshellos/extension"
-	"github.com/godevsig/gshellos/lined"
 	"github.com/godevsig/gshellos/log"
-	"github.com/godevsig/gshellos/stdlib"
 	"github.com/traefik/yaegi/interp"
 )
 
@@ -29,93 +24,6 @@ var (
 	debugService      func(lg *log.Logger)
 	godevsigPublisher = "godevsig.org"
 )
-
-type shell struct {
-	*interp.Interpreter
-}
-
-func newShell(opt interp.Options) *shell {
-	os.Setenv("YAEGI_SPECIAL_STDIO", "1")
-	i := interp.New(opt)
-	if err := i.Use(stdlib.Symbols); err != nil {
-		panic(err)
-	}
-	if err := i.Use(extension.Symbols); err != nil {
-		panic(err)
-	}
-	i.ImportUsed()
-	sh := &shell{Interpreter: i}
-	return sh
-}
-
-func (sh *shell) runREPL() {
-	ctx, cancel := context.WithCancel(context.Background())
-	end := make(chan struct{}) // channel to terminate the REPL
-	defer close(end)
-	sig := make(chan os.Signal, 1) // channel to trap interrupt signal (Ctrl-C)
-
-	signal.Notify(sig, os.Interrupt)
-	defer signal.Stop(sig)
-
-	go func() {
-		for {
-			select {
-			case <-sig:
-				cancel()
-				ctx, cancel = context.WithCancel(context.Background())
-			case <-end:
-				return
-			}
-		}
-	}()
-
-	led := lined.NewEditor(lined.Cfg{
-		Prompt: ">> ",
-	})
-	defer led.Close()
-
-	for {
-		line, err := led.Readline()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if len(line) != 0 {
-			_, err := sh.EvalWithContext(ctx, line)
-			if err != nil {
-				fmt.Println(err)
-			}
-		}
-	}
-}
-
-func rmShebang(b []byte) []byte {
-	if len(b) >= 2 {
-		if string(b[:2]) == "#!" {
-			copy(b, "//")
-		}
-	}
-	return b
-}
-
-func isFile(path string) bool {
-	fi, err := os.Stat(path)
-	return err == nil && fi.Mode().IsRegular()
-}
-
-func (sh *shell) runFile(path string) error {
-	if isFile(path) {
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		_, err = sh.Eval(string(rmShebang(b)))
-		return err
-	}
-
-	_, err := sh.EvalPath(path)
-	return err
-}
 
 func getSelfID(opts []as.Option) (selfID string, err error) {
 	opts = append(opts, as.WithScope(as.ScopeProcess|as.ScopeOS))
@@ -160,16 +68,21 @@ func newLogger(logStream *log.Stream, loggerName string) *log.Logger {
 	return logStream.NewLogger(loggerName, log.Linfo)
 }
 
-func newCmd(name, usage, help string) string {
-	head := fmt.Sprintf("%s %s", name, usage)
-	return fmt.Sprintf("%s\n\t%s", head, help)
+func newCmd(name, usage string, helps ...string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s %s", name, usage)
+	for _, line := range helps {
+		fmt.Fprintf(&b, "\n\t%s", line)
+	}
+	return b.String()
 }
 
 func addDeamonCmd() {
-	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "start local gshell daemon"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "Start local gshell daemon"), flag.ExitOnError)
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
 	registryAddr := cmd.String("registry", "", "root registry address")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
+	codeRepo := cmd.String("repo", "", "code repo https address in format site/org/proj/branch")
 
 	action := func() error {
 		if len(*registryAddr) == 0 {
@@ -177,6 +90,13 @@ func addDeamonCmd() {
 		}
 		if len(*lanBroadcastPort) == 0 {
 			return errors.New("lan broadcast port not set")
+		}
+		var repoInfo []string
+		if len(*codeRepo) != 0 {
+			repoInfo = strings.Split(*codeRepo, "/")
+			if len(repoInfo) != 4 {
+				return errors.New("wrong repo format")
+			}
 		}
 
 		logStream := log.NewStream("daemon")
@@ -194,6 +114,24 @@ func addDeamonCmd() {
 			EnableServiceLister()
 		if *rootRegistry {
 			s.EnableRootRegistry()
+		}
+
+		if len(repoInfo) == 4 {
+			crs := &codeRepoSvc{sh: newShell(interp.Options{}), repoInfo: repoInfo}
+			if err := crs.sh.loadScriptLib(); err != nil {
+				return err
+			}
+			v, err := crs.sh.Eval("scriptlib.HTTPGet")
+			if err != nil {
+				return err
+			}
+			crs.httpGet = v.Interface().(func(url string) ([]byte, error))
+			if err := s.Publish("codeRepo",
+				codeRepoKnownMsgs,
+				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(crs) }),
+			); err != nil {
+				return err
+			}
 		}
 
 		gd := &daemon{
@@ -215,7 +153,7 @@ func addDeamonCmd() {
 }
 
 func addListCmd() {
-	cmd := flag.NewFlagSet(newCmd("list", "[options]", "list services in all scopes"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("list", "[options]", "List services in all scopes"), flag.ExitOnError)
 	verbose := cmd.Bool("v", false, "show verbose info")
 	publisher := cmd.String("p", "*", "publisher name, can be wildcard")
 	service := cmd.String("s", "*", "service name, can be wildcard")
@@ -295,7 +233,7 @@ func addListCmd() {
 }
 
 func addIDCmd() {
-	cmd := flag.NewFlagSet(newCmd("id", "", "print self provider ID"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("id", "", "Print self provider ID"), flag.ExitOnError)
 
 	action := func() error {
 		opts := []as.Option{
@@ -312,7 +250,7 @@ func addIDCmd() {
 }
 
 func addExecCmd() {
-	cmd := flag.NewFlagSet(newCmd("exec", "<file.go> [args...]", "run <file.go> in a local VM"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("exec", "<file.go> [args...]", "Run <file.go> in a local VM"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -329,7 +267,7 @@ func addExecCmd() {
 }
 
 func addStartCmd() {
-	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "start named gre"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "Start named gre"), flag.ExitOnError)
 	greName := cmd.String("e", "", "create new gre(gshell runtime environment)")
 
 	action := func() error {
@@ -366,7 +304,7 @@ func addStartCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func getConn(lg *log.Logger) (conn as.Connection) {
+func connectDaemon(lg *log.Logger) (conn as.Connection) {
 	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
 	if providerID == "self" { // local
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
@@ -376,8 +314,40 @@ func getConn(lg *log.Logger) (conn as.Connection) {
 	return
 }
 
+func getCodeRepoAddr(lg as.Logger) (addr string, err error) {
+	addr = "NA"
+	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+	conn := <-c.Discover(godevsigPublisher, "codeRepo")
+	if conn == nil {
+		err = as.ErrServiceNotFound
+		return
+	}
+	defer conn.Close()
+
+	err = conn.SendRecv(codeRepoAddr{}, &addr)
+	return
+}
+
+func addRepoCmd() {
+	cmd := flag.NewFlagSet(newCmd("repo", "", "Print central code repo https address"), flag.ExitOnError)
+
+	action := func() error {
+		lg := newLogger(log.DefaultStream, "main")
+		addr, _ := getCodeRepoAddr(lg)
+		fmt.Println(addr)
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
 func addRunCmd() {
-	cmd := flag.NewFlagSet(newCmd("run", "[options] <file.go> [args...]", "run <file.go> in a new VM in specified gre on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("run",
+		"[options] <package_path[/file.go]> [args...]",
+		"Look for package_path[/file.go] in `pwd` or else in `gshell repo`,",
+		"call `func Run(args []string) error` if package_path has the func",
+		"which must have been compiled into gshell, or else just run file.go.",
+		"Run in a new VM in specified gre on local/remote system"),
+		flag.ExitOnError)
 	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment)")
 	interactive := cmd.Bool("i", false, "enter interactive mode")
 	autoRemove := cmd.Bool("rm", false, "automatically remove the VM when it exits")
@@ -388,11 +358,32 @@ func addRunCmd() {
 			return errors.New("no file provided, see --help")
 		}
 
+		lg := newLogger(log.DefaultStream, "main")
 		file := args[0]
-		byteCode, err := os.ReadFile(file)
-		if err != nil {
-			return err
+		var byteCode []byte
+		var err error
+		if strings.HasSuffix(file, ".go") {
+			byteCode, err = os.ReadFile(file)
+			if err != nil {
+				c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+				conn := <-c.Discover(godevsigPublisher, "codeRepo")
+				if conn == nil {
+					return errors.New("file not found")
+				}
+				defer conn.Close()
+
+				if err := conn.SendRecv(getFileContent{file}, &byteCode); err != nil {
+					return err
+				}
+			}
+		} else {
+			repoAddr, err := getCodeRepoAddr(lg)
+			if err != nil {
+				return err
+			}
+			file = strings.Split(repoAddr, " ")[0] + "/" + file
 		}
+
 		cmd := cmdRun{
 			greCmdRun: greCmdRun{
 				File:        file,
@@ -404,8 +395,7 @@ func addRunCmd() {
 			GreName: *greName,
 		}
 
-		lg := newLogger(log.DefaultStream, "main")
-		conn := getConn(lg)
+		conn := connectDaemon(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -434,12 +424,12 @@ func addRunCmd() {
 }
 
 func addPsCmd() {
-	cmd := flag.NewFlagSet(newCmd("ps", "[options] [VMIDs ...|names ...]", "show VM instances by VM ID or name on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("ps", "[options] [VMIDs ...|names ...]", "Show VM instances by VM ID or name on local/remote system"), flag.ExitOnError)
 	greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
 
 	action := func() error {
 		lg := newLogger(log.DefaultStream, "main")
-		conn := getConn(lg)
+		conn := connectDaemon(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -513,9 +503,9 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"kill", "[options] [VMIDs ...|names ...]", "abort the execution of one or more VMs on local/remote system"},
-		{"rm", "[options] [VMIDs ...|names ...]", "remove one or more stopped VMs on local/remote system"},
-		{"restart", "[options] [VMIDs ...|names ...]", "restart one or more stopped VMs on local/remote system"},
+		{"kill", "[options] [VMIDs ...|names ...]", "Abort the execution of one or more VMs on local/remote system"},
+		{"rm", "[options] [VMIDs ...|names ...]", "Remove one or more stopped VMs on local/remote system"},
+		{"restart", "[options] [VMIDs ...|names ...]", "Restart one or more stopped VMs on local/remote system"},
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
@@ -523,7 +513,7 @@ func addPatternCmds() {
 
 		action := func() error {
 			lg := newLogger(log.DefaultStream, "main")
-			conn := getConn(lg)
+			conn := connectDaemon(lg)
 			if conn == nil {
 				return as.ErrServiceNotFound
 			}
@@ -562,11 +552,11 @@ func addPatternCmds() {
 }
 
 func addInfoCmd() {
-	cmd := flag.NewFlagSet(newCmd("info", "", "show gshell info on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("info", "", "Show gshell info on local/remote system"), flag.ExitOnError)
 
 	action := func() error {
 		lg := newLogger(log.DefaultStream, "main")
-		conn := getConn(lg)
+		conn := connectDaemon(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -584,7 +574,7 @@ func addInfoCmd() {
 }
 
 func addTailfCmd() {
-	cmd := flag.NewFlagSet(newCmd("tailf", "[options] <daemon|gre|VMID>", "print logs on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("tailf", "[options] <daemon|gre|VMID>", "Print logs on local/remote system"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -593,7 +583,7 @@ func addTailfCmd() {
 		}
 		target := args[0]
 		lg := newLogger(log.DefaultStream, "main")
-		conn := getConn(lg)
+		conn := connectDaemon(lg)
 		if conn == nil {
 			return as.ErrServiceNotFound
 		}
@@ -628,6 +618,7 @@ func ShellMain() error {
 	addIDCmd()
 	addExecCmd()
 	addStartCmd()
+	addRepoCmd()
 	addRunCmd()
 	addPsCmd()
 	addPatternCmds()

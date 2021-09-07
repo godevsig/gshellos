@@ -102,15 +102,37 @@ func (vc *vmCtl) runVM() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	vc.cancel = cancel
+	var stderr strings.Builder
 	sh := newShell(interp.Options{
 		Stdin:  vc.stdin,
 		Stdout: vc.stdout,
+		Stderr: &stderr,
 		Args:   vc.args,
 	})
+	var src string
+	if vc.runMsg.ByteCode == nil {
+		src = fmt.Sprintf(`
+package main
+import (
+	"fmt"
+	"os"
+	"%s"
+)
+func main() {
+	if err := %s.Run(os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+}`, vc.runMsg.File, vc.Name)
+	} else {
+		src = string(vc.runMsg.ByteCode)
+	}
 	atomic.StoreInt32(&vc.stat, vmStatRunning)
 	vc.StartTime = time.Now()
-	_, err := sh.EvalWithContext(ctx, string(vc.runMsg.ByteCode))
+	_, err := sh.EvalWithContext(ctx, src)
 	vc.EndTime = time.Now()
+	if err == nil && len(stderr.String()) != 0 {
+		err = fmt.Errorf("%s", stderr.String())
+	}
 	if err != nil {
 		vc.vmErr = err
 		vc.VMErr = err.Error()
