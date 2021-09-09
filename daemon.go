@@ -32,6 +32,9 @@ func (gd *daemon) setupgre(name string) as.Connection {
 	}
 
 	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-e " + name
+	if os.Args[0] == "gshell.tester" {
+		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gre" + name + ".cov -- " + args
+	}
 	cmd := exec.Command(os.Args[0], strings.Split(args, " ")...)
 	buf := &bytes.Buffer{}
 	cmd.Stdout = buf

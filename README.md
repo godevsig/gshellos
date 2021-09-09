@@ -1,3 +1,5 @@
-Gshellos is shell alike OS based on [d5/tengo](https://github.com/d5/tengo), with native go extensions.
+# introduction
+gshell is gshellos based service management tool.
+gshellos ~= [yaegi](github.com/traefik/yaegi) + [adaptiveservice](github.com/godevsig/adaptiveservice)
 
 [gshellos godoc](https://pkg.go.dev/github.com/godevsig/gshellos)
