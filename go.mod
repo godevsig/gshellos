@@ -3,7 +3,7 @@ module github.com/godevsig/gshellos
 go 1.16
 
 require (
-	github.com/godevsig/adaptiveservice v0.0.0-20210831161717-29bec916d9c5
+	github.com/godevsig/adaptiveservice v0.9.0
 	github.com/peterh/liner v1.2.1
 	github.com/traefik/yaegi v0.9.23
 )
