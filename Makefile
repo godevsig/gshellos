@@ -47,25 +47,19 @@ dep:
 build: dep
 	@go build -tags $(BLDTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
-debug: BLDTAGS := $(BLDTAGS),debug
-debug: build ## Build debug binary to bin dir
-
-lite: BLDTAGS := $(BLDTAGS)
+lite: BLDTAGS := $(BLDTAGS),stdcommon
 lite: LDFLAGS += -s -w
 lite: build ## Build lite release binary to bin dir
 
-normal: BLDTAGS := $(BLDTAGS),stdcommon
-normal: build ## Build normal release binary to bin dir
-
-FULLTAGS := $(BLDTAGS),stdcommon
+FULLTAGS := $(BLDTAGS),stdcommon,stdext
 FULLTAGS := $(FULLTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 FULLTAGS := $(FULLTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdruntime,stdtext,stdunicode
+FULLTAGS := $(FULLTAGS),debug
 full: BLDTAGS := $(FULLTAGS)
 full: build ## Build full release binary to bin dir
 
 clean: ## Remove previous build and test files
-	@rm -rf bin `find -name "\.test"`
-	@rm -rf bin `find -name "test"`
+	@rm -rf bin `find -name "\.test"` `find -name "test"`
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

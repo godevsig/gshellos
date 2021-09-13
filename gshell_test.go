@@ -373,6 +373,7 @@ func TestMain(m *testing.M) {
 		time.Sleep(1 * time.Second)
 		ret := m.Run()
 		exec.Command("pkill", "-SIGINT", "gshell.tester").Run()
+		time.Sleep(3 * time.Second)
 		os.Exit(ret)
 	} else {
 		os.Exit(m.Run())

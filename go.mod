@@ -9,6 +9,6 @@ require (
 	github.com/traefik/yaegi v0.9.23
 )
 
-replace github.com/traefik/yaegi => github.com/godevsig/yaegi v0.9.24-0.20210912175842-de16837109eb
+replace github.com/traefik/yaegi => github.com/godevsig/yaegi v0.9.24-0.20210913181827-a19e2afe695a
 
-replace github.com/niubaoshu/gotiny => github.com/godevsig/gotiny v0.0.4-0.20210826165942-af63eabe2674
+replace github.com/niubaoshu/gotiny => github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177

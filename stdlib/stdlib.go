@@ -15,13 +15,15 @@ func init() {
 // Provide access to go standard library (http://golang.org/pkg/)
 // go list std | grep -v internal | grep -v '\.' | grep -v unsafe | grep -v syscall
 
-//go:generate ../cmd/extract/extract -name stdlib -tag stdbase bufio bytes context embed errors expvar flag fmt
+//go:generate ../cmd/extract/extract -name stdlib -tag stdbase bufio bytes context errors expvar flag fmt
 //go:generate ../cmd/extract/extract -name stdlib -tag stdbase io io/fs io/ioutil net os os/exec os/signal os/user
-//go:generate ../cmd/extract/extract -name stdlib -tag stdbase path path/filepath plugin reflect
+//go:generate ../cmd/extract/extract -name stdlib -tag stdbase path path/filepath reflect
 //go:generate ../cmd/extract/extract -name stdlib -tag stdbase sort strconv strings sync sync/atomic time
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdcommon archive/tar compress/gzip crypto/md5 crypto/rand
 //go:generate ../cmd/extract/extract -name stdlib -tag stdcommon encoding/binary encoding/hex encoding/json net/http
+
+//go:generate ../cmd/extract/extract -name stdlib -tag stdext embed plugin
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdarchive archive/zip
 
