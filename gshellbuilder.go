@@ -344,7 +344,7 @@ func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <package_path[/file.go]> [args...]",
 		"Look for package_path[/file.go] in `pwd` or else in `gshell repo`,",
-		"call `func Run(args []string) error` if package_path has the func",
+		"call `func Start(args []string) error` if package_path has the func",
 		"which must have been compiled into gshell, or else just run file.go.",
 		"Run in a new VM in specified gre on local/remote system"),
 		flag.ExitOnError)
@@ -503,7 +503,7 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"kill", "[options] [VMIDs ...|names ...]", "Abort the execution of one or more VMs on local/remote system"},
+		{"kill", "[options] [VMIDs ...|names ...]", "Call `func Stop()` to kill one or more VMs on local/remote system"},
 		{"rm", "[options] [VMIDs ...|names ...]", "Remove one or more stopped VMs on local/remote system"},
 		{"restart", "[options] [VMIDs ...|names ...]", "Restart one or more stopped VMs on local/remote system"},
 	} {

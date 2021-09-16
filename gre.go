@@ -91,26 +91,22 @@ type vmCtl struct {
 	cancel     context.CancelFunc
 	stdin      io.Reader
 	stdout     io.Writer
+	stderr     strings.Builder
 	args       []string
 	stat       int32
 	vmErr      error // returned error when VM exits
 	runMsg     *greCmdRun
 	outputFile string
+	sh         *shell
 }
 
-func (vc *vmCtl) runVM() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	vc.cancel = cancel
-	var stderr strings.Builder
-	sh := newShell(interp.Options{
-		Stdin:  vc.stdin,
-		Stdout: vc.stdout,
-		Stderr: &stderr,
-		Args:   vc.args,
-	})
-	var src string
-	if vc.runMsg.ByteCode == nil {
+func (vc *vmCtl) newShell() error {
+	src := string(vc.runMsg.ByteCode)
+	if len(src) != 0 {
+		src = strings.Replace(src, "main(", "_main(", 1)
+	} else {
+		pkg := vc.runMsg.File
+		pkgBase := filepath.Base(pkg)
 		src = fmt.Sprintf(`
 package main
 import (
@@ -118,25 +114,46 @@ import (
 	"os"
 	"%s"
 )
-func main() {
-	if err := %s.Run(os.Args); err != nil {
+func Stop() { %s.Stop() }
+func _main() {
+	if err := %s.Start(os.Args); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
-}`, vc.runMsg.File, vc.Name)
-	} else {
-		src = string(vc.runMsg.ByteCode)
+}`, pkg, pkgBase, pkgBase)
 	}
+
+	vc.sh = newShell(interp.Options{
+		Stdin:  vc.stdin,
+		Stdout: vc.stdout,
+		Stderr: &vc.stderr,
+		Args:   vc.args,
+	})
+
+	_, err := vc.sh.Eval(src)
+	return err
+}
+
+func (vc *vmCtl) runVM() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	vc.cancel = cancel
+
 	atomic.StoreInt32(&vc.stat, vmStatRunning)
 	vc.StartTime = time.Now()
-	_, err := sh.EvalWithContext(ctx, src)
-	vc.EndTime = time.Now()
-	if err == nil && len(stderr.String()) != 0 {
-		err = fmt.Errorf("%s", stderr.String())
+
+	if err := vc.newShell(); err != nil {
+		fmt.Fprintln(&vc.stderr, err)
+	} else {
+		if _, err := vc.sh.EvalWithContext(ctx, "_main()"); err != nil {
+			fmt.Fprintln(&vc.stderr, err)
+		}
 	}
-	if err != nil {
-		vc.vmErr = err
-		vc.VMErr = err.Error()
-		fmt.Fprintln(vc.stdout, err)
+
+	vc.EndTime = time.Now()
+	if len(vc.stderr.String()) != 0 {
+		vc.vmErr = fmt.Errorf("%s", vc.stderr.String())
+		vc.VMErr = vc.stderr.String()
+		fmt.Fprintln(vc.stdout, vc.VMErr)
 	}
 	atomic.StoreInt32(&vc.stat, vmStatExited)
 }
@@ -159,6 +176,11 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gre.lg.Debugf("greCmdRun: file: %v, args: %v, interactive: %v\n", msg.File, msg.Args, msg.Interactive)
 
 	name := filepath.Base(msg.File)
+	upper := filepath.Base(filepath.Dir(msg.File))
+	if upper != "." {
+		name = upper + "/" + name
+	}
+
 	vc := &vmCtl{args: msg.Args, runMsg: msg}
 	vc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 	vc.ID = genVMID()
@@ -251,6 +273,7 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "kill":
 			if vc.stat == vmStatRunning { // no need to atomic
+				vc.sh.Eval("Stop()") // try to call Stop() if there is one
 				vc.cancel()
 				atomic.CompareAndSwapInt32(&vc.stat, vmStatRunning, vmStatAborting)
 				ids = append(ids, vc.ID)
