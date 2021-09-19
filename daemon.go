@@ -46,8 +46,11 @@ func (gd *daemon) setupgre(name string) as.Connection {
 		return nil
 	}
 	go func() {
-		if err := cmd.Wait(); err != nil {
+		err := cmd.Wait()
+		if err != nil {
 			gd.lg.Errorf("cmd: %s exited with error: %v, output: %v", cmd.String(), err, buf.String())
+		} else {
+			gd.lg.Infof("cmd: %s exited, output: %v", cmd.String(), buf.String())
 		}
 	}()
 
