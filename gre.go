@@ -153,7 +153,6 @@ func (vc *vmCtl) runVM() {
 	if len(vc.stderr.String()) != 0 {
 		vc.vmErr = fmt.Errorf("%s", vc.stderr.String())
 		vc.VMErr = vc.stderr.String()
-		fmt.Fprintln(vc.stdout, vc.VMErr)
 	}
 	atomic.StoreInt32(&vc.stat, vmStatExited)
 }
