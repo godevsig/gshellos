@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -194,9 +195,7 @@ var daemonKnownMsgs = []as.KnownMessage{
 }
 
 type codeRepoSvc struct {
-	sh       *shell
 	repoInfo []string
-	httpGet  func(url string) ([]byte, error)
 }
 
 type codeRepoAddr struct{}
@@ -208,6 +207,24 @@ func (msg codeRepoAddr) Handle(stream as.ContextStream) (reply interface{}) {
 
 type getFileContent struct {
 	File string
+}
+
+func httpGet(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("file not found: %d error", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
 }
 
 func (msg getFileContent) Handle(stream as.ContextStream) (reply interface{}) {
@@ -223,7 +240,7 @@ func (msg getFileContent) Handle(stream as.ContextStream) (reply interface{}) {
 		return fmt.Errorf("%s not supported", repoInfo[0])
 	}
 
-	body, err := crs.httpGet(addr)
+	body, err := httpGet(addr)
 	if err != nil {
 		return err
 	}

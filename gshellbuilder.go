@@ -117,15 +117,7 @@ func addDeamonCmd() {
 		}
 
 		if len(repoInfo) == 4 {
-			crs := &codeRepoSvc{sh: newShell(interp.Options{}), repoInfo: repoInfo}
-			if err := crs.sh.loadScriptLib(); err != nil {
-				return err
-			}
-			v, err := crs.sh.Eval("scriptlib.HTTPGet")
-			if err != nil {
-				return err
-			}
-			crs.httpGet = v.Interface().(func(url string) ([]byte, error))
+			crs := &codeRepoSvc{repoInfo: repoInfo}
 			if err := s.Publish("codeRepo",
 				codeRepoKnownMsgs,
 				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(crs) }),

@@ -3,6 +3,8 @@ package gshellos
 import (
 	"errors"
 	"io"
+	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -66,3 +68,29 @@ type null struct{}
 func (null) Close() error                  { return nil }
 func (null) Write(buf []byte) (int, error) { return len(buf), nil }
 func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
+
+// RunCmd runs a command and returns its output
+func RunCmd(cmd string) string {
+	strs := strings.Split(cmd, " ")
+	var cmdStrs []string
+	for _, str := range strs {
+		if len(str) != 0 {
+			cmdStrs = append(cmdStrs, str)
+		}
+	}
+	if len(cmdStrs) == 0 {
+		return ""
+	}
+	name := cmdStrs[0]
+	var args []string
+	if len(cmdStrs) > 1 {
+		args = cmdStrs[1:]
+	}
+
+	output, err := exec.Command(name, args...).Output()
+	outputStr := string(output)
+	if err != nil {
+		outputStr = outputStr + err.Error()
+	}
+	return outputStr
+}

@@ -352,6 +352,19 @@ func TestCmdRepo(t *testing.T) {
 	}
 }
 
+func TestCmdRepoRun(t *testing.T) {
+	gs.RunCmd("mv testdata/hello.go testdata/_hello.go")
+	defer gs.RunCmd("mv testdata/_hello.go testdata/hello.go")
+	out, err := gshellRunCmd("run -i testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "Hello, playground\n" {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestRunMain(t *testing.T) {
 	os.Args = append([]string{os.Args[0]}, flag.Args()...)
 	err := gs.ShellMain()

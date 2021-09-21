@@ -2,7 +2,6 @@ package gshellos
 
 import (
 	"context"
-	_ "embed" // embed libs
 	"errors"
 	"fmt"
 	"io"
@@ -100,15 +99,4 @@ func (sh *shell) runFile(path string) error {
 
 	_, err := sh.EvalPath(path)
 	return err
-}
-
-//go:embed scriptlib/scriptlib.go
-var scriptlib string
-
-func (sh *shell) loadScriptLib() error {
-	_, err := sh.Eval(scriptlib)
-	if err != nil {
-		return fmt.Errorf("load script libs error: %s", err)
-	}
-	return nil
 }
