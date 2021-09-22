@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/gshellos/log"
@@ -57,6 +58,43 @@ func (gd *daemon) setupgre(name string) as.Connection {
 
 	c.SetDiscoverTimeout(3)
 	return <-c.Discover(godevsigPublisher, "gre-"+name)
+}
+
+type cmdKill struct {
+	GreNames []string
+	Force    bool
+}
+
+func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
+	gd.lg.Debugf("handle cmdKill: %v", msg)
+
+	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
+	var b strings.Builder
+	for _, gre := range msg.GreNames {
+		connChan := c.Discover(godevsigPublisher, "gre-"+gre)
+		for conn := range connChan {
+			var pInfo processInfo
+			if err := conn.SendRecv(getProcessInfo{}, &pInfo); err != nil {
+				gd.lg.Warnf("get info for %s failed: %v", gre, err)
+			}
+			if pInfo.pid != 0 && (pInfo.runningCnt == 0 || msg.Force) {
+				if process, err := os.FindProcess(pInfo.pid); err != nil {
+					gd.lg.Warnf("pid of %s not found: %v", pInfo.greName, err)
+				} else if err := process.Signal(syscall.SIGINT); err != nil {
+					gd.lg.Warnf("kill %s failed: %v", pInfo.greName, err)
+				} else {
+					fmt.Fprintf(&b, "%s ", pInfo.greName)
+				}
+			}
+			conn.Close()
+		}
+	}
+	if len(b.String()) == 0 {
+		fmt.Fprintf(&b, "none ")
+	}
+	fmt.Fprintf(&b, "killed")
+	return b.String()
 }
 
 type cmdRun struct {
@@ -187,6 +225,7 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 }
 
 var daemonKnownMsgs = []as.KnownMessage{
+	(*cmdKill)(nil),
 	(*cmdRun)(nil),
 	(*cmdQuery)(nil),
 	(*cmdPatternAction)(nil),
@@ -253,6 +292,7 @@ var codeRepoKnownMsgs = []as.KnownMessage{
 }
 
 func init() {
+	as.RegisterType((*cmdKill)(nil))
 	as.RegisterType((*cmdRun)(nil))
 	as.RegisterType((*cmdQuery)(nil))
 	as.RegisterType([]*greVMInfo(nil))

@@ -270,7 +270,7 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 	var ids []string
 	for _, vc := range vcs {
 		switch msg.Cmd {
-		case "kill":
+		case "stop":
 			if vc.stat == vmStatRunning { // no need to atomic
 				vc.sh.Eval("Stop()") // try to call Stop() if there is one
 				vc.cancel()
@@ -305,18 +305,34 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 	return ids
 }
 
-type getProcess struct{}
+type processInfo struct {
+	greName    string
+	pid        int
+	runningCnt int
+}
 
-func (msg getProcess) Handle(stream as.ContextStream) (reply interface{}) {
+// reply with processInfo
+type getProcessInfo struct{}
+
+func (msg getProcessInfo) Handle(stream as.ContextStream) (reply interface{}) {
+	gre := stream.GetContext().(*gre)
 	pid := os.Getpid()
-	return pid
+	runningCnt := 0
+	gre.RLock()
+	for _, vc := range gre.vms {
+		if vc.stat == vmStatRunning {
+			runningCnt++
+		}
+	}
+	gre.RUnlock()
+	return processInfo{gre.name, pid, runningCnt}
 }
 
 var greKnownMsgs = []as.KnownMessage{
 	(*greCmdRun)(nil),
 	(*greCmdQuery)(nil),
 	(*greCmdPatternAction)(nil),
-	getProcess{},
+	getProcessInfo{},
 }
 
 func init() {
@@ -324,5 +340,6 @@ func init() {
 	as.RegisterType((*greCmdQuery)(nil))
 	as.RegisterType((*greVMInfo)(nil))
 	as.RegisterType((*greCmdPatternAction)(nil))
-	as.RegisterType(getProcess{})
+	as.RegisterType(getProcessInfo{})
+	as.RegisterType(processInfo{})
 }

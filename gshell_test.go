@@ -240,6 +240,40 @@ func TestCmdRun(t *testing.T) {
 	}
 }
 
+func TestCmdKill(t *testing.T) {
+	out, err := gshellRunCmd("run -e test testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("run -e test2 testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("kill -f test* test1")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if out != "test test2 killed\n" {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("ps -e test*")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(out, "test") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestCmdPs(t *testing.T) {
 	out, err := gshellRunCmd("ps")
 	t.Logf("\n%s", out)
@@ -267,7 +301,7 @@ func TestCmdPsID(t *testing.T) {
 	}
 }
 
-func TestCmdKillRm(t *testing.T) {
+func TestCmdStopRm(t *testing.T) {
 	out, err := gshellRunCmd("run testdata/sleep.go")
 	t.Logf("\n%s", out)
 	if err != nil {
@@ -275,12 +309,12 @@ func TestCmdKillRm(t *testing.T) {
 	}
 	id := strings.TrimSpace(out)
 	time.Sleep(1 * time.Second)
-	out, err = gshellRunCmd("kill " + id)
+	out, err = gshellRunCmd("stop " + id)
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "killed") {
+	if !strings.Contains(out, "stopped") {
 		t.Fatal("unexpected output")
 	}
 	out, err = gshellRunCmd("rm " + id)

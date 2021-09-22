@@ -332,6 +332,37 @@ func addRepoCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
+func addKillCmd() {
+	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named gre(s)"), flag.ExitOnError)
+	force := cmd.Bool("f", false, "force terminate even if there are still running VMs")
+
+	action := func() error {
+		args := cmd.Args()
+		if len(args) == 0 {
+			return errors.New("no gre specified, see --help")
+		}
+
+		lg := newLogger(log.DefaultStream, "main")
+		conn := connectDaemon(lg)
+		if conn == nil {
+			return as.ErrServiceNotFound
+		}
+		defer conn.Close()
+
+		cmd := cmdKill{
+			GreNames: args,
+			Force:    *force,
+		}
+		var reply string
+		if err := conn.SendRecv(&cmd, &reply); err != nil {
+			return err
+		}
+		fmt.Println(reply)
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <package_path[/file.go]> [args...]",
@@ -348,6 +379,9 @@ func addRunCmd() {
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
+		}
+		if strings.Contains(*greName, "*") {
+			return errors.New("wrong use of wildcard(*), see --help")
 		}
 
 		lg := newLogger(log.DefaultStream, "main")
@@ -495,7 +529,7 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"kill", "[options] [VMIDs ...|names ...]", "Call `func Stop()` to kill one or more VMs on local/remote system"},
+		{"stop", "[options] [VMIDs ...|names ...]", "Call `func Stop()` to stop one or more VMs on local/remote system"},
 		{"rm", "[options] [VMIDs ...|names ...]", "Remove one or more stopped VMs on local/remote system"},
 		{"restart", "[options] [VMIDs ...|names ...]", "Restart one or more stopped VMs on local/remote system"},
 	} {
@@ -519,8 +553,8 @@ func addPatternCmds() {
 
 			var info string
 			switch msg.Cmd {
-			case "kill":
-				info = "killed"
+			case "stop":
+				info = "stopped"
 			case "rm":
 				info = "removed"
 			case "restart":
@@ -612,6 +646,7 @@ func ShellMain() error {
 	addStartCmd()
 	addRepoCmd()
 	addRunCmd()
+	addKillCmd()
 	addPsCmd()
 	addPatternCmds()
 	addInfoCmd()
@@ -637,7 +672,7 @@ func ShellMain() error {
 gshell runtime environment(gre), which is essentially a shared memory space.
 
 gshell daemon starts a daemon which is supposed to run on each system so that
-gshell run/ps/kill... commands can run on a remote system with specified provider ID.
+gshell run/ps/... commands can run on a remote system with specified provider ID.
 
 gshell enters interactive mode if no options and no commands provided.
 `
