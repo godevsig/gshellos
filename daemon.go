@@ -106,7 +106,7 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
 
-	conn := gd.setupgre(msg.GreName)
+	conn := gd.setupgre(msg.GreName + "." + version)
 	if conn == nil {
 		return ErrBrokenGre
 	}
@@ -233,6 +233,83 @@ var daemonKnownMsgs = []as.KnownMessage{
 	cmdInfo{},
 }
 
+func httpGet(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("url: %s not found: %d error", url, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
+type updater struct {
+	urlFmt string
+}
+
+type gshellBin struct {
+	bin []byte
+	md5 string
+}
+
+// reply with *gshellBin
+type tryUpdate struct {
+	revInuse string
+	arch     string
+}
+
+func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
+	updtr := stream.GetContext().(*updater)
+
+	rev, err := httpGet(fmt.Sprintf(updtr.urlFmt, "rev"))
+	if err != nil {
+		return err
+	}
+	if string(rev) == msg.revInuse {
+		return nil
+	}
+
+	checksum, err := httpGet(fmt.Sprintf(updtr.urlFmt, "md5sum"))
+	if err != nil {
+		return err
+	}
+
+	var md5 string
+	b := bytes.NewBuffer(checksum)
+	for {
+		line, err := b.ReadString('\n')
+		if err != nil {
+			break
+		}
+		if strings.Contains(line, msg.arch) {
+			md5 = strings.Split(line, " ")[0]
+			break
+		}
+	}
+	if len(md5) == 0 {
+		return fmt.Errorf("arch %s not supported", msg.arch)
+	}
+
+	bin, err := httpGet(fmt.Sprintf(updtr.urlFmt, "gshell."+msg.arch))
+	if err != nil {
+		return err
+	}
+
+	return &gshellBin{bin, md5}
+}
+
+var updaterKnownMsgs = []as.KnownMessage{
+	tryUpdate{},
+}
+
 type codeRepoSvc struct {
 	repoInfo []string
 }
@@ -246,24 +323,6 @@ func (msg codeRepoAddr) Handle(stream as.ContextStream) (reply interface{}) {
 
 type getFileContent struct {
 	File string
-}
-
-func httpGet(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("file not found: %d error", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
 }
 
 func (msg getFileContent) Handle(stream as.ContextStream) (reply interface{}) {
@@ -302,4 +361,6 @@ func init() {
 	as.RegisterType(cmdInfo{})
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType(getFileContent{})
+	as.RegisterType(tryUpdate{})
+	as.RegisterType((*gshellBin)(nil))
 }

@@ -3,8 +3,10 @@ SHELL=bash
 PKG_ALL := $(shell go list ./...)
 PKG_LIST := $(shell go list ./... | grep -E -v "gshellos$$|/cmd|extension$$|stdlib$$|scriptlib$$")
 GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
+COMMIT_REV := $(shell git rev-parse HEAD)
 BLDTAGS := stdbase,adaptiveservice
 LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)' -X 'github.com/godevsig/gshellos.buildTags=$(BLDTAGS)'
+LDFLAGS += -X 'github.com/godevsig/gshellos.commitRev=$(COMMIT_REV)'
 
 .PHONY: all dep format build clean test testbin coverage lint vet race help
 

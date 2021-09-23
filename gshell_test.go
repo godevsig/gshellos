@@ -202,7 +202,7 @@ func TestCmdList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "godevsig.org        gshellDaemon        self          1111") {
+	if !strings.Contains(out, "godevsig            gshellDaemon        self          1111") {
 		t.Fatal("unexpected output")
 	}
 }
@@ -259,7 +259,7 @@ func TestCmdKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if out != "test test2 killed\n" {
+	if !(strings.Contains(out, "test") && strings.Contains(out, "test2")) {
 		t.Fatal("unexpected output")
 	}
 
@@ -280,7 +280,7 @@ func TestCmdPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "VM ID         IN GRE        NAME          START AT             STATUS") {
+	if !strings.Contains(out, "VM ID         IN GRE            NAME              START AT             STATUS") {
 		t.Fatal("unexpected output")
 	}
 }
@@ -381,7 +381,8 @@ func TestCmdRepo(t *testing.T) {
 	}
 
 	out, err = gshellRunCmd("run nosuchfile.go")
-	if err == nil || !strings.Contains(out, "file not found: 404 error") {
+	t.Logf("\n%s", out)
+	if err == nil || !strings.Contains(out, "not found: 404 error") {
 		t.Fatal("expected 404 error")
 	}
 }

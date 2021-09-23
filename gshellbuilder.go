@@ -1,11 +1,14 @@
 package gshellos
 
 import (
+	"crypto/md5"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -16,14 +19,24 @@ import (
 )
 
 var (
+	commitRev         string
 	version           string
 	buildTags         string
 	workDir           = "/var/tmp/gshell"
 	loglevel          = "error"
 	providerID        = "self"
 	debugService      func(lg *log.Logger)
-	godevsigPublisher = "godevsig.org"
+	godevsigPublisher = "godevsig"
 )
+
+func init() {
+	if len(commitRev) == 0 {
+		commitRev = "devel"
+	}
+	if len(version) == 0 {
+		version = commitRev[:5]
+	}
+}
 
 func getSelfID(opts []as.Option) (selfID string, err error) {
 	opts = append(opts, as.WithScope(as.ScopeProcess|as.ScopeOS))
@@ -83,8 +96,10 @@ func addDeamonCmd() {
 	registryAddr := cmd.String("registry", "", "root registry address")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
 	codeRepo := cmd.String("repo", "", "code repo https address in format site/org/proj/branch")
+	updateURL := cmd.String("update", "", "url of artifacts to update gshell")
 
 	action := func() error {
+		cmdArgs := os.Args
 		if len(*registryAddr) == 0 {
 			return errors.New("root registry address not set")
 		}
@@ -126,6 +141,60 @@ func addDeamonCmd() {
 			}
 		}
 
+		if len(*updateURL) != 0 {
+			updtr := &updater{urlFmt: *updateURL}
+			if err := s.Publish("updater",
+				updaterKnownMsgs,
+				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(updtr) }),
+			); err != nil {
+				return err
+			}
+		}
+
+		var updateChan chan struct{}
+		go func() {
+			for {
+				time.Sleep(15 * time.Minute)
+				c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+				conn := <-c.Discover(godevsigPublisher, "updater")
+				if conn == nil {
+					continue
+				}
+				var gshellbin *gshellBin
+				err := conn.SendRecv(tryUpdate{revInuse: commitRev, arch: runtime.GOARCH}, &gshellbin)
+				conn.Close()
+				if err != nil {
+					lg.Warnf("get gshell bin error: %v", err)
+					continue
+				}
+				if gshellbin == nil {
+					lg.Debugf("no newer version available")
+					continue
+				}
+				if fmt.Sprintf("%x", md5.Sum(gshellbin.bin)) != gshellbin.md5 {
+					lg.Warnf("gshell new version md5 mismatch")
+					continue
+				}
+				newFile := cmdArgs[0] + ".update"
+				if err := os.WriteFile(newFile, gshellbin.bin, 0755); err != nil {
+					lg.Warnf("create gshell new version failed")
+					continue
+				}
+
+				lg.Infof("updating gshell version...")
+				updateChan = make(chan struct{})
+				s.Close()
+				os.Rename(newFile, cmdArgs[0])
+				if err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Start(); err != nil {
+					lg.Errorf("start new gshell failed: %v", err)
+				} else {
+					lg.Infof("new version gshell started")
+				}
+				close(updateChan)
+				return
+			}
+		}()
+
 		gd := &daemon{
 			lg: lg,
 		}
@@ -139,7 +208,11 @@ func addDeamonCmd() {
 			go debugService(lg)
 		}
 
-		return s.Serve()
+		err := s.Serve()
+		if updateChan != nil {
+			<-updateChan
+		}
+		return err
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }
@@ -492,10 +565,10 @@ func addPsCmd() {
 				}
 			}
 		} else { // ps
-			fmt.Println("VM ID         IN GRE        NAME          START AT             STATUS")
+			fmt.Println("VM ID         IN GRE            NAME              START AT             STATUS")
 			trimName := func(name string) string {
-				if len(name) > 12 {
-					name = name[:9] + "..."
+				if len(name) > 16 {
+					name = name[:13] + "..."
 				}
 				return name
 			}
@@ -518,7 +591,7 @@ func addPsCmd() {
 						stat = fmt.Sprintf("%-10s %v", stat, d)
 					}
 
-					fmt.Printf("%s  %-12s  %-12s  %s  %s\n", vmi.ID, trimName(gvi.Name), trimName(vmi.Name), created, stat)
+					fmt.Printf("%s  %-16s  %-16s  %s  %s\n", vmi.ID, trimName(gvi.Name), trimName(vmi.Name), created, stat)
 				}
 			}
 		}
@@ -651,10 +724,6 @@ func ShellMain() error {
 	addPatternCmds()
 	addInfoCmd()
 	addTailfCmd()
-
-	if len(version) == 0 {
-		version = "development"
-	}
 
 	usage := func() {
 		fmt.Println("COMMANDS:")
