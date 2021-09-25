@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,6 +91,8 @@ func newCmd(name, usage string, helps ...string) string {
 	return b.String()
 }
 
+var updateInterval = "600"
+
 func addDeamonCmd() {
 	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "Start local gshell daemon"), flag.ExitOnError)
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
@@ -142,7 +145,7 @@ func addDeamonCmd() {
 		}
 
 		if len(*updateURL) != 0 {
-			updtr := &updater{urlFmt: *updateURL}
+			updtr := &updater{urlFmt: *updateURL, lg: lg}
 			if err := s.Publish("updater",
 				updaterKnownMsgs,
 				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(updtr) }),
@@ -153,8 +156,10 @@ func addDeamonCmd() {
 
 		var updateChan chan struct{}
 		go func() {
+			i, _ := strconv.Atoi(updateInterval)
+			lg.Debugf("updater interval: %d", i)
 			for {
-				time.Sleep(15 * time.Minute)
+				time.Sleep(time.Duration(i) * time.Second)
 				c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
 				conn := <-c.Discover(godevsigPublisher, "updater")
 				if conn == nil {
@@ -164,11 +169,11 @@ func addDeamonCmd() {
 				err := conn.SendRecv(tryUpdate{revInuse: commitRev, arch: runtime.GOARCH}, &gshellbin)
 				conn.Close()
 				if err != nil {
-					lg.Warnf("get gshell bin error: %v", err)
-					continue
-				}
-				if gshellbin == nil {
-					lg.Debugf("no newer version available")
+					if err == ErrNoUpdate {
+						lg.Debugln(ErrNoUpdate)
+					} else {
+						lg.Warnf("get gshell bin error: %v", err)
+					}
 					continue
 				}
 				if fmt.Sprintf("%x", md5.Sum(gshellbin.bin)) != gshellbin.md5 {
@@ -185,7 +190,12 @@ func addDeamonCmd() {
 				updateChan = make(chan struct{})
 				s.Close()
 				os.Rename(newFile, cmdArgs[0])
-				if err := exec.Command(cmdArgs[0], cmdArgs[1:]...).Start(); err != nil {
+				cmd := cmdArgs[0]
+				args := cmdArgs[1:]
+				if cmdArgs[0] == "gshell.tester" {
+					args = append([]string{"-test.run", "^TestRunMain$", "--"}, args...)
+				}
+				if err := exec.Command(cmd, args...).Start(); err != nil {
 					lg.Errorf("start new gshell failed: %v", err)
 				} else {
 					lg.Infof("new version gshell started")

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -35,7 +36,7 @@ func (gd *daemon) setupgre(name string) as.Connection {
 
 	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-e " + name
 	if os.Args[0] == "gshell.tester" {
-		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gre" + name + ".cov -- " + args
+		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gre" + name + genID(3) + ".cov -- " + args
 	}
 	cmd := exec.Command(os.Args[0], strings.Split(args, " ")...)
 	buf := &bytes.Buffer{}
@@ -220,6 +221,7 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Version: %s\n", version)
 	fmt.Fprintf(&b, "Build tags: %s\n", buildTags)
+	fmt.Fprintf(&b, "Commit: %s\n", commitRev)
 
 	return b.String()
 }
@@ -253,6 +255,7 @@ func httpGet(url string) ([]byte, error) {
 
 type updater struct {
 	urlFmt string
+	lg     *log.Logger
 }
 
 type gshellBin struct {
@@ -268,13 +271,16 @@ type tryUpdate struct {
 
 func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	updtr := stream.GetContext().(*updater)
+	updtr.lg.Debugf("tryUpdate: %v", msg)
 
 	rev, err := httpGet(fmt.Sprintf(updtr.urlFmt, "rev"))
 	if err != nil {
 		return err
 	}
-	if string(rev) == msg.revInuse {
-		return nil
+	revNew := strings.TrimSpace(string(rev))
+	updtr.lg.Debugf("tryUpdate rev: %s", revNew)
+	if revNew == msg.revInuse {
+		return ErrNoUpdate
 	}
 
 	checksum, err := httpGet(fmt.Sprintf(updtr.urlFmt, "md5sum"))
@@ -361,6 +367,7 @@ func init() {
 	as.RegisterType(cmdInfo{})
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType(getFileContent{})
+	as.RegisterType((*url.Error)(nil))
 	as.RegisterType(tryUpdate{})
 	as.RegisterType((*gshellBin)(nil))
 }

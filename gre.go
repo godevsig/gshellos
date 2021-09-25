@@ -2,8 +2,6 @@ package gshellos
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -31,12 +29,7 @@ func (gre *gre) onNewStream(ctx as.Context) {
 	ctx.SetContext(gre)
 }
 
-func genVMID() string {
-	b := make([]byte, 6)
-	rand.Read(b)
-	id := hex.EncodeToString(b)
-	return id
-}
+const vmIDWidth = 6
 
 func (gre *gre) addVM(vc *vmCtl) {
 	gre.Lock()
@@ -182,7 +175,7 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 
 	vc := &vmCtl{args: msg.Args, runMsg: msg}
 	vc.Name = strings.TrimSuffix(name, filepath.Ext(name))
-	vc.ID = genVMID()
+	vc.ID = genID(vmIDWidth)
 	vc.vmInfo.Args = msg.Args
 	atomic.StoreInt32(&vc.stat, vmStatStarting)
 

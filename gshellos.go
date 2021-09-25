@@ -1,6 +1,8 @@
 package gshellos
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os/exec"
@@ -11,7 +13,16 @@ import (
 var (
 	// ErrBrokenGre is an error where the specified gre has problem to run.
 	ErrBrokenGre = errors.New("broken gre")
+	// ErrNoUpdate is an error that no update available
+	ErrNoUpdate = errors.New("no update available")
 )
+
+func genID(width int) string {
+	b := make([]byte, width)
+	rand.Read(b)
+	id := hex.EncodeToString(b)
+	return id
+}
 
 type endlessReader struct {
 	r io.Reader

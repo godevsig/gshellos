@@ -2,12 +2,15 @@ package gshellos_test
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -167,8 +170,15 @@ func getSout(out []byte) string {
 	return strings.Join(lines[:len(lines)-2], "")
 }
 
+func randID() string {
+	b := make([]byte, 3)
+	rand.Read(b)
+	id := hex.EncodeToString(b)
+	return id
+}
+
 func makeCmd(cmdstr string) *exec.Cmd {
-	prefix := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_" + strings.Split(cmdstr, " ")[0] + ".cov -- "
+	prefix := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_" + strings.Split(cmdstr, " ")[0] + randID() + ".cov -- "
 	return exec.Command("gshell.tester", strings.Split(prefix+cmdstr, " ")...)
 }
 
@@ -382,8 +392,8 @@ func TestCmdRepo(t *testing.T) {
 
 	out, err = gshellRunCmd("run nosuchfile.go")
 	t.Logf("\n%s", out)
-	if err == nil || !strings.Contains(out, "not found: 404 error") {
-		t.Fatal("expected 404 error")
+	if err == nil {
+		t.Fatal("expected 404 error or *net/url.Error")
 	}
 }
 
@@ -400,6 +410,47 @@ func TestCmdRepoRun(t *testing.T) {
 	}
 }
 
+func TestAutoUpdate(t *testing.T) {
+	os.WriteFile("bin/rev", []byte("11111111111111111111111111111111\n"), 0644)
+	gs.RunCmd("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
+	md5sum := gs.RunCmd("md5sum bin/gshell." + runtime.GOARCH)
+	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
+	t.Logf("\n%s", gs.RunCmd("cat bin/rev bin/md5sum"))
+	oldpid := gs.RunCmd("pidof gshell.tester")
+	t.Logf("\n%s", oldpid)
+
+	out, err := gshellRunCmd("run testdata/fileserver.go -dir bin -port 9001")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id := strings.TrimSpace(out)
+	defer func() {
+		out, err := gshellRunCmd("stop " + id)
+		t.Logf("\n%s", out)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	time.Sleep(8 * time.Second)
+	pids := gs.RunCmd("pidof gshell.tester")
+	t.Logf("\n%s", pids)
+	if strings.Contains(pids, oldpid) {
+		t.Fatal("old pid still running")
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "VM ID         IN GRE            NAME              START AT             STATUS") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestRunMain(t *testing.T) {
 	os.Args = append([]string{os.Args[0]}, flag.Args()...)
 	err := gs.ShellMain()
@@ -411,15 +462,16 @@ func TestRunMain(t *testing.T) {
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if len(flag.Args()) == 0 {
-		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld.cov -- "
+		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
 		cmdstr += "-wd .working -loglevel debug daemon -registry 127.0.0.1:11985 -bcast 9923 "
-		cmdstr += "-root -repo github.com/godevsig/gshellos/master"
+		cmdstr += "-root -repo github.com/godevsig/gshellos/master "
+		cmdstr += "-update http://127.0.0.1:9001/%s"
 		if err := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).Start(); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 		time.Sleep(1 * time.Second)
-		ret := m.Run()
+		ret := m.Run() // run tests
 		exec.Command("pkill", "-SIGINT", "gshell.tester").Run()
 		time.Sleep(3 * time.Second)
 		os.Exit(ret)

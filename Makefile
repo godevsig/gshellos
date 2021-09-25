@@ -22,21 +22,24 @@ vet: ## Examine and report suspicious constructs
 	@go vet ${PKG_ALL}
 
 testbin: BLDTAGS := $(BLDTAGS),stdcommon
+testbin: LDFLAGS += -X 'github.com/godevsig/gshellos.updateInterval=5'
 testbin: dep ## Generate test version of main binary
 	@go test -tags $(BLDTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
 	@ln -snf gshell.tester bin/gshell.test
 
 test: testbin ## Run unit tests
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
+	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate
 	@set -o pipefail; go test -v -short ${PKG_LIST} | tee .test/test.log
 	@ERRORS=$$(grep "no test files" .test/test.log); echo "$$ERRORS"; test -z "$$ERRORS"
 
 race:  ## Run data race detector
 	@go test -race -short ${PKG_LIST}
 
-COVER_GOAL := 77
+COVER_GOAL := 80
 coverage: testbin ## Generate global code coverage report
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
+	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
 	@go test -covermode=count -coverpkg="./..." -coverprofile .test/l1_coverage.cov $(PKG_LIST)
 	@echo "mode: count" > .test/final_coverage.out
 	@cat `find -name "*.cov"` | grep -E -v "mode: count|/extension/|/stdlib/|/scriptlib/" >> .test/final_coverage.out
