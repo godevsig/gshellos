@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"runtime"
@@ -180,8 +181,8 @@ func addDeamonCmd() {
 					lg.Warnf("gshell new version md5 mismatch")
 					continue
 				}
-				newFile := cmdArgs[0] + ".update"
-				if err := os.WriteFile(newFile, gshellbin.bin, 0755); err != nil {
+				newFile := workDir + "/gshell.updating"
+				if err := os.WriteFile(newFile, gshellbin.bin, 0755|fs.ModeSetuid|fs.ModeSetgid); err != nil {
 					lg.Warnf("create gshell new version failed")
 					continue
 				}
@@ -189,7 +190,10 @@ func addDeamonCmd() {
 				lg.Infof("updating gshell version...")
 				updateChan = make(chan struct{})
 				s.Close()
-				os.Rename(newFile, cmdArgs[0])
+				if err := os.Rename(newFile, cmdArgs[0]); err != nil {
+					lg.Errorf("failed to mv new gshell to %s", cmdArgs[0])
+					continue
+				}
 				cmd := cmdArgs[0]
 				args := cmdArgs[1:]
 				if cmdArgs[0] == "gshell.tester" {
@@ -416,7 +420,7 @@ func addRepoCmd() {
 }
 
 func addKillCmd() {
-	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named gre(s)"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named gre(s) on local/remote system"), flag.ExitOnError)
 	force := cmd.Bool("f", false, "force terminate even if there are still running VMs")
 
 	action := func() error {
@@ -728,8 +732,8 @@ func ShellMain() error {
 	addExecCmd()
 	addStartCmd()
 	addRepoCmd()
-	addRunCmd()
 	addKillCmd()
+	addRunCmd()
 	addPsCmd()
 	addPatternCmds()
 	addInfoCmd()

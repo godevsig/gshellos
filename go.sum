@@ -1,7 +1,7 @@
 github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4 h1:iBbhlt5YmtL9QXsMVf/XPXgYBQLifn38Cdjc0J/+uYg=
 github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4/go.mod h1:hiVxq5OP2bUGBRNS3Z/bt/reCLFNbdcST6gISi1fiOM=
-github.com/godevsig/adaptiveservice v0.9.3 h1:HcBncZmRAGKADYmUEaae7SeF70hNMWhpbU9Ihh/9PYU=
-github.com/godevsig/adaptiveservice v0.9.3/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
+github.com/godevsig/adaptiveservice v0.9.4 h1:1+LlW18m2EHAImsGI3rz4HDV0KcaYVS/3vc4ZNH4AMk=
+github.com/godevsig/adaptiveservice v0.9.4/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177 h1:Ga+4dO0xF4ejuZfKnHfEA/bqlNUc2XKNjpopVDhMjLM=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177/go.mod h1:QdEauSzqdF5tbLIVtGYO6sqOhUKVPSZGd5x7xK5oeS4=
 github.com/godevsig/yaegi v0.9.24-0.20210913181827-a19e2afe695a h1:Fmy8tJ/28e9eTb8GfYZ2vTJ7se+HKXdNcqpcxk3cpNw=
