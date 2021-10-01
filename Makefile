@@ -4,7 +4,8 @@ PKG_ALL := $(shell go list ./...)
 PKG_LIST := $(shell go list ./... | grep -E -v "gshellos$$|/cmd|extension$$|stdlib$$|scriptlib$$")
 GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
 COMMIT_REV := $(shell git rev-parse HEAD)
-BLDTAGS := stdbase,adaptiveservice
+BLDTAGS := adaptiveservice
+BLDTAGS := $(BLDTAGS),stdbase,stdcommon
 LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)' -X 'github.com/godevsig/gshellos.buildTags=$(BLDTAGS)'
 LDFLAGS += -X 'github.com/godevsig/gshellos.commitRev=$(COMMIT_REV)'
 
@@ -21,7 +22,6 @@ lint: ## Lint the files
 vet: ## Examine and report suspicious constructs
 	@go vet ${PKG_ALL}
 
-testbin: BLDTAGS := $(BLDTAGS),stdcommon
 testbin: LDFLAGS += -X 'github.com/godevsig/gshellos.updateInterval=5'
 testbin: dep ## Generate test version of main binary
 	@go test -tags $(BLDTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
@@ -52,12 +52,10 @@ dep:
 build: dep
 	@go build -tags $(BLDTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
-lite: BLDTAGS := $(BLDTAGS),stdcommon
 lite: LDFLAGS += -s -w
 lite: build ## Build lite release binary to bin dir
 
-FULLTAGS := $(BLDTAGS),stdcommon,stdext
-FULLTAGS := $(FULLTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
+FULLTAGS := $(BLDTAGS),stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 FULLTAGS := $(FULLTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdruntime,stdtext,stdunicode
 FULLTAGS := $(FULLTAGS),debug
 full: BLDTAGS := $(FULLTAGS)
