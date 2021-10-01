@@ -209,46 +209,89 @@ func init() {
 // _net_http_CloseNotifier is an interface wrapper for CloseNotifier type
 type _net_http_CloseNotifier struct {
 	IValue       interface{}
-	WCloseNotify func() <-chan bool
+	WCloseNotify func() (r0 <-chan bool)
 }
 
-func (W _net_http_CloseNotifier) CloseNotify() <-chan bool { return W.WCloseNotify() }
+func (W _net_http_CloseNotifier) CloseNotify() (r0 <-chan bool) {
+	if W.WCloseNotify == nil {
+		return
+	}
+	return W.WCloseNotify()
+}
 
 // _net_http_CookieJar is an interface wrapper for CookieJar type
 type _net_http_CookieJar struct {
 	IValue      interface{}
-	WCookies    func(u *url.URL) []*http.Cookie
+	WCookies    func(u *url.URL) (r0 []*http.Cookie)
 	WSetCookies func(u *url.URL, cookies []*http.Cookie)
 }
 
-func (W _net_http_CookieJar) Cookies(u *url.URL) []*http.Cookie { return W.WCookies(u) }
+func (W _net_http_CookieJar) Cookies(u *url.URL) (r0 []*http.Cookie) {
+	if W.WCookies == nil {
+		return
+	}
+	return W.WCookies(u)
+}
 func (W _net_http_CookieJar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+	if W.WSetCookies == nil {
+		return
+	}
 	W.WSetCookies(u, cookies)
 }
 
 // _net_http_File is an interface wrapper for File type
 type _net_http_File struct {
 	IValue   interface{}
-	WClose   func() error
+	WClose   func() (r0 error)
 	WRead    func(p []byte) (n int, err error)
-	WReaddir func(count int) ([]fs.FileInfo, error)
-	WSeek    func(offset int64, whence int) (int64, error)
-	WStat    func() (fs.FileInfo, error)
+	WReaddir func(count int) (r0 []fs.FileInfo, r1 error)
+	WSeek    func(offset int64, whence int) (r0 int64, r1 error)
+	WStat    func() (r0 fs.FileInfo, r1 error)
 }
 
-func (W _net_http_File) Close() error                                 { return W.WClose() }
-func (W _net_http_File) Read(p []byte) (n int, err error)             { return W.WRead(p) }
-func (W _net_http_File) Readdir(count int) ([]fs.FileInfo, error)     { return W.WReaddir(count) }
-func (W _net_http_File) Seek(offset int64, whence int) (int64, error) { return W.WSeek(offset, whence) }
-func (W _net_http_File) Stat() (fs.FileInfo, error)                   { return W.WStat() }
+func (W _net_http_File) Close() (r0 error) {
+	if W.WClose == nil {
+		return
+	}
+	return W.WClose()
+}
+func (W _net_http_File) Read(p []byte) (n int, err error) {
+	if W.WRead == nil {
+		return
+	}
+	return W.WRead(p)
+}
+func (W _net_http_File) Readdir(count int) (r0 []fs.FileInfo, r1 error) {
+	if W.WReaddir == nil {
+		return
+	}
+	return W.WReaddir(count)
+}
+func (W _net_http_File) Seek(offset int64, whence int) (r0 int64, r1 error) {
+	if W.WSeek == nil {
+		return
+	}
+	return W.WSeek(offset, whence)
+}
+func (W _net_http_File) Stat() (r0 fs.FileInfo, r1 error) {
+	if W.WStat == nil {
+		return
+	}
+	return W.WStat()
+}
 
 // _net_http_FileSystem is an interface wrapper for FileSystem type
 type _net_http_FileSystem struct {
 	IValue interface{}
-	WOpen  func(name string) (http.File, error)
+	WOpen  func(name string) (r0 http.File, r1 error)
 }
 
-func (W _net_http_FileSystem) Open(name string) (http.File, error) { return W.WOpen(name) }
+func (W _net_http_FileSystem) Open(name string) (r0 http.File, r1 error) {
+	if W.WOpen == nil {
+		return
+	}
+	return W.WOpen(name)
+}
 
 // _net_http_Flusher is an interface wrapper for Flusher type
 type _net_http_Flusher struct {
@@ -256,7 +299,12 @@ type _net_http_Flusher struct {
 	WFlush func()
 }
 
-func (W _net_http_Flusher) Flush() { W.WFlush() }
+func (W _net_http_Flusher) Flush() {
+	if W.WFlush == nil {
+		return
+	}
+	W.WFlush()
+}
 
 // _net_http_Handler is an interface wrapper for Handler type
 type _net_http_Handler struct {
@@ -264,44 +312,75 @@ type _net_http_Handler struct {
 	WServeHTTP func(a0 http.ResponseWriter, a1 *http.Request)
 }
 
-func (W _net_http_Handler) ServeHTTP(a0 http.ResponseWriter, a1 *http.Request) { W.WServeHTTP(a0, a1) }
+func (W _net_http_Handler) ServeHTTP(a0 http.ResponseWriter, a1 *http.Request) {
+	if W.WServeHTTP == nil {
+		return
+	}
+	W.WServeHTTP(a0, a1)
+}
 
 // _net_http_Hijacker is an interface wrapper for Hijacker type
 type _net_http_Hijacker struct {
 	IValue  interface{}
-	WHijack func() (net.Conn, *bufio.ReadWriter, error)
+	WHijack func() (r0 net.Conn, r1 *bufio.ReadWriter, r2 error)
 }
 
-func (W _net_http_Hijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) { return W.WHijack() }
+func (W _net_http_Hijacker) Hijack() (r0 net.Conn, r1 *bufio.ReadWriter, r2 error) {
+	if W.WHijack == nil {
+		return
+	}
+	return W.WHijack()
+}
 
 // _net_http_Pusher is an interface wrapper for Pusher type
 type _net_http_Pusher struct {
 	IValue interface{}
-	WPush  func(target string, opts *http.PushOptions) error
+	WPush  func(target string, opts *http.PushOptions) (r0 error)
 }
 
-func (W _net_http_Pusher) Push(target string, opts *http.PushOptions) error {
+func (W _net_http_Pusher) Push(target string, opts *http.PushOptions) (r0 error) {
+	if W.WPush == nil {
+		return
+	}
 	return W.WPush(target, opts)
 }
 
 // _net_http_ResponseWriter is an interface wrapper for ResponseWriter type
 type _net_http_ResponseWriter struct {
 	IValue       interface{}
-	WHeader      func() http.Header
-	WWrite       func(a0 []byte) (int, error)
+	WHeader      func() (r0 http.Header)
+	WWrite       func(a0 []byte) (r0 int, r1 error)
 	WWriteHeader func(statusCode int)
 }
 
-func (W _net_http_ResponseWriter) Header() http.Header          { return W.WHeader() }
-func (W _net_http_ResponseWriter) Write(a0 []byte) (int, error) { return W.WWrite(a0) }
-func (W _net_http_ResponseWriter) WriteHeader(statusCode int)   { W.WWriteHeader(statusCode) }
+func (W _net_http_ResponseWriter) Header() (r0 http.Header) {
+	if W.WHeader == nil {
+		return
+	}
+	return W.WHeader()
+}
+func (W _net_http_ResponseWriter) Write(a0 []byte) (r0 int, r1 error) {
+	if W.WWrite == nil {
+		return
+	}
+	return W.WWrite(a0)
+}
+func (W _net_http_ResponseWriter) WriteHeader(statusCode int) {
+	if W.WWriteHeader == nil {
+		return
+	}
+	W.WWriteHeader(statusCode)
+}
 
 // _net_http_RoundTripper is an interface wrapper for RoundTripper type
 type _net_http_RoundTripper struct {
 	IValue     interface{}
-	WRoundTrip func(a0 *http.Request) (*http.Response, error)
+	WRoundTrip func(a0 *http.Request) (r0 *http.Response, r1 error)
 }
 
-func (W _net_http_RoundTripper) RoundTrip(a0 *http.Request) (*http.Response, error) {
+func (W _net_http_RoundTripper) RoundTrip(a0 *http.Request) (r0 *http.Response, r1 error) {
+	if W.WRoundTrip == nil {
+		return
+	}
 	return W.WRoundTrip(a0)
 }

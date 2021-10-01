@@ -33,9 +33,19 @@ func init() {
 // _go_build_constraint_Expr is an interface wrapper for Expr type
 type _go_build_constraint_Expr struct {
 	IValue  interface{}
-	WEval   func(ok func(tag string) bool) bool
-	WString func() string
+	WEval   func(ok func(tag string) bool) (r0 bool)
+	WString func() (r0 string)
 }
 
-func (W _go_build_constraint_Expr) Eval(ok func(tag string) bool) bool { return W.WEval(ok) }
-func (W _go_build_constraint_Expr) String() string                     { return W.WString() }
+func (W _go_build_constraint_Expr) Eval(ok func(tag string) bool) (r0 bool) {
+	if W.WEval == nil {
+		return
+	}
+	return W.WEval(ok)
+}
+func (W _go_build_constraint_Expr) String() (r0 string) {
+	if W.WString == nil {
+		return
+	}
+	return W.WString()
+}

@@ -29,15 +29,40 @@ func init() {
 // _container_heap_Interface is an interface wrapper for Interface type
 type _container_heap_Interface struct {
 	IValue interface{}
-	WLen   func() int
-	WLess  func(i int, j int) bool
-	WPop   func() interface{}
+	WLen   func() (r0 int)
+	WLess  func(i int, j int) (r0 bool)
+	WPop   func() (r0 interface{})
 	WPush  func(x interface{})
 	WSwap  func(i int, j int)
 }
 
-func (W _container_heap_Interface) Len() int               { return W.WLen() }
-func (W _container_heap_Interface) Less(i int, j int) bool { return W.WLess(i, j) }
-func (W _container_heap_Interface) Pop() interface{}       { return W.WPop() }
-func (W _container_heap_Interface) Push(x interface{})     { W.WPush(x) }
-func (W _container_heap_Interface) Swap(i int, j int)      { W.WSwap(i, j) }
+func (W _container_heap_Interface) Len() (r0 int) {
+	if W.WLen == nil {
+		return
+	}
+	return W.WLen()
+}
+func (W _container_heap_Interface) Less(i int, j int) (r0 bool) {
+	if W.WLess == nil {
+		return
+	}
+	return W.WLess(i, j)
+}
+func (W _container_heap_Interface) Pop() (r0 interface{}) {
+	if W.WPop == nil {
+		return
+	}
+	return W.WPop()
+}
+func (W _container_heap_Interface) Push(x interface{}) {
+	if W.WPush == nil {
+		return
+	}
+	W.WPush(x)
+}
+func (W _container_heap_Interface) Swap(i int, j int) {
+	if W.WSwap == nil {
+		return
+	}
+	W.WSwap(i, j)
+}

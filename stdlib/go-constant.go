@@ -62,11 +62,26 @@ func init() {
 // _go_constant_Value is an interface wrapper for Value type
 type _go_constant_Value struct {
 	IValue       interface{}
-	WExactString func() string
-	WKind        func() constant.Kind
-	WString      func() string
+	WExactString func() (r0 string)
+	WKind        func() (r0 constant.Kind)
+	WString      func() (r0 string)
 }
 
-func (W _go_constant_Value) ExactString() string { return W.WExactString() }
-func (W _go_constant_Value) Kind() constant.Kind { return W.WKind() }
-func (W _go_constant_Value) String() string      { return W.WString() }
+func (W _go_constant_Value) ExactString() (r0 string) {
+	if W.WExactString == nil {
+		return
+	}
+	return W.WExactString()
+}
+func (W _go_constant_Value) Kind() (r0 constant.Kind) {
+	if W.WKind == nil {
+		return
+	}
+	return W.WKind()
+}
+func (W _go_constant_Value) String() (r0 string) {
+	if W.WString == nil {
+		return
+	}
+	return W.WString()
+}

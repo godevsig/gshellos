@@ -40,29 +40,55 @@ type _image_draw_Drawer struct {
 }
 
 func (W _image_draw_Drawer) Draw(dst draw.Image, r image.Rectangle, src image.Image, sp image.Point) {
+	if W.WDraw == nil {
+		return
+	}
 	W.WDraw(dst, r, src, sp)
 }
 
 // _image_draw_Image is an interface wrapper for Image type
 type _image_draw_Image struct {
 	IValue      interface{}
-	WAt         func(x int, y int) color.Color
-	WBounds     func() image.Rectangle
-	WColorModel func() color.Model
+	WAt         func(x int, y int) (r0 color.Color)
+	WBounds     func() (r0 image.Rectangle)
+	WColorModel func() (r0 color.Model)
 	WSet        func(x int, y int, c color.Color)
 }
 
-func (W _image_draw_Image) At(x int, y int) color.Color     { return W.WAt(x, y) }
-func (W _image_draw_Image) Bounds() image.Rectangle         { return W.WBounds() }
-func (W _image_draw_Image) ColorModel() color.Model         { return W.WColorModel() }
-func (W _image_draw_Image) Set(x int, y int, c color.Color) { W.WSet(x, y, c) }
+func (W _image_draw_Image) At(x int, y int) (r0 color.Color) {
+	if W.WAt == nil {
+		return
+	}
+	return W.WAt(x, y)
+}
+func (W _image_draw_Image) Bounds() (r0 image.Rectangle) {
+	if W.WBounds == nil {
+		return
+	}
+	return W.WBounds()
+}
+func (W _image_draw_Image) ColorModel() (r0 color.Model) {
+	if W.WColorModel == nil {
+		return
+	}
+	return W.WColorModel()
+}
+func (W _image_draw_Image) Set(x int, y int, c color.Color) {
+	if W.WSet == nil {
+		return
+	}
+	W.WSet(x, y, c)
+}
 
 // _image_draw_Quantizer is an interface wrapper for Quantizer type
 type _image_draw_Quantizer struct {
 	IValue    interface{}
-	WQuantize func(p color.Palette, m image.Image) color.Palette
+	WQuantize func(p color.Palette, m image.Image) (r0 color.Palette)
 }
 
-func (W _image_draw_Quantizer) Quantize(p color.Palette, m image.Image) color.Palette {
+func (W _image_draw_Quantizer) Quantize(p color.Palette, m image.Image) (r0 color.Palette) {
+	if W.WQuantize == nil {
+		return
+	}
 	return W.WQuantize(p, m)
 }

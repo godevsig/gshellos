@@ -32,16 +32,22 @@ type _encoding_BinaryMarshaler struct {
 }
 
 func (W _encoding_BinaryMarshaler) MarshalBinary() (data []byte, err error) {
+	if W.WMarshalBinary == nil {
+		return
+	}
 	return W.WMarshalBinary()
 }
 
 // _encoding_BinaryUnmarshaler is an interface wrapper for BinaryUnmarshaler type
 type _encoding_BinaryUnmarshaler struct {
 	IValue           interface{}
-	WUnmarshalBinary func(data []byte) error
+	WUnmarshalBinary func(data []byte) (r0 error)
 }
 
-func (W _encoding_BinaryUnmarshaler) UnmarshalBinary(data []byte) error {
+func (W _encoding_BinaryUnmarshaler) UnmarshalBinary(data []byte) (r0 error) {
+	if W.WUnmarshalBinary == nil {
+		return
+	}
 	return W.WUnmarshalBinary(data)
 }
 
@@ -51,12 +57,22 @@ type _encoding_TextMarshaler struct {
 	WMarshalText func() (text []byte, err error)
 }
 
-func (W _encoding_TextMarshaler) MarshalText() (text []byte, err error) { return W.WMarshalText() }
+func (W _encoding_TextMarshaler) MarshalText() (text []byte, err error) {
+	if W.WMarshalText == nil {
+		return
+	}
+	return W.WMarshalText()
+}
 
 // _encoding_TextUnmarshaler is an interface wrapper for TextUnmarshaler type
 type _encoding_TextUnmarshaler struct {
 	IValue         interface{}
-	WUnmarshalText func(text []byte) error
+	WUnmarshalText func(text []byte) (r0 error)
 }
 
-func (W _encoding_TextUnmarshaler) UnmarshalText(text []byte) error { return W.WUnmarshalText(text) }
+func (W _encoding_TextUnmarshaler) UnmarshalText(text []byte) (r0 error) {
+	if W.WUnmarshalText == nil {
+		return
+	}
+	return W.WUnmarshalText(text)
+}

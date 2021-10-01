@@ -57,13 +57,21 @@ func init() {
 type _crypto_Decrypter struct {
 	IValue   interface{}
 	WDecrypt func(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error)
-	WPublic  func() crypto.PublicKey
+	WPublic  func() (r0 crypto.PublicKey)
 }
 
 func (W _crypto_Decrypter) Decrypt(rand io.Reader, msg []byte, opts crypto.DecrypterOpts) (plaintext []byte, err error) {
+	if W.WDecrypt == nil {
+		return
+	}
 	return W.WDecrypt(rand, msg, opts)
 }
-func (W _crypto_Decrypter) Public() crypto.PublicKey { return W.WPublic() }
+func (W _crypto_Decrypter) Public() (r0 crypto.PublicKey) {
+	if W.WPublic == nil {
+		return
+	}
+	return W.WPublic()
+}
 
 // _crypto_DecrypterOpts is an interface wrapper for DecrypterOpts type
 type _crypto_DecrypterOpts struct {
@@ -83,19 +91,32 @@ type _crypto_PublicKey struct {
 // _crypto_Signer is an interface wrapper for Signer type
 type _crypto_Signer struct {
 	IValue  interface{}
-	WPublic func() crypto.PublicKey
+	WPublic func() (r0 crypto.PublicKey)
 	WSign   func(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error)
 }
 
-func (W _crypto_Signer) Public() crypto.PublicKey { return W.WPublic() }
+func (W _crypto_Signer) Public() (r0 crypto.PublicKey) {
+	if W.WPublic == nil {
+		return
+	}
+	return W.WPublic()
+}
 func (W _crypto_Signer) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) (signature []byte, err error) {
+	if W.WSign == nil {
+		return
+	}
 	return W.WSign(rand, digest, opts)
 }
 
 // _crypto_SignerOpts is an interface wrapper for SignerOpts type
 type _crypto_SignerOpts struct {
 	IValue    interface{}
-	WHashFunc func() crypto.Hash
+	WHashFunc func() (r0 crypto.Hash)
 }
 
-func (W _crypto_SignerOpts) HashFunc() crypto.Hash { return W.WHashFunc() }
+func (W _crypto_SignerOpts) HashFunc() (r0 crypto.Hash) {
+	if W.WHashFunc == nil {
+		return
+	}
+	return W.WHashFunc()
+}

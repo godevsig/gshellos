@@ -44,16 +44,31 @@ func init() {
 type _compress_flate_Reader struct {
 	IValue    interface{}
 	WRead     func(p []byte) (n int, err error)
-	WReadByte func() (byte, error)
+	WReadByte func() (r0 byte, r1 error)
 }
 
-func (W _compress_flate_Reader) Read(p []byte) (n int, err error) { return W.WRead(p) }
-func (W _compress_flate_Reader) ReadByte() (byte, error)          { return W.WReadByte() }
+func (W _compress_flate_Reader) Read(p []byte) (n int, err error) {
+	if W.WRead == nil {
+		return
+	}
+	return W.WRead(p)
+}
+func (W _compress_flate_Reader) ReadByte() (r0 byte, r1 error) {
+	if W.WReadByte == nil {
+		return
+	}
+	return W.WReadByte()
+}
 
 // _compress_flate_Resetter is an interface wrapper for Resetter type
 type _compress_flate_Resetter struct {
 	IValue interface{}
-	WReset func(r io.Reader, dict []byte) error
+	WReset func(r io.Reader, dict []byte) (r0 error)
 }
 
-func (W _compress_flate_Resetter) Reset(r io.Reader, dict []byte) error { return W.WReset(r, dict) }
+func (W _compress_flate_Resetter) Reset(r io.Reader, dict []byte) (r0 error) {
+	if W.WReset == nil {
+		return
+	}
+	return W.WReset(r, dict)
+}

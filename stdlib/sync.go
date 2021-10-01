@@ -36,5 +36,15 @@ type _sync_Locker struct {
 	WUnlock func()
 }
 
-func (W _sync_Locker) Lock()   { W.WLock() }
-func (W _sync_Locker) Unlock() { W.WUnlock() }
+func (W _sync_Locker) Lock() {
+	if W.WLock == nil {
+		return
+	}
+	W.WLock()
+}
+func (W _sync_Locker) Unlock() {
+	if W.WUnlock == nil {
+		return
+	}
+	W.WUnlock()
+}

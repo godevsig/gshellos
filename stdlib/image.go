@@ -75,25 +75,60 @@ func init() {
 // _image_Image is an interface wrapper for Image type
 type _image_Image struct {
 	IValue      interface{}
-	WAt         func(x int, y int) color.Color
-	WBounds     func() image.Rectangle
-	WColorModel func() color.Model
+	WAt         func(x int, y int) (r0 color.Color)
+	WBounds     func() (r0 image.Rectangle)
+	WColorModel func() (r0 color.Model)
 }
 
-func (W _image_Image) At(x int, y int) color.Color { return W.WAt(x, y) }
-func (W _image_Image) Bounds() image.Rectangle     { return W.WBounds() }
-func (W _image_Image) ColorModel() color.Model     { return W.WColorModel() }
+func (W _image_Image) At(x int, y int) (r0 color.Color) {
+	if W.WAt == nil {
+		return
+	}
+	return W.WAt(x, y)
+}
+func (W _image_Image) Bounds() (r0 image.Rectangle) {
+	if W.WBounds == nil {
+		return
+	}
+	return W.WBounds()
+}
+func (W _image_Image) ColorModel() (r0 color.Model) {
+	if W.WColorModel == nil {
+		return
+	}
+	return W.WColorModel()
+}
 
 // _image_PalettedImage is an interface wrapper for PalettedImage type
 type _image_PalettedImage struct {
 	IValue        interface{}
-	WAt           func(x int, y int) color.Color
-	WBounds       func() image.Rectangle
-	WColorIndexAt func(x int, y int) uint8
-	WColorModel   func() color.Model
+	WAt           func(x int, y int) (r0 color.Color)
+	WBounds       func() (r0 image.Rectangle)
+	WColorIndexAt func(x int, y int) (r0 uint8)
+	WColorModel   func() (r0 color.Model)
 }
 
-func (W _image_PalettedImage) At(x int, y int) color.Color     { return W.WAt(x, y) }
-func (W _image_PalettedImage) Bounds() image.Rectangle         { return W.WBounds() }
-func (W _image_PalettedImage) ColorIndexAt(x int, y int) uint8 { return W.WColorIndexAt(x, y) }
-func (W _image_PalettedImage) ColorModel() color.Model         { return W.WColorModel() }
+func (W _image_PalettedImage) At(x int, y int) (r0 color.Color) {
+	if W.WAt == nil {
+		return
+	}
+	return W.WAt(x, y)
+}
+func (W _image_PalettedImage) Bounds() (r0 image.Rectangle) {
+	if W.WBounds == nil {
+		return
+	}
+	return W.WBounds()
+}
+func (W _image_PalettedImage) ColorIndexAt(x int, y int) (r0 uint8) {
+	if W.WColorIndexAt == nil {
+		return
+	}
+	return W.WColorIndexAt(x, y)
+}
+func (W _image_PalettedImage) ColorModel() (r0 color.Model) {
+	if W.WColorModel == nil {
+		return
+	}
+	return W.WColorModel()
+}

@@ -37,23 +37,45 @@ type _crypto_elliptic_Curve struct {
 	IValue          interface{}
 	WAdd            func(x1 *big.Int, y1 *big.Int, x2 *big.Int, y2 *big.Int) (x *big.Int, y *big.Int)
 	WDouble         func(x1 *big.Int, y1 *big.Int) (x *big.Int, y *big.Int)
-	WIsOnCurve      func(x *big.Int, y *big.Int) bool
-	WParams         func() *elliptic.CurveParams
+	WIsOnCurve      func(x *big.Int, y *big.Int) (r0 bool)
+	WParams         func() (r0 *elliptic.CurveParams)
 	WScalarBaseMult func(k []byte) (x *big.Int, y *big.Int)
 	WScalarMult     func(x1 *big.Int, y1 *big.Int, k []byte) (x *big.Int, y *big.Int)
 }
 
 func (W _crypto_elliptic_Curve) Add(x1 *big.Int, y1 *big.Int, x2 *big.Int, y2 *big.Int) (x *big.Int, y *big.Int) {
+	if W.WAdd == nil {
+		return
+	}
 	return W.WAdd(x1, y1, x2, y2)
 }
 func (W _crypto_elliptic_Curve) Double(x1 *big.Int, y1 *big.Int) (x *big.Int, y *big.Int) {
+	if W.WDouble == nil {
+		return
+	}
 	return W.WDouble(x1, y1)
 }
-func (W _crypto_elliptic_Curve) IsOnCurve(x *big.Int, y *big.Int) bool { return W.WIsOnCurve(x, y) }
-func (W _crypto_elliptic_Curve) Params() *elliptic.CurveParams         { return W.WParams() }
+func (W _crypto_elliptic_Curve) IsOnCurve(x *big.Int, y *big.Int) (r0 bool) {
+	if W.WIsOnCurve == nil {
+		return
+	}
+	return W.WIsOnCurve(x, y)
+}
+func (W _crypto_elliptic_Curve) Params() (r0 *elliptic.CurveParams) {
+	if W.WParams == nil {
+		return
+	}
+	return W.WParams()
+}
 func (W _crypto_elliptic_Curve) ScalarBaseMult(k []byte) (x *big.Int, y *big.Int) {
+	if W.WScalarBaseMult == nil {
+		return
+	}
 	return W.WScalarBaseMult(k)
 }
 func (W _crypto_elliptic_Curve) ScalarMult(x1 *big.Int, y1 *big.Int, k []byte) (x *big.Int, y *big.Int) {
+	if W.WScalarMult == nil {
+		return
+	}
 	return W.WScalarMult(x1, y1, k)
 }

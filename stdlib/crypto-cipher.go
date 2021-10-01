@@ -41,42 +41,83 @@ func init() {
 // _crypto_cipher_AEAD is an interface wrapper for AEAD type
 type _crypto_cipher_AEAD struct {
 	IValue     interface{}
-	WNonceSize func() int
-	WOpen      func(dst []byte, nonce []byte, ciphertext []byte, additionalData []byte) ([]byte, error)
-	WOverhead  func() int
-	WSeal      func(dst []byte, nonce []byte, plaintext []byte, additionalData []byte) []byte
+	WNonceSize func() (r0 int)
+	WOpen      func(dst []byte, nonce []byte, ciphertext []byte, additionalData []byte) (r0 []byte, r1 error)
+	WOverhead  func() (r0 int)
+	WSeal      func(dst []byte, nonce []byte, plaintext []byte, additionalData []byte) (r0 []byte)
 }
 
-func (W _crypto_cipher_AEAD) NonceSize() int { return W.WNonceSize() }
-func (W _crypto_cipher_AEAD) Open(dst []byte, nonce []byte, ciphertext []byte, additionalData []byte) ([]byte, error) {
+func (W _crypto_cipher_AEAD) NonceSize() (r0 int) {
+	if W.WNonceSize == nil {
+		return
+	}
+	return W.WNonceSize()
+}
+func (W _crypto_cipher_AEAD) Open(dst []byte, nonce []byte, ciphertext []byte, additionalData []byte) (r0 []byte, r1 error) {
+	if W.WOpen == nil {
+		return
+	}
 	return W.WOpen(dst, nonce, ciphertext, additionalData)
 }
-func (W _crypto_cipher_AEAD) Overhead() int { return W.WOverhead() }
-func (W _crypto_cipher_AEAD) Seal(dst []byte, nonce []byte, plaintext []byte, additionalData []byte) []byte {
+func (W _crypto_cipher_AEAD) Overhead() (r0 int) {
+	if W.WOverhead == nil {
+		return
+	}
+	return W.WOverhead()
+}
+func (W _crypto_cipher_AEAD) Seal(dst []byte, nonce []byte, plaintext []byte, additionalData []byte) (r0 []byte) {
+	if W.WSeal == nil {
+		return
+	}
 	return W.WSeal(dst, nonce, plaintext, additionalData)
 }
 
 // _crypto_cipher_Block is an interface wrapper for Block type
 type _crypto_cipher_Block struct {
 	IValue     interface{}
-	WBlockSize func() int
+	WBlockSize func() (r0 int)
 	WDecrypt   func(dst []byte, src []byte)
 	WEncrypt   func(dst []byte, src []byte)
 }
 
-func (W _crypto_cipher_Block) BlockSize() int                 { return W.WBlockSize() }
-func (W _crypto_cipher_Block) Decrypt(dst []byte, src []byte) { W.WDecrypt(dst, src) }
-func (W _crypto_cipher_Block) Encrypt(dst []byte, src []byte) { W.WEncrypt(dst, src) }
+func (W _crypto_cipher_Block) BlockSize() (r0 int) {
+	if W.WBlockSize == nil {
+		return
+	}
+	return W.WBlockSize()
+}
+func (W _crypto_cipher_Block) Decrypt(dst []byte, src []byte) {
+	if W.WDecrypt == nil {
+		return
+	}
+	W.WDecrypt(dst, src)
+}
+func (W _crypto_cipher_Block) Encrypt(dst []byte, src []byte) {
+	if W.WEncrypt == nil {
+		return
+	}
+	W.WEncrypt(dst, src)
+}
 
 // _crypto_cipher_BlockMode is an interface wrapper for BlockMode type
 type _crypto_cipher_BlockMode struct {
 	IValue       interface{}
-	WBlockSize   func() int
+	WBlockSize   func() (r0 int)
 	WCryptBlocks func(dst []byte, src []byte)
 }
 
-func (W _crypto_cipher_BlockMode) BlockSize() int                     { return W.WBlockSize() }
-func (W _crypto_cipher_BlockMode) CryptBlocks(dst []byte, src []byte) { W.WCryptBlocks(dst, src) }
+func (W _crypto_cipher_BlockMode) BlockSize() (r0 int) {
+	if W.WBlockSize == nil {
+		return
+	}
+	return W.WBlockSize()
+}
+func (W _crypto_cipher_BlockMode) CryptBlocks(dst []byte, src []byte) {
+	if W.WCryptBlocks == nil {
+		return
+	}
+	W.WCryptBlocks(dst, src)
+}
 
 // _crypto_cipher_Stream is an interface wrapper for Stream type
 type _crypto_cipher_Stream struct {
@@ -84,4 +125,9 @@ type _crypto_cipher_Stream struct {
 	WXORKeyStream func(dst []byte, src []byte)
 }
 
-func (W _crypto_cipher_Stream) XORKeyStream(dst []byte, src []byte) { W.WXORKeyStream(dst, src) }
+func (W _crypto_cipher_Stream) XORKeyStream(dst []byte, src []byte) {
+	if W.WXORKeyStream == nil {
+		return
+	}
+	W.WXORKeyStream(dst, src)
+}

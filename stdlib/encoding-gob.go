@@ -33,15 +33,25 @@ func init() {
 // _encoding_gob_GobDecoder is an interface wrapper for GobDecoder type
 type _encoding_gob_GobDecoder struct {
 	IValue     interface{}
-	WGobDecode func(a0 []byte) error
+	WGobDecode func(a0 []byte) (r0 error)
 }
 
-func (W _encoding_gob_GobDecoder) GobDecode(a0 []byte) error { return W.WGobDecode(a0) }
+func (W _encoding_gob_GobDecoder) GobDecode(a0 []byte) (r0 error) {
+	if W.WGobDecode == nil {
+		return
+	}
+	return W.WGobDecode(a0)
+}
 
 // _encoding_gob_GobEncoder is an interface wrapper for GobEncoder type
 type _encoding_gob_GobEncoder struct {
 	IValue     interface{}
-	WGobEncode func() ([]byte, error)
+	WGobEncode func() (r0 []byte, r1 error)
 }
 
-func (W _encoding_gob_GobEncoder) GobEncode() ([]byte, error) { return W.WGobEncode() }
+func (W _encoding_gob_GobEncoder) GobEncode() (r0 []byte, r1 error) {
+	if W.WGobEncode == nil {
+		return
+	}
+	return W.WGobEncode()
+}

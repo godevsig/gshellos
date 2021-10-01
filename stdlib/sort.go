@@ -44,11 +44,26 @@ func init() {
 // _sort_Interface is an interface wrapper for Interface type
 type _sort_Interface struct {
 	IValue interface{}
-	WLen   func() int
-	WLess  func(i int, j int) bool
+	WLen   func() (r0 int)
+	WLess  func(i int, j int) (r0 bool)
 	WSwap  func(i int, j int)
 }
 
-func (W _sort_Interface) Len() int               { return W.WLen() }
-func (W _sort_Interface) Less(i int, j int) bool { return W.WLess(i, j) }
-func (W _sort_Interface) Swap(i int, j int)      { W.WSwap(i, j) }
+func (W _sort_Interface) Len() (r0 int) {
+	if W.WLen == nil {
+		return
+	}
+	return W.WLen()
+}
+func (W _sort_Interface) Less(i int, j int) (r0 bool) {
+	if W.WLess == nil {
+		return
+	}
+	return W.WLess(i, j)
+}
+func (W _sort_Interface) Swap(i int, j int) {
+	if W.WSwap == nil {
+		return
+	}
+	W.WSwap(i, j)
+}

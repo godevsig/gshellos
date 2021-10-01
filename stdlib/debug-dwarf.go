@@ -272,11 +272,26 @@ func init() {
 // _debug_dwarf_Type is an interface wrapper for Type type
 type _debug_dwarf_Type struct {
 	IValue  interface{}
-	WCommon func() *dwarf.CommonType
-	WSize   func() int64
-	WString func() string
+	WCommon func() (r0 *dwarf.CommonType)
+	WSize   func() (r0 int64)
+	WString func() (r0 string)
 }
 
-func (W _debug_dwarf_Type) Common() *dwarf.CommonType { return W.WCommon() }
-func (W _debug_dwarf_Type) Size() int64               { return W.WSize() }
-func (W _debug_dwarf_Type) String() string            { return W.WString() }
+func (W _debug_dwarf_Type) Common() (r0 *dwarf.CommonType) {
+	if W.WCommon == nil {
+		return
+	}
+	return W.WCommon()
+}
+func (W _debug_dwarf_Type) Size() (r0 int64) {
+	if W.WSize == nil {
+		return
+	}
+	return W.WSize()
+}
+func (W _debug_dwarf_Type) String() (r0 string) {
+	if W.WString == nil {
+		return
+	}
+	return W.WString()
+}

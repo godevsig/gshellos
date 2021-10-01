@@ -36,8 +36,14 @@ type _net_smtp_Auth struct {
 }
 
 func (W _net_smtp_Auth) Next(fromServer []byte, more bool) (toServer []byte, err error) {
+	if W.WNext == nil {
+		return
+	}
 	return W.WNext(fromServer, more)
 }
 func (W _net_smtp_Auth) Start(server *smtp.ServerInfo) (proto string, toServer []byte, err error) {
+	if W.WStart == nil {
+		return
+	}
 	return W.WStart(server)
 }

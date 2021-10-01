@@ -66,21 +66,46 @@ func init() {
 // _flag_Getter is an interface wrapper for Getter type
 type _flag_Getter struct {
 	IValue  interface{}
-	WGet    func() interface{}
-	WSet    func(a0 string) error
-	WString func() string
+	WGet    func() (r0 interface{})
+	WSet    func(a0 string) (r0 error)
+	WString func() (r0 string)
 }
 
-func (W _flag_Getter) Get() interface{}    { return W.WGet() }
-func (W _flag_Getter) Set(a0 string) error { return W.WSet(a0) }
-func (W _flag_Getter) String() string      { return W.WString() }
+func (W _flag_Getter) Get() (r0 interface{}) {
+	if W.WGet == nil {
+		return
+	}
+	return W.WGet()
+}
+func (W _flag_Getter) Set(a0 string) (r0 error) {
+	if W.WSet == nil {
+		return
+	}
+	return W.WSet(a0)
+}
+func (W _flag_Getter) String() (r0 string) {
+	if W.WString == nil {
+		return
+	}
+	return W.WString()
+}
 
 // _flag_Value is an interface wrapper for Value type
 type _flag_Value struct {
 	IValue  interface{}
-	WSet    func(a0 string) error
-	WString func() string
+	WSet    func(a0 string) (r0 error)
+	WString func() (r0 string)
 }
 
-func (W _flag_Value) Set(a0 string) error { return W.WSet(a0) }
-func (W _flag_Value) String() string      { return W.WString() }
+func (W _flag_Value) Set(a0 string) (r0 error) {
+	if W.WSet == nil {
+		return
+	}
+	return W.WSet(a0)
+}
+func (W _flag_Value) String() (r0 string) {
+	if W.WString == nil {
+		return
+	}
+	return W.WString()
+}
