@@ -157,6 +157,10 @@ func addDeamonCmd() {
 
 		var updateChan chan struct{}
 		go func() {
+			if _, has := os.LookupEnv("GSHELL_NOUPDATE"); has {
+				lg.Infoln("no auto update")
+				return
+			}
 			i, _ := strconv.Atoi(updateInterval)
 			lg.Debugf("updater interval: %d", i)
 			for {
@@ -338,9 +342,12 @@ func addExecCmd() {
 		}
 
 		file := args[0]
-		os.Args = args // pass os.Args down
-		sh := newShell(interp.Options{})
-		return sh.runFile(file)
+		sh := newShell(interp.Options{Args: args})
+		err := sh.runFile(file)
+		if p, ok := err.(interp.Panic); ok {
+			err = fmt.Errorf("%w\n%s", err, string(p.Stack))
+		}
+		return err
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }

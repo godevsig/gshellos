@@ -139,6 +139,9 @@ func (vc *vmCtl) runVM() {
 	} else {
 		if _, err := vc.sh.EvalWithContext(ctx, "_main()"); err != nil {
 			fmt.Fprintln(&vc.stderr, err)
+			if p, ok := err.(interp.Panic); ok {
+				fmt.Fprintln(&vc.stderr, string(p.Stack))
+			}
 		}
 	}
 
@@ -168,11 +171,6 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gre.lg.Debugf("greCmdRun: file: %v, args: %v, interactive: %v\n", msg.File, msg.Args, msg.Interactive)
 
 	name := filepath.Base(msg.File)
-	upper := filepath.Base(filepath.Dir(msg.File))
-	if upper != "." {
-		name = upper + "/" + name
-	}
-
 	vc := &vmCtl{args: msg.Args, runMsg: msg}
 	vc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 	vc.ID = genID(vmIDWidth)
