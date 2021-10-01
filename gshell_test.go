@@ -360,7 +360,7 @@ func TestCmdInfo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "Build tags: stdbase,adaptiveservice,stdcommon") {
+	if !strings.Contains(out, "stdbase") {
 		t.Fatal("unexpected output")
 	}
 }
