@@ -9,8 +9,6 @@ BLDTAGS := $(BLDTAGS),stdbase,stdcommon
 LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)' -X 'github.com/godevsig/gshellos.buildTags=$(BLDTAGS)'
 LDFLAGS += -X 'github.com/godevsig/gshellos.commitRev=$(COMMIT_REV)'
 
-.PHONY: all dep format build clean test testbin coverage lint vet race help
-
 all: format lint vet test build
 
 format: ## Check coding style
@@ -60,6 +58,17 @@ FULLTAGS := $(FULLTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,st
 FULLTAGS := $(FULLTAGS),debug
 full: BLDTAGS := $(FULLTAGS)
 full: build ## Build full release binary to bin dir
+
+generate: gen-extlib gen-stdlib ## Generate libraries
+
+gen-extlib: extractbin
+	@go generate github.com/godevsig/gshellos/extension
+
+gen-stdlib: extractbin
+	@go generate github.com/godevsig/gshellos/stdlib
+
+extractbin:
+	@go build -o cmd/extract ./cmd/extract
 
 clean: ## Remove previous build and test files
 	@rm -rf bin `find -name "\.test"` `find -name "test"`

@@ -9,10 +9,12 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
@@ -43,9 +45,9 @@ func init() {
 func getSelfID(opts []as.Option) (selfID string, err error) {
 	opts = append(opts, as.WithScope(as.ScopeProcess|as.ScopeOS))
 	c := as.NewClient(opts...).SetDiscoverTimeout(0)
-	conn := <-c.Discover(as.BuiltinPublisher, "providerInfo")
+	conn := <-c.Discover(as.BuiltinPublisher, as.SrvProviderInfo)
 	if conn == nil {
-		err = as.ErrServiceNotFound
+		err = as.ErrServiceNotFound(as.BuiltinPublisher, as.SrvProviderInfo)
 		return
 	}
 	defer conn.Close()
@@ -251,9 +253,9 @@ func addListCmd() {
 		}
 
 		c := as.NewClient(opts...)
-		conn := <-c.Discover(as.BuiltinPublisher, "serviceLister")
+		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
 		if conn == nil {
-			return as.ErrServiceNotFound
+			return as.ErrServiceNotFound(as.BuiltinPublisher, as.SrvServiceLister)
 		}
 		defer conn.Close()
 
@@ -405,7 +407,7 @@ func getCodeRepoAddr(lg as.Logger) (addr string, err error) {
 	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
 	conn := <-c.Discover(godevsigPublisher, "codeRepo")
 	if conn == nil {
-		err = as.ErrServiceNotFound
+		err = as.ErrServiceNotFound(godevsigPublisher, "codeRepo")
 		return
 	}
 	defer conn.Close()
@@ -439,7 +441,7 @@ func addKillCmd() {
 		lg := newLogger(log.DefaultStream, "main")
 		conn := connectDaemon(lg)
 		if conn == nil {
-			return as.ErrServiceNotFound
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 		}
 		defer conn.Close()
 
@@ -459,11 +461,9 @@ func addKillCmd() {
 
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
-		"[options] <package_path[/file.go]> [args...]",
-		"Look for package_path[/file.go] in `pwd` or else in `gshell repo`,",
-		"call `func Start(args []string) error` if package_path has the func",
-		"which must have been compiled into gshell, or else just run file.go.",
-		"Run in a new VM in specified gre on local/remote system"),
+		"[options] <package_path/file.go> [args...]",
+		"Look for package_path/file.go in `pwd` or else in `gshell repo`,",
+		"run it in a new VM in specified gre on local/remote system"),
 		flag.ExitOnError)
 	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment)")
 	interactive := cmd.Bool("i", false, "enter interactive mode")
@@ -482,26 +482,22 @@ func addRunCmd() {
 		file := args[0]
 		var byteCode []byte
 		var err error
-		if strings.HasSuffix(file, ".go") {
-			byteCode, err = os.ReadFile(file)
-			if err != nil {
-				c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
-				conn := <-c.Discover(godevsigPublisher, "codeRepo")
-				if conn == nil {
-					return errors.New("file not found")
-				}
-				defer conn.Close()
+		if !strings.HasSuffix(file, ".go") {
+			return errors.New("wrong file suffix, see --help")
+		}
 
-				if err := conn.SendRecv(getFileContent{file}, &byteCode); err != nil {
-					return err
-				}
+		byteCode, err = os.ReadFile(file)
+		if err != nil {
+			c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+			conn := <-c.Discover(godevsigPublisher, "codeRepo")
+			if conn == nil {
+				return errors.New("file not found")
 			}
-		} else {
-			repoAddr, err := getCodeRepoAddr(lg)
-			if err != nil {
+			defer conn.Close()
+
+			if err := conn.SendRecv(getFileContent{file}, &byteCode); err != nil {
 				return err
 			}
-			file = strings.Split(repoAddr, " ")[0] + "/" + file
 		}
 
 		cmd := cmdRun{
@@ -517,7 +513,7 @@ func addRunCmd() {
 
 		conn := connectDaemon(lg)
 		if conn == nil {
-			return as.ErrServiceNotFound
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 		}
 		defer conn.Close()
 
@@ -534,9 +530,10 @@ func addRunCmd() {
 			return nil
 		}
 
+		ioconn := as.NewStreamIO(conn)
 		lg.Debugln("enter interactive io")
-		go io.Copy(conn, os.Stdin)
-		io.Copy(os.Stdout, conn)
+		go io.Copy(ioconn, os.Stdin)
+		io.Copy(os.Stdout, ioconn)
 		lg.Debugln("exit interactive io")
 		return nil
 	}
@@ -551,7 +548,7 @@ func addPsCmd() {
 		lg := newLogger(log.DefaultStream, "main")
 		conn := connectDaemon(lg)
 		if conn == nil {
-			return as.ErrServiceNotFound
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 		}
 		defer conn.Close()
 
@@ -635,7 +632,7 @@ func addPatternCmds() {
 			lg := newLogger(log.DefaultStream, "main")
 			conn := connectDaemon(lg)
 			if conn == nil {
-				return as.ErrServiceNotFound
+				return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 			}
 			defer conn.Close()
 
@@ -678,7 +675,7 @@ func addInfoCmd() {
 		lg := newLogger(log.DefaultStream, "main")
 		conn := connectDaemon(lg)
 		if conn == nil {
-			return as.ErrServiceNotFound
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 		}
 		defer conn.Close()
 
@@ -693,8 +690,9 @@ func addInfoCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func addTailfCmd() {
-	cmd := flag.NewFlagSet(newCmd("tailf", "[options] <daemon|gre|VMID>", "Print logs on local/remote system"), flag.ExitOnError)
+func addLogCmd() {
+	cmd := flag.NewFlagSet(newCmd("log", "[options] <daemon|gre|VMID>", "Print target log on local/remote system"), flag.ExitOnError)
+	follow := cmd.Bool("f", false, "follow and output appended data as the log grows")
 
 	action := func() error {
 		args := cmd.Args()
@@ -705,16 +703,32 @@ func addTailfCmd() {
 		lg := newLogger(log.DefaultStream, "main")
 		conn := connectDaemon(lg)
 		if conn == nil {
-			return as.ErrServiceNotFound
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 		}
 		defer conn.Close()
 
-		msg := cmdTailf{Target: target}
+		msg := cmdLog{Target: target, Follow: *follow}
 		if err := conn.Send(&msg); err != nil {
 			return err
 		}
-		io.Copy(os.Stdout, conn)
-		lg.Debugln("cmdTailf: done")
+		if *follow {
+			sigChan := make(chan os.Signal, 1)
+			signal.Notify(sigChan, syscall.SIGINT)
+			go func() {
+				sig := <-sigChan
+				lg.Debugf("signal: %s", sig.String())
+				conn.Close()
+			}()
+			ioconn := as.NewStreamIO(conn)
+			io.Copy(os.Stdout, ioconn)
+			lg.Debugln("cmdLog: done")
+		} else {
+			var log []byte
+			if err := conn.Recv(&log); err != nil {
+				return err
+			}
+			fmt.Printf("%s", log)
+		}
 
 		return nil
 	}
@@ -744,7 +758,7 @@ func ShellMain() error {
 	addPsCmd()
 	addPatternCmds()
 	addInfoCmd()
-	addTailfCmd()
+	addLogCmd()
 
 	usage := func() {
 		fmt.Println("COMMANDS:")

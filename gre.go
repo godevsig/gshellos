@@ -95,25 +95,7 @@ type vmCtl struct {
 
 func (vc *vmCtl) newShell() error {
 	src := string(vc.runMsg.ByteCode)
-	if len(src) != 0 {
-		src = strings.Replace(src, "main(", "_main(", 1)
-	} else {
-		pkg := vc.runMsg.File
-		pkgBase := filepath.Base(pkg)
-		src = fmt.Sprintf(`
-package main
-import (
-	"fmt"
-	"os"
-	"%s"
-)
-func Stop() { %s.Stop() }
-func _main() {
-	if err := %s.Start(os.Args); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-}`, pkg, pkgBase, pkgBase)
-	}
+	src = strings.Replace(src, "main(", "_main(", 1)
 
 	vc.sh = newShell(interp.Options{
 		Stdin:  vc.stdin,
@@ -188,13 +170,15 @@ func (msg *greCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	if msg.Interactive {
 		gre.lg.Debugln("greCmdRun: interactive")
 		defer output.Close()
-		vc.stdin = stream
-		vc.stdout = multiWriter(stream, output)
+		clientIO := as.NewStreamIO(stream)
+		vc.stdin = clientIO
+		vc.stdout = multiWriter(clientIO, output)
 		vc.runVM()
 		if msg.AutoRemove {
 			gre.rmVM(vc)
 		}
-		return io.EOF
+		clientIO.Close()
+		return nil
 	}
 
 	go func() {

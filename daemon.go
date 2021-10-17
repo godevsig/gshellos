@@ -2,6 +2,7 @@ package gshellos
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -124,9 +125,11 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 		}
 		return vmid
 	}
+	client := as.NewStreamIO(stream)
+	gre := as.NewStreamIO(conn)
 	gd.lg.Debugln("enter interactive io")
-	go io.Copy(conn, stream)
-	io.Copy(stream, conn)
+	go io.Copy(gre, client)
+	io.Copy(client, gre)
 	gd.lg.Debugln("exit interactive io")
 
 	return io.EOF
@@ -188,13 +191,13 @@ func (msg *cmdPatternAction) Handle(stream as.ContextStream) (reply interface{})
 	return gvmids
 }
 
-type cmdTailf struct {
+type cmdLog struct {
 	Target string
+	Follow bool
 }
 
-func (msg *cmdTailf) Handle(stream as.ContextStream) (reply interface{}) {
+func (msg *cmdLog) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
-	reply = io.EOF
 	var file string
 	switch msg.Target {
 	case "daemon":
@@ -205,13 +208,27 @@ func (msg *cmdTailf) Handle(stream as.ContextStream) (reply interface{}) {
 		file = workDir + "/logs/" + msg.Target
 	}
 
-	f, err := os.Open(file)
-	if err != nil {
-		fmt.Fprintln(stream, msg.Target+" not found")
-		return
+	if msg.Follow {
+		clientIO := as.NewStreamIO(stream)
+		f, err := os.Open(file)
+		if err != nil {
+			fmt.Fprintln(clientIO, msg.Target+" not found")
+			return
+		}
+		defer f.Close()
+		io.Copy(clientIO, endlessReader{f})
+		gd.lg.Debugln("cmdLog: done")
+		clientIO.Close()
+	} else {
+		buf, err := os.ReadFile(file)
+		if err != nil {
+			return errors.New(msg.Target + " not found")
+		}
+		if err := stream.Send(buf); err != nil {
+			return err
+		}
 	}
-	io.Copy(stream, endlessReader{f})
-	gd.lg.Debugln("cmdTailf: done")
+
 	return
 }
 
@@ -231,7 +248,7 @@ var daemonKnownMsgs = []as.KnownMessage{
 	(*cmdRun)(nil),
 	(*cmdQuery)(nil),
 	(*cmdPatternAction)(nil),
-	(*cmdTailf)(nil),
+	(*cmdLog)(nil),
 	cmdInfo{},
 }
 
@@ -363,7 +380,7 @@ func init() {
 	as.RegisterType([]*greVMInfo(nil))
 	as.RegisterType((*cmdPatternAction)(nil))
 	as.RegisterType([]*greVMIDs(nil))
-	as.RegisterType((*cmdTailf)(nil))
+	as.RegisterType((*cmdLog)(nil))
 	as.RegisterType(cmdInfo{})
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType(getFileContent{})

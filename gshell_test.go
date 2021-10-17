@@ -365,14 +365,14 @@ func TestCmdInfo(t *testing.T) {
 	}
 }
 
-func TestCmdTailf(t *testing.T) {
+func TestCmdLog(t *testing.T) {
 	out, err := gshellRunCmd("run testdata/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out)
-	out, err = gshellRunCmdTimeout("tailf "+id, 1)
+	out, err = gshellRunCmdTimeout("log "+id, 1)
 	t.Logf("\n%s", out)
 	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")

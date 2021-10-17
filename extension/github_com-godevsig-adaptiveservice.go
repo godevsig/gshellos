@@ -16,13 +16,13 @@ func init() {
 	Symbols["github.com/godevsig/adaptiveservice/adaptiveservice"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"BuiltinPublisher":       reflect.ValueOf(constant.MakeFromLiteral("\"builtin\"", token.STRING, 0)),
-		"ErrBadMessage":          reflect.ValueOf(&adaptiveservice.ErrBadMessage).Elem(),
 		"ErrConnReset":           reflect.ValueOf(&adaptiveservice.ErrConnReset).Elem(),
 		"ErrServerClosed":        reflect.ValueOf(&adaptiveservice.ErrServerClosed).Elem(),
-		"ErrServiceNotFound":     reflect.ValueOf(&adaptiveservice.ErrServiceNotFound).Elem(),
+		"ErrServiceNotFound":     reflect.ValueOf(adaptiveservice.ErrServiceNotFound),
 		"ErrServiceNotReachable": reflect.ValueOf(&adaptiveservice.ErrServiceNotReachable).Elem(),
 		"NewClient":              reflect.ValueOf(adaptiveservice.NewClient),
 		"NewServer":              reflect.ValueOf(adaptiveservice.NewServer),
+		"NewStreamIO":            reflect.ValueOf(adaptiveservice.NewStreamIO),
 		"OK":                     reflect.ValueOf(constant.MakeFromLiteral("0", token.INT, 0)),
 		"OnConnectFunc":          reflect.ValueOf(adaptiveservice.OnConnectFunc),
 		"OnDisconnectFunc":       reflect.ValueOf(adaptiveservice.OnDisconnectFunc),
@@ -33,6 +33,11 @@ func init() {
 		"ScopeOS":                reflect.ValueOf(adaptiveservice.ScopeOS),
 		"ScopeProcess":           reflect.ValueOf(adaptiveservice.ScopeProcess),
 		"ScopeWAN":               reflect.ValueOf(adaptiveservice.ScopeWAN),
+		"SrvLANRegistry":         reflect.ValueOf(constant.MakeFromLiteral("\"LANRegistry\"", token.STRING, 0)),
+		"SrvProviderInfo":        reflect.ValueOf(constant.MakeFromLiteral("\"providerInfo\"", token.STRING, 0)),
+		"SrvRegistryInfo":        reflect.ValueOf(constant.MakeFromLiteral("\"registryInfo\"", token.STRING, 0)),
+		"SrvReverseProxy":        reflect.ValueOf(constant.MakeFromLiteral("\"reverseProxy\"", token.STRING, 0)),
+		"SrvServiceLister":       reflect.ValueOf(constant.MakeFromLiteral("\"serviceLister\"", token.STRING, 0)),
 		"WithLogger":             reflect.ValueOf(adaptiveservice.WithLogger),
 		"WithProviderID":         reflect.ValueOf(adaptiveservice.WithProviderID),
 		"WithQsize":              reflect.ValueOf(adaptiveservice.WithQsize),
@@ -75,14 +80,13 @@ func init() {
 
 // _github_com_godevsig_adaptiveservice_Connection is an interface wrapper for Connection type
 type _github_com_godevsig_adaptiveservice_Connection struct {
-	IValue     interface{}
-	WClose     func()
-	WNewStream func() (r0 adaptiveservice.Stream)
-	WRead      func(p []byte) (n int, err error)
-	WRecv      func(msgPtr interface{}) (r0 error)
-	WSend      func(msg interface{}) (r0 error)
-	WSendRecv  func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
-	WWrite     func(p []byte) (n int, err error)
+	IValue      interface{}
+	WClose      func()
+	WGetNetconn func() (r0 adaptiveservice.Netconn)
+	WNewStream  func() (r0 adaptiveservice.Stream)
+	WRecv       func(msgPtr interface{}) (r0 error)
+	WSend       func(msg interface{}) (r0 error)
+	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
 }
 
 func (W _github_com_godevsig_adaptiveservice_Connection) Close() {
@@ -91,17 +95,17 @@ func (W _github_com_godevsig_adaptiveservice_Connection) Close() {
 	}
 	W.WClose()
 }
+func (W _github_com_godevsig_adaptiveservice_Connection) GetNetconn() (r0 adaptiveservice.Netconn) {
+	if W.WGetNetconn == nil {
+		return
+	}
+	return W.WGetNetconn()
+}
 func (W _github_com_godevsig_adaptiveservice_Connection) NewStream() (r0 adaptiveservice.Stream) {
 	if W.WNewStream == nil {
 		return
 	}
 	return W.WNewStream()
-}
-func (W _github_com_godevsig_adaptiveservice_Connection) Read(p []byte) (n int, err error) {
-	if W.WRead == nil {
-		return
-	}
-	return W.WRead(p)
 }
 func (W _github_com_godevsig_adaptiveservice_Connection) Recv(msgPtr interface{}) (r0 error) {
 	if W.WRecv == nil {
@@ -120,12 +124,6 @@ func (W _github_com_godevsig_adaptiveservice_Connection) SendRecv(msgSnd interfa
 		return
 	}
 	return W.WSendRecv(msgSnd, msgRcvPtr)
-}
-func (W _github_com_godevsig_adaptiveservice_Connection) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
-	return W.WWrite(p)
 }
 
 // _github_com_godevsig_adaptiveservice_Context is an interface wrapper for Context type
@@ -166,14 +164,13 @@ func (W _github_com_godevsig_adaptiveservice_Context) SetContext(v interface{}) 
 type _github_com_godevsig_adaptiveservice_ContextStream struct {
 	IValue      interface{}
 	WGetContext func() (r0 interface{})
+	WGetNetconn func() (r0 adaptiveservice.Netconn)
 	WGetVar     func(v interface{})
 	WPutVar     func(v interface{})
-	WRead       func(p []byte) (n int, err error)
 	WRecv       func(msgPtr interface{}) (r0 error)
 	WSend       func(msg interface{}) (r0 error)
 	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
 	WSetContext func(v interface{})
-	WWrite      func(p []byte) (n int, err error)
 }
 
 func (W _github_com_godevsig_adaptiveservice_ContextStream) GetContext() (r0 interface{}) {
@@ -181,6 +178,12 @@ func (W _github_com_godevsig_adaptiveservice_ContextStream) GetContext() (r0 int
 		return
 	}
 	return W.WGetContext()
+}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) GetNetconn() (r0 adaptiveservice.Netconn) {
+	if W.WGetNetconn == nil {
+		return
+	}
+	return W.WGetNetconn()
 }
 func (W _github_com_godevsig_adaptiveservice_ContextStream) GetVar(v interface{}) {
 	if W.WGetVar == nil {
@@ -193,12 +196,6 @@ func (W _github_com_godevsig_adaptiveservice_ContextStream) PutVar(v interface{}
 		return
 	}
 	W.WPutVar(v)
-}
-func (W _github_com_godevsig_adaptiveservice_ContextStream) Read(p []byte) (n int, err error) {
-	if W.WRead == nil {
-		return
-	}
-	return W.WRead(p)
 }
 func (W _github_com_godevsig_adaptiveservice_ContextStream) Recv(msgPtr interface{}) (r0 error) {
 	if W.WRecv == nil {
@@ -223,12 +220,6 @@ func (W _github_com_godevsig_adaptiveservice_ContextStream) SetContext(v interfa
 		return
 	}
 	W.WSetContext(v)
-}
-func (W _github_com_godevsig_adaptiveservice_ContextStream) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
-	return W.WWrite(p)
 }
 
 // _github_com_godevsig_adaptiveservice_HighPriorityMessage is an interface wrapper for HighPriorityMessage type
@@ -347,19 +338,18 @@ func (W _github_com_godevsig_adaptiveservice_Netconn) RemoteAddr() (r0 net.Addr)
 
 // _github_com_godevsig_adaptiveservice_Stream is an interface wrapper for Stream type
 type _github_com_godevsig_adaptiveservice_Stream struct {
-	IValue    interface{}
-	WRead     func(p []byte) (n int, err error)
-	WRecv     func(msgPtr interface{}) (r0 error)
-	WSend     func(msg interface{}) (r0 error)
-	WSendRecv func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
-	WWrite    func(p []byte) (n int, err error)
+	IValue      interface{}
+	WGetNetconn func() (r0 adaptiveservice.Netconn)
+	WRecv       func(msgPtr interface{}) (r0 error)
+	WSend       func(msg interface{}) (r0 error)
+	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
 }
 
-func (W _github_com_godevsig_adaptiveservice_Stream) Read(p []byte) (n int, err error) {
-	if W.WRead == nil {
+func (W _github_com_godevsig_adaptiveservice_Stream) GetNetconn() (r0 adaptiveservice.Netconn) {
+	if W.WGetNetconn == nil {
 		return
 	}
-	return W.WRead(p)
+	return W.WGetNetconn()
 }
 func (W _github_com_godevsig_adaptiveservice_Stream) Recv(msgPtr interface{}) (r0 error) {
 	if W.WRecv == nil {
@@ -378,10 +368,4 @@ func (W _github_com_godevsig_adaptiveservice_Stream) SendRecv(msgSnd interface{}
 		return
 	}
 	return W.WSendRecv(msgSnd, msgRcvPtr)
-}
-func (W _github_com_godevsig_adaptiveservice_Stream) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
-	return W.WWrite(p)
 }
