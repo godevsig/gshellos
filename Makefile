@@ -5,7 +5,7 @@ PKG_LIST := $(shell go list ./... | grep -E -v "gshellos$$|/cmd|extension$$|stdl
 GIT_TAG := $(shell git describe --tags --abbrev=0 2>/dev/null)
 COMMIT_REV := $(shell git rev-parse HEAD)
 BLDTAGS := adaptiveservice
-BLDTAGS := $(BLDTAGS),stdbase,stdcommon
+BLDTAGS := $(BLDTAGS),stdbase,stdcommon,stdruntime
 LDFLAGS = -X 'github.com/godevsig/gshellos.version=$(GIT_TAG)' -X 'github.com/godevsig/gshellos.buildTags=$(BLDTAGS)'
 LDFLAGS += -X 'github.com/godevsig/gshellos.commitRev=$(COMMIT_REV)'
 
@@ -53,8 +53,9 @@ build: dep
 lite: LDFLAGS += -s -w
 lite: build ## Build lite release binary to bin dir
 
-FULLTAGS := $(BLDTAGS),stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
-FULLTAGS := $(FULLTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdruntime,stdtext,stdunicode
+FULLTAGS := $(BLDTAGS)
+FULLTAGS := $(FULLTAGS),stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
+FULLTAGS := $(FULLTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
 FULLTAGS := $(FULLTAGS),debug
 full: BLDTAGS := $(FULLTAGS)
 full: build ## Build full release binary to bin dir
