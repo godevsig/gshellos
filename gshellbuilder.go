@@ -466,6 +466,8 @@ func addRunCmd() {
 		"run it in a new VM in specified gre on local/remote system"),
 		flag.ExitOnError)
 	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment)")
+	rtPriority := cmd.String("rt", "", `Set the gre to SCHED_RR min/max priority 1/99 on new gre creation
+Caution: gshell daemon must be started as root to set realtime attributes`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
 	autoRemove := cmd.Bool("rm", false, "automatically remove the VM when it exits")
 
@@ -476,6 +478,12 @@ func addRunCmd() {
 		}
 		if strings.Contains(*greName, "*") {
 			return errors.New("wrong use of wildcard(*), see --help")
+		}
+		if len(*rtPriority) != 0 {
+			pri, err := strconv.Atoi(*rtPriority)
+			if err != nil || pri < 1 || pri > 99 {
+				return errors.New("wrong SCHED_RR priority, see man chrt")
+			}
 		}
 
 		lg := newLogger(log.DefaultStream, "main")
@@ -508,7 +516,8 @@ func addRunCmd() {
 				AutoRemove:  *autoRemove,
 				ByteCode:    rmShebang(byteCode),
 			},
-			GreName: *greName,
+			GreName:    *greName,
+			RtPriority: *rtPriority,
 		}
 
 		conn := connectDaemon(lg)

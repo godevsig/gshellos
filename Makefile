@@ -25,7 +25,10 @@ testbin: dep ## Generate test version of main binary
 	@go test -tags $(BLDTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
 	@ln -snf gshell.tester bin/gshell.test
 
-test: testbin ## Run unit tests
+rmtestfiles:
+	@rm -rf .working; rm -rf .test
+
+test: rmtestfiles testbin ## Run unit tests
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate
 	@set -o pipefail; go test -v -short ${PKG_LIST} | tee .test/test.log
@@ -35,7 +38,7 @@ race:  ## Run data race detector
 	@go test -race -short ${PKG_LIST}
 
 COVER_GOAL := 80
-coverage: testbin ## Generate global code coverage report
+coverage: rmtestfiles testbin ## Generate global code coverage report
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
 	@go test -covermode=count -coverpkg="./..." -coverprofile .test/l1_coverage.cov $(PKG_LIST)

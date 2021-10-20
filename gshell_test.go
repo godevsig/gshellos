@@ -250,6 +250,15 @@ func TestCmdRun(t *testing.T) {
 	}
 }
 
+func TestCmdRunRT(t *testing.T) {
+	out, _ := gshellRunCmd("run -e testrt -rt 50 testdata/hello.go")
+	t.Logf("\n%s", out)
+
+	if !strings.Contains(out, "Operation not permitted") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestCmdKill(t *testing.T) {
 	out, err := gshellRunCmd("run -e test testdata/hello.go")
 	t.Logf("\n%s", out)
@@ -398,8 +407,8 @@ func TestCmdRepo(t *testing.T) {
 }
 
 func TestCmdRepoRun(t *testing.T) {
-	gs.RunCmd("mv testdata/hello.go testdata/_hello.go")
-	defer gs.RunCmd("mv testdata/_hello.go testdata/hello.go")
+	gs.RunShCmd("mv testdata/hello.go testdata/_hello.go")
+	defer gs.RunShCmd("mv testdata/_hello.go testdata/hello.go")
 	out, err := gshellRunCmd("run -i testdata/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
@@ -412,11 +421,11 @@ func TestCmdRepoRun(t *testing.T) {
 
 func TestAutoUpdate(t *testing.T) {
 	os.WriteFile("bin/rev", []byte("11111111111111111111111111111111\n"), 0644)
-	gs.RunCmd("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
-	md5sum := gs.RunCmd("md5sum bin/gshell." + runtime.GOARCH)
+	gs.RunShCmd("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
+	md5sum := gs.RunShCmd("md5sum bin/gshell." + runtime.GOARCH)
 	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
-	t.Logf("\n%s", gs.RunCmd("cat bin/rev bin/md5sum"))
-	oldpid := gs.RunCmd("pidof gshell.tester")
+	t.Logf("\n%s", gs.RunShCmd("cat bin/rev bin/md5sum"))
+	oldpid := gs.RunShCmd("pidof gshell.tester")
 	t.Logf("\n%s", oldpid)
 
 	out, err := gshellRunCmd("run testdata/fileserver.go -dir bin -port 9001")
@@ -434,8 +443,8 @@ func TestAutoUpdate(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(8 * time.Second)
-	pids := gs.RunCmd("pidof gshell.tester")
+	time.Sleep(10 * time.Second)
+	pids := gs.RunShCmd("pidof gshell.tester")
 	t.Logf("\n%s", pids)
 	if strings.Contains(pids, oldpid) {
 		t.Fatal("old pid still running")

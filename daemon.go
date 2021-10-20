@@ -24,7 +24,7 @@ func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgre(name string) as.Connection {
+func (gd *daemon) setupgre(name, rtPriority string) (as.Connection, error) {
 	opts := []as.Option{
 		as.WithLogger(gd.lg),
 		as.WithScope(as.ScopeOS),
@@ -32,34 +32,48 @@ func (gd *daemon) setupgre(name string) as.Connection {
 	c := as.NewClient(opts...).SetDiscoverTimeout(0)
 	conn := <-c.Discover(godevsigPublisher, "gre-"+name)
 	if conn != nil {
-		return conn
+		return conn, nil
 	}
 
 	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-e " + name
 	if os.Args[0] == "gshell.tester" {
 		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gre" + name + genID(3) + ".cov -- " + args
 	}
-	cmd := exec.Command(os.Args[0], strings.Split(args, " ")...)
+	exe := os.Args[0]
+	if len(rtPriority) != 0 {
+		args = rtPriority + " " + exe + " " + args
+		exe = "chrt"
+	}
+	cmd := exec.Command(exe, strings.Split(args, " ")...)
 	buf := &bytes.Buffer{}
 	cmd.Stdout = buf
 	cmd.Stderr = buf
 	gd.lg.Debugln("starting gre:", cmd.String())
 
-	if err := cmd.Start(); err != nil {
+	err := cmd.Start()
+	if err != nil {
 		gd.lg.Errorf("start cmd %s failed: %w", cmd.String(), err)
-		return nil
+		return nil, err
 	}
 	go func() {
-		err := cmd.Wait()
-		if err != nil {
-			gd.lg.Errorf("cmd: %s exited with error: %v, output: %v", cmd.String(), err, buf.String())
+		cmderr := cmd.Wait()
+		if cmderr != nil {
+			err = errors.New(buf.String())
+			gd.lg.Errorf("cmd: %s exited with error: %v, output: %v", cmd.String(), cmderr, buf.String())
 		} else {
 			gd.lg.Infof("cmd: %s exited, output: %v", cmd.String(), buf.String())
 		}
 	}()
 
 	c.SetDiscoverTimeout(3)
-	return <-c.Discover(godevsigPublisher, "gre-"+name)
+	conn = <-c.Discover(godevsigPublisher, "gre-"+name)
+	if conn != nil {
+		return conn, nil
+	}
+	if err == nil {
+		err = ErrBrokenGre
+	}
+	return nil, err
 }
 
 type cmdKill struct {
@@ -101,16 +115,17 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 
 type cmdRun struct {
 	greCmdRun
-	GreName string
+	GreName    string
+	RtPriority string
 }
 
 func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
 
-	conn := gd.setupgre(msg.GreName + "." + version)
-	if conn == nil {
-		return ErrBrokenGre
+	conn, err := gd.setupgre(msg.GreName+"."+version, msg.RtPriority)
+	if err != nil {
+		return err
 	}
 	defer conn.Close()
 
@@ -385,6 +400,7 @@ func init() {
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType(getFileContent{})
 	as.RegisterType((*url.Error)(nil))
+	as.RegisterType((*exec.ExitError)(nil))
 	as.RegisterType(tryUpdate{})
 	as.RegisterType((*gshellBin)(nil))
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -80,28 +81,28 @@ func (null) Close() error                  { return nil }
 func (null) Write(buf []byte) (int, error) { return len(buf), nil }
 func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
 
-// RunCmd runs a command and returns its output
-func RunCmd(cmd string) string {
-	strs := strings.Split(cmd, " ")
-	var cmdStrs []string
-	for _, str := range strs {
-		if len(str) != 0 {
-			cmdStrs = append(cmdStrs, str)
-		}
-	}
-	if len(cmdStrs) == 0 {
+// RunShCmd runs a command and returns its output.
+// The command will be running in background and output is discarded
+// if it ends with &.
+func RunShCmd(cmd string) string {
+	fields := strings.Fields(cmd)
+	if len(fields) == 0 {
 		return ""
 	}
-	name := cmdStrs[0]
-	var args []string
-	if len(cmdStrs) > 1 {
-		args = cmdStrs[1:]
+	bg := false
+	if fields[len(fields)-1] == "&" {
+		bg = true
+		fields = fields[:len(fields)-1]
 	}
-
-	output, err := exec.Command(name, args...).Output()
-	outputStr := string(output)
-	if err != nil {
-		outputStr = outputStr + err.Error()
+	if _, err := os.Stat(fields[0]); os.IsNotExist(err) {
+		fields = append([]string{"-c"}, strings.Join(fields, " "))
 	}
-	return outputStr
+	if bg {
+		if err := exec.Command("sh", fields...).Start(); err != nil {
+			return err.Error()
+		}
+		return ""
+	}
+	output, _ := exec.Command("sh", fields...).CombinedOutput()
+	return string(output)
 }
