@@ -315,7 +315,7 @@ func TestCmdPsID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "IN GRE    : master") {
+	if !strings.Contains(out, "NAME      : hello") {
 		t.Fatal("unexpected output")
 	}
 }

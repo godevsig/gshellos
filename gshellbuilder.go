@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math/rand"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -106,12 +107,19 @@ func addDeamonCmd() {
 
 	action := func() error {
 		cmdArgs := os.Args
+		scope := as.ScopeAll
 		if len(*registryAddr) == 0 {
-			return errors.New("root registry address not set")
+			scope &= ^as.ScopeWAN // not ScopeWAN
 		}
 		if len(*lanBroadcastPort) == 0 {
-			return errors.New("lan broadcast port not set")
+			scope &= ^as.ScopeLAN // not ScopeLAN
 		}
+		if len(*codeRepo) != 0 || len(*updateURL) != 0 || *rootRegistry {
+			if scope&as.ScopeWAN != as.ScopeWAN {
+				return errors.New("root registry address not set")
+			}
+		}
+
 		var repoInfo []string
 		if len(*codeRepo) != 0 {
 			repoInfo = strings.Split(*codeRepo, "/")
@@ -125,14 +133,21 @@ func addDeamonCmd() {
 		lg := newLogger(logStream, "daemon")
 
 		opts := []as.Option{
-			as.WithRegistryAddr(*registryAddr),
+			as.WithScope(scope),
 			as.WithLogger(lg),
+		}
+		if len(*registryAddr) != 0 {
+			opts = append(opts, as.WithRegistryAddr(*registryAddr))
 		}
 		s := as.NewServer(opts...).
 			SetPublisher(godevsigPublisher).
-			SetBroadcastPort(*lanBroadcastPort).
-			EnableAutoReverseProxy().
 			EnableServiceLister()
+		if len(*lanBroadcastPort) != 0 {
+			s.SetBroadcastPort(*lanBroadcastPort)
+		}
+		if scope&as.ScopeWAN == as.ScopeWAN || scope&as.ScopeLAN == as.ScopeLAN {
+			s.EnableAutoReverseProxy()
+		}
 		if *rootRegistry {
 			s.EnableRootRegistry()
 		}
@@ -245,12 +260,10 @@ func addListCmd() {
 
 	action := func() error {
 		opts := []as.Option{
+			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
 		}
-		selfID, err := getSelfID(opts)
-		if err != nil {
-			return err
-		}
+		selfID, _ := getSelfID(opts)
 
 		c := as.NewClient(opts...)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
@@ -326,7 +339,7 @@ func addIDCmd() {
 		}
 		selfID, err := getSelfID(opts)
 		if err != nil {
-			return err
+			selfID = "NA"
 		}
 		fmt.Println(selfID)
 		return nil
@@ -459,13 +472,22 @@ func addKillCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
+func randStringRunes(n int) string {
+	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
+
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
-		"[options] <package_path/file.go> [args...]",
-		"Look for package_path/file.go in `pwd` or else in `gshell repo`,",
+		"[options] <file.go> [args...]",
+		"Look for file.go in local file system or else in `gshell repo`,",
 		"run it in a new VM in specified gre on local/remote system"),
 		flag.ExitOnError)
-	greName := cmd.String("e", "master", "create new or use existing gre(gshell runtime environment)")
+	greName := cmd.String("e", "<random>", "create new or use existing gre(gshell runtime environment)")
 	rtPriority := cmd.String("rt", "", `Set the gre to SCHED_RR min/max priority 1/99 on new gre creation
 Caution: gshell daemon must be started as root to set realtime attributes`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
@@ -476,8 +498,12 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
-		if strings.Contains(*greName, "*") {
+		gre := *greName
+		if strings.Contains(gre, "*") {
 			return errors.New("wrong use of wildcard(*), see --help")
+		}
+		if len(gre) == 0 || gre == "<random>" {
+			gre = randStringRunes(6)
 		}
 		if len(*rtPriority) != 0 {
 			pri, err := strconv.Atoi(*rtPriority)
@@ -516,7 +542,7 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 				AutoRemove:  *autoRemove,
 				ByteCode:    rmShebang(byteCode),
 			},
-			GreName:    *greName,
+			GreName:    gre,
 			RtPriority: *rtPriority,
 		}
 
