@@ -438,14 +438,8 @@ func TestCmdREPL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `>> 
->> count := 9
->> count++
->> fmt.Println("hello", count, "times")
-hello 10 times
->> `
-	if out != want {
-		t.Fatalf("Want:\n%s, Got:\n%s", want, out)
+	if !strings.Contains(out, "hello 10 times") {
+		t.Fatalf("unexpected output:\n%s", out)
 	}
 }
 
