@@ -13,7 +13,7 @@ import (
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/gshellos/log"
+	"github.com/godevsig/grepo/lib-sys/log"
 	"github.com/traefik/yaegi/interp"
 )
 

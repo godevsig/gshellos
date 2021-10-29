@@ -212,7 +212,7 @@ func TestCmdList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "godevsig            gshellDaemon        self          1111") {
+	if !strings.Contains(out, "godevsig                  gshellDaemon              self          1111") {
 		t.Fatal("unexpected output")
 	}
 }
@@ -237,6 +237,9 @@ func TestCmdExec(t *testing.T) {
 	if out != "Hello, playground\n" {
 		t.Fatal("unexpected output")
 	}
+
+	out, err = gshellRunCmd("exec testdata/nofile.go")
+	t.Logf("\n%s", out)
 }
 
 func TestCmdRun(t *testing.T) {
@@ -419,6 +422,33 @@ func TestCmdRepoRun(t *testing.T) {
 	}
 }
 
+func TestCmdREPL(t *testing.T) {
+	inFile, err := os.Open("testdata/repl.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer inFile.Close()
+
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+	os.Stdin = inFile
+
+	os.Args = []string{"main"}
+	out, err := getShellMainOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `>> 
+>> count := 9
+>> count++
+>> fmt.Println("hello", count, "times")
+hello 10 times
+>> `
+	if out != want {
+		t.Fatalf("Want:\n%s, Got:\n%s", want, out)
+	}
+}
+
 func TestAutoUpdate(t *testing.T) {
 	os.WriteFile("bin/rev", []byte("11111111111111111111111111111111\n"), 0644)
 	gs.RunShCmd("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
@@ -436,6 +466,7 @@ func TestAutoUpdate(t *testing.T) {
 
 	id := strings.TrimSpace(out)
 	defer func() {
+		gs.RunShCmd("rm -f gshell.tester")
 		out, err := gshellRunCmd("stop " + id)
 		t.Logf("\n%s", out)
 		if err != nil {
@@ -443,7 +474,7 @@ func TestAutoUpdate(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(8 * time.Second)
 	pids := gs.RunShCmd("pidof gshell.tester")
 	t.Logf("\n%s", pids)
 	if strings.Contains(pids, oldpid) {

@@ -2,6 +2,7 @@ package gshellos
 
 import (
 	"crypto/md5"
+	_ "embed" // go embed
 	"errors"
 	"flag"
 	"fmt"
@@ -19,14 +20,20 @@ import (
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/gshellos/log"
+	"github.com/godevsig/grepo/lib-sys/log"
 	"github.com/traefik/yaegi/interp"
 )
 
+//go:embed bin/rev
+var commitRev string
+
+//go:embed bin/gittag
+var version string
+
+//go:embed bin/buildtag
+var buildTags string
+
 var (
-	commitRev         string
-	version           string
-	buildTags         string
 	workDir           = "/var/tmp/gshell"
 	loglevel          = "error"
 	providerID        = "self"
@@ -128,6 +135,15 @@ func addDeamonCmd() {
 			}
 		}
 
+		euid := os.Geteuid()
+		if err := syscall.Setreuid(euid, euid); err != nil {
+			return err
+		}
+		egid := os.Getegid()
+		if err := syscall.Setregid(egid, egid); err != nil {
+			return err
+		}
+
 		logStream := log.NewStream("daemon")
 		logStream.SetOutput("file:" + workDir + "/logs/daemon.log")
 		lg := newLogger(logStream, "daemon")
@@ -180,6 +196,12 @@ func addDeamonCmd() {
 			}
 			i, _ := strconv.Atoi(updateInterval)
 			lg.Debugf("updater interval: %d", i)
+			exe, err := os.Executable()
+			if err != nil {
+				lg.Warnf("executable path error: %s", err)
+				return
+			}
+			lg.Debugf("executable path: %s", exe)
 			for {
 				time.Sleep(time.Duration(i) * time.Second)
 				c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
@@ -191,7 +213,7 @@ func addDeamonCmd() {
 				err := conn.SendRecv(tryUpdate{revInuse: commitRev, arch: runtime.GOARCH}, &gshellbin)
 				conn.Close()
 				if err != nil {
-					if err == ErrNoUpdate {
+					if strings.Contains(err.Error(), ErrNoUpdate.Error()) {
 						lg.Debugln(ErrNoUpdate)
 					} else {
 						lg.Warnf("get gshell bin error: %v", err)
@@ -208,13 +230,24 @@ func addDeamonCmd() {
 					continue
 				}
 
+				lg.Debugf(RunShCmd("ls -lh " + newFile))
 				lg.Infof("updating gshell version...")
-				updateChan = make(chan struct{})
-				s.Close()
-				if err := os.Rename(newFile, cmdArgs[0]); err != nil {
-					lg.Errorf("failed to mv new gshell to %s", cmdArgs[0])
+
+				if err := os.Rename(newFile, exe); err != nil {
+					lg.Infof("failed to rename new gshell to %s: %s", exe, err)
+					output := RunShCmd("mv -f " + newFile + " " + exe)
+					if len(output) != 0 {
+						lg.Warnf("failed to mv new gshell to %s: %s", exe, output)
+						continue
+					}
+				}
+				if output := RunShCmd("chmod ugo+s " + exe); len(output) != 0 {
+					lg.Warnf("failed to set gshell bin permission : %s", output)
 					continue
 				}
+
+				updateChan = make(chan struct{})
+				s.Close()
 				cmd := cmdArgs[0]
 				args := cmdArgs[1:]
 				if cmdArgs[0] == "gshell.tester" {
@@ -315,14 +348,14 @@ func addListCmd() {
 				names = append(names, name)
 			}
 			sort.Strings(names)
-			fmt.Println("PUBLISHER           SERVICE             PROVIDER      WLOP(SCOPE)")
+			fmt.Println("PUBLISHER                 SERVICE                   PROVIDER      WLOP(SCOPE)")
 			for _, svc := range names {
 				p := list[svc]
 				if p == nil {
 					panic("nil p")
 				}
 				ss := strings.Split(svc, "_")
-				fmt.Printf("%-18s  %-18s  %-12s  %4b\n", trimName(ss[0], 18), trimName(ss[1], 18), ss[2], *p)
+				fmt.Printf("%-24s  %-24s  %-12s  %4b\n", trimName(ss[0], 24), trimName(ss[1], 24), ss[2], *p)
 			}
 		}
 		return nil

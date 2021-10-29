@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/godevsig/grepo/lib-sys/lined"
 	"github.com/godevsig/gshellos/extension"
-	"github.com/godevsig/gshellos/lined"
 	"github.com/godevsig/gshellos/stdlib"
 	"github.com/traefik/yaegi/interp"
 )

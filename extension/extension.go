@@ -13,3 +13,4 @@ func init() {
 }
 
 //go:generate ../cmd/extract/extract -name extension -tag adaptiveservice github.com/godevsig/adaptiveservice
+//go:generate ../cmd/extract/extract -name extension -tag shell github.com/godevsig/grepo/lib-sys/shell

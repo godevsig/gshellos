@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/gshellos/log"
+	"github.com/godevsig/grepo/lib-sys/log"
 )
 
 type daemon struct {
