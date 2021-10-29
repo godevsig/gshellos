@@ -38,8 +38,5 @@ jobs:
     - name: Test
       run: make test
 
-    - name: Race detect
-      run: make race
-
     - name: Coverage
       run: make coverage
