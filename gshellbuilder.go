@@ -145,8 +145,11 @@ func addDeamonCmd() {
 		}
 
 		logStream := log.NewStream("daemon")
-		logStream.SetOutput("file:" + workDir + "/logs/daemon.log")
+		if err := logStream.SetOutput("file:" + workDir + "/logs/daemon.log"); err != nil {
+			return err
+		}
 		lg := newLogger(logStream, "daemon")
+		lg.Infof("daemon version: %s", version)
 
 		opts := []as.Option{
 			as.WithScope(scope),
