@@ -67,6 +67,8 @@ func init() {
 //go:generate ../cmd/extract/extract -name stdlib -tag stdregexp regexp regexp/syntax
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdruntime runtime runtime/debug runtime/metrics runtime/pprof runtime/trace
+//go:generate sed -i "/NumCgoCall/d" runtime.go
+//go:generate sed -i "/SetCgoTraceback/d" runtime.go
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdtesting testing testing/fstest testing/iotest testing/quick
 
