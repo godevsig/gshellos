@@ -169,6 +169,7 @@ func addDeamonCmd() {
 		}
 		if *rootRegistry {
 			s.EnableRootRegistry()
+			s.EnableIPObserver()
 		}
 
 		if len(repoInfo) == 4 {
