@@ -4,7 +4,7 @@ PKG_ALL = $(shell go list ./...)
 GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
 COMMIT_REV = $(shell git rev-parse HEAD)
 STDTAGS := stdbase,stdcommon,stdruntime
-EXTTAGS := adaptiveservice,shell
+EXTTAGS := adaptiveservice,shell,log
 
 all: format lint vet test build
 
