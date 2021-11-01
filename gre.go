@@ -19,10 +19,11 @@ import (
 
 type gre struct {
 	sync.RWMutex
-	name  string
-	lg    *log.Logger
-	vmids []string // keep the order
-	vms   map[string]*vmCtl
+	server *as.Server
+	name   string
+	lg     *log.Logger
+	vmids  []string // keep the order
+	vms    map[string]*vmCtl
 }
 
 func (gre *gre) onNewStream(ctx as.Context) {
@@ -275,6 +276,10 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 				ids = append(ids, vc.ID)
 			}
 		}
+	}
+
+	if msg.Cmd == "rm" && len(gre.vmids) == 0 {
+		gre.server.Close()
 	}
 
 	return ids

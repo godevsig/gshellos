@@ -423,9 +423,10 @@ func addStartCmd() {
 
 		s := as.NewServer(opts...).SetPublisher(godevsigPublisher)
 		gre := &gre{
-			name: *greName,
-			lg:   lg,
-			vms:  make(map[string]*vmCtl),
+			server: s,
+			name:   *greName,
+			lg:     lg,
+			vms:    make(map[string]*vmCtl),
 		}
 
 		if err := s.Publish("gre-"+*greName,
