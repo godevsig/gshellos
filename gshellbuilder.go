@@ -109,8 +109,8 @@ func addDeamonCmd() {
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
 	registryAddr := cmd.String("registry", "", "root registry address")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
-	codeRepo := cmd.String("repo", "", "code repo https address in format site/org/proj/branch")
-	updateURL := cmd.String("update", "", "url of artifacts to update gshell")
+	codeRepo := cmd.String("repo", "", "code repo https address in format site/org/proj/branch, require -root")
+	updateURL := cmd.String("update", "", "url of artifacts to update gshell, require -root")
 
 	action := func() error {
 		cmdArgs := os.Args
@@ -170,25 +170,25 @@ func addDeamonCmd() {
 		if *rootRegistry {
 			s.EnableRootRegistry()
 			s.EnableIPObserver()
-		}
 
-		if len(repoInfo) == 4 {
-			crs := &codeRepoSvc{repoInfo: repoInfo}
-			if err := s.Publish("codeRepo",
-				codeRepoKnownMsgs,
-				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(crs) }),
-			); err != nil {
-				return err
+			if len(repoInfo) == 4 {
+				crs := &codeRepoSvc{repoInfo: repoInfo}
+				if err := s.Publish("codeRepo",
+					codeRepoKnownMsgs,
+					as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(crs) }),
+				); err != nil {
+					return err
+				}
 			}
-		}
 
-		if len(*updateURL) != 0 {
-			updtr := &updater{urlFmt: *updateURL, lg: lg}
-			if err := s.Publish("updater",
-				updaterKnownMsgs,
-				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(updtr) }),
-			); err != nil {
-				return err
+			if len(*updateURL) != 0 {
+				updtr := &updater{urlFmt: *updateURL, lg: lg}
+				if err := s.Publish("updater",
+					updaterKnownMsgs,
+					as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(updtr) }),
+				); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -648,7 +648,7 @@ func addPsCmd() {
 					}
 					fmt.Println("START AT  :", startTime)
 					endTime := ""
-					if !vmi.EndTime.IsZero() {
+					if vmi.Stat == "exited" {
 						endTime = fmt.Sprint(vmi.EndTime)
 					}
 					fmt.Println("END AT    :", endTime)
@@ -668,19 +668,15 @@ func addPsCmd() {
 
 					created := vmi.StartTime.Format("2006/01/02 15:04:05")
 					stat := vmi.Stat
-					switch stat {
-					case "exited":
+					if stat == "exited" {
 						ret := ":OK"
 						if len(vmi.VMErr) != 0 {
 							ret = ":ERR"
 						}
 						stat = stat + ret
-						d := vmi.EndTime.Sub(vmi.StartTime)
-						stat = fmt.Sprintf("%-10s %v", stat, d)
-					case "running":
-						d := time.Since(vmi.StartTime)
-						stat = fmt.Sprintf("%-10s %v", stat, d)
 					}
+					d := vmi.EndTime.Sub(vmi.StartTime)
+					stat = fmt.Sprintf("%-10s %v", stat, d)
 
 					fmt.Printf("%s  %-16s  %-16s  %s  %s\n", vmi.ID, trimName(gvi.Name), trimName(vmi.Name), created, stat)
 				}

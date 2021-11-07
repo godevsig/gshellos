@@ -116,6 +116,9 @@ func (vc *vmCtl) runVM() {
 
 	atomic.StoreInt32(&vc.stat, vmStatRunning)
 	vc.StartTime = time.Now()
+	vc.vmErr = nil
+	vc.VMErr = ""
+	vc.EndTime = time.Time{}
 
 	if err := vc.newShell(); err != nil {
 		fmt.Fprintln(&vc.stderr, err)
@@ -248,8 +251,9 @@ func (msg *greCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "stop":
 			if vc.stat == vmStatRunning { // no need to atomic
-				vc.sh.Eval("Stop()") // try to call Stop() if there is one
-				vc.cancel()
+				if _, err := vc.sh.Eval("Stop()"); err != nil { // try to call Stop() if there is one
+					vc.cancel()
+				}
 				atomic.CompareAndSwapInt32(&vc.stat, vmStatRunning, vmStatAborting)
 				ids = append(ids, vc.ID)
 			}

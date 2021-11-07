@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 	"syscall"
+	"time"
 
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/grepo/lib-sys/log"
@@ -168,6 +169,11 @@ func (msg *cmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 			gd.lg.Warnf("cmdQuery: send recv error: %v", err)
 		}
 		if gvi != nil {
+			for _, vmi := range gvi.VMInfos {
+				if vmi.Stat != "exited" {
+					vmi.EndTime = time.Now()
+				}
+			}
 			gvis = append(gvis, gvi)
 		}
 		conn.Close()
@@ -311,6 +317,12 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	}
 	revNew := strings.TrimSpace(string(rev))
 	updtr.lg.Debugf("tryUpdate rev: %s", revNew)
+	if revNew != commitRev { // check root registry rev
+		// not update other gshell daemons if root registry is not the latest
+		if stream.GetNetconn().LocalAddr().Network() != "chan" {
+			return ErrNoUpdate
+		}
+	}
 	if revNew == msg.revInuse {
 		return ErrNoUpdate
 	}
