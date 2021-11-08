@@ -385,7 +385,7 @@ func addIDCmd() {
 }
 
 func addExecCmd() {
-	cmd := flag.NewFlagSet(newCmd("exec", "<file.go> [args...]", "Run <file.go> in a local VM"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("exec", "<file.go> [args...]", "Run <file.go> in a local GRE"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -405,33 +405,33 @@ func addExecCmd() {
 }
 
 func addStartCmd() {
-	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "Start named gre"), flag.ExitOnError)
-	greName := cmd.String("e", "", "create new gre(gshell runtime environment)")
+	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "Start named GRG"), flag.ExitOnError)
+	grgName := cmd.String("group", "", "GRG name")
 
 	action := func() error {
-		if len(*greName) == 0 {
-			return errors.New("no gre name, see --help")
+		if len(*grgName) == 0 {
+			return errors.New("no GRG name, see --help")
 		}
 
-		logStream := log.NewStream("gre")
-		logStream.SetOutput("file:" + workDir + "/logs/gre.log")
-		lg := newLogger(logStream, "gre-"+*greName)
+		logStream := log.NewStream("grg")
+		logStream.SetOutput("file:" + workDir + "/logs/grg.log")
+		lg := newLogger(logStream, "grg-"+*grgName)
 		opts := []as.Option{
 			as.WithScope(as.ScopeOS),
 			as.WithLogger(lg),
 		}
 
 		s := as.NewServer(opts...).SetPublisher(godevsigPublisher)
-		gre := &gre{
+		grg := &grg{
 			server: s,
-			name:   *greName,
+			name:   *grgName,
 			lg:     lg,
-			vms:    make(map[string]*vmCtl),
+			gres:   make(map[string]*greCtl),
 		}
 
-		if err := s.Publish("gre-"+*greName,
-			greKnownMsgs,
-			as.OnNewStreamFunc(gre.onNewStream),
+		if err := s.Publish("grg-"+*grgName,
+			grgKnownMsgs,
+			as.OnNewStreamFunc(grg.onNewStream),
 		); err != nil {
 			return err
 		}
@@ -480,13 +480,13 @@ func addRepoCmd() {
 }
 
 func addKillCmd() {
-	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named gre(s) on local/remote system"), flag.ExitOnError)
-	force := cmd.Bool("f", false, "force terminate even if there are still running VMs")
+	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named GRG(s) on local/remote system"), flag.ExitOnError)
+	force := cmd.Bool("f", false, "force terminate even if there are still running GREs")
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no gre specified, see --help")
+			return errors.New("no GRG specified, see --help")
 		}
 
 		lg := newLogger(log.DefaultStream, "main")
@@ -497,7 +497,7 @@ func addKillCmd() {
 		defer conn.Close()
 
 		cmd := cmdKill{
-			GreNames: args,
+			GRGNames: args,
 			Force:    *force,
 		}
 		var reply string
@@ -523,25 +523,25 @@ func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <file.go> [args...]",
 		"Look for file.go in local file system or else in `gshell repo`,",
-		"run it in a new VM in specified gre on local/remote system"),
+		"run it in a new GRE in specified GRG on local/remote system"),
 		flag.ExitOnError)
-	greName := cmd.String("e", "<random>", "create new or use existing gre(gshell runtime environment)")
-	rtPriority := cmd.String("rt", "", `Set the gre to SCHED_RR min/max priority 1/99 on new gre creation
+	grgName := cmd.String("group", "<random>", "create new or use existing GRG")
+	rtPriority := cmd.String("rt", "", `Set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
 Caution: gshell daemon must be started as root to set realtime attributes`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
-	autoRemove := cmd.Bool("rm", false, "automatically remove the VM when it exits")
+	autoRemove := cmd.Bool("rm", false, "automatically remove the GRE when it exits")
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
 		}
-		gre := *greName
-		if strings.Contains(gre, "*") {
+		grg := *grgName
+		if strings.Contains(grg, "*") {
 			return errors.New("wrong use of wildcard(*), see --help")
 		}
-		if len(gre) == 0 || gre == "<random>" {
-			gre = randStringRunes(6)
+		if len(grg) == 0 || grg == "<random>" {
+			grg = randStringRunes(6)
 		}
 		if len(*rtPriority) != 0 {
 			pri, err := strconv.Atoi(*rtPriority)
@@ -573,14 +573,14 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 		}
 
 		cmd := cmdRun{
-			greCmdRun: greCmdRun{
+			grgCmdRun: grgCmdRun{
 				File:        file,
 				Args:        args,
 				Interactive: *interactive,
 				AutoRemove:  *autoRemove,
 				ByteCode:    rmShebang(byteCode),
 			},
-			GreName:    gre,
+			GRGName:    grg,
 			RtPriority: *rtPriority,
 		}
 
@@ -595,11 +595,11 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 		}
 
 		if !*interactive {
-			var vmid string
-			if err := conn.Recv(&vmid); err != nil {
+			var greid string
+			if err := conn.Recv(&greid); err != nil {
 				return err
 			}
-			fmt.Println(vmid)
+			fmt.Println(greid)
 			return nil
 		}
 
@@ -614,8 +614,8 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 }
 
 func addPsCmd() {
-	cmd := flag.NewFlagSet(newCmd("ps", "[options] [VMIDs ...|names ...]", "Show VM instances by VM ID or name on local/remote system"), flag.ExitOnError)
-	greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
+	cmd := flag.NewFlagSet(newCmd("ps", "[options] [GRE IDs ...|names ...]", "Show GRE instances by GRE ID or name on local/remote system"), flag.ExitOnError)
+	grgName := cmd.String("group", "*", "in which GRG")
 
 	action := func() error {
 		lg := newLogger(log.DefaultStream, "main")
@@ -625,60 +625,60 @@ func addPsCmd() {
 		}
 		defer conn.Close()
 
-		msg := cmdQuery{GreName: *greName, IDPattern: cmd.Args()}
-		var gvis []*greVMInfo
-		if err := conn.SendRecv(&msg, &gvis); err != nil {
+		msg := cmdQuery{GRGName: *grgName, IDPattern: cmd.Args()}
+		var ggis []*grgGREInfo
+		if err := conn.SendRecv(&msg, &ggis); err != nil {
 			return err
 		}
 
 		if len(msg.IDPattern) != 0 { // info
-			for _, gvi := range gvis {
-				for _, vmi := range gvi.VMInfos {
-					fmt.Println("ID        :", vmi.ID)
-					fmt.Println("IN GRE    :", gvi.Name)
-					fmt.Println("NAME      :", vmi.Name)
-					fmt.Println("ARGS      :", vmi.Args)
-					fmt.Println("STATUS    :", vmi.Stat)
-					if vmi.RestartedNum != 0 {
-						fmt.Println("RESTARTED :", vmi.RestartedNum)
+			for _, ggi := range ggis {
+				for _, grei := range ggi.GREInfos {
+					fmt.Println("ID        :", grei.ID)
+					fmt.Println("IN GROUP  :", ggi.Name)
+					fmt.Println("NAME      :", grei.Name)
+					fmt.Println("ARGS      :", grei.Args)
+					fmt.Println("STATUS    :", grei.Stat)
+					if grei.RestartedNum != 0 {
+						fmt.Println("RESTARTED :", grei.RestartedNum)
 					}
 					startTime := ""
-					if !vmi.StartTime.IsZero() {
-						startTime = fmt.Sprint(vmi.StartTime)
+					if !grei.StartTime.IsZero() {
+						startTime = fmt.Sprint(grei.StartTime)
 					}
 					fmt.Println("START AT  :", startTime)
 					endTime := ""
-					if vmi.Stat == "exited" {
-						endTime = fmt.Sprint(vmi.EndTime)
+					if grei.Stat == "exited" {
+						endTime = fmt.Sprint(grei.EndTime)
 					}
 					fmt.Println("END AT    :", endTime)
-					fmt.Printf("ERROR     : %v\n\n", vmi.VMErr)
+					fmt.Printf("ERROR     : %v\n\n", grei.GREErr)
 				}
 			}
 		} else { // ps
-			fmt.Println("VM ID         IN GRE            NAME              START AT             STATUS")
+			fmt.Println("GRE ID        IN GROUP          NAME              START AT             STATU")
 			trimName := func(name string) string {
 				if len(name) > 16 {
 					name = name[:13] + "..."
 				}
 				return name
 			}
-			for _, gvi := range gvis {
-				for _, vmi := range gvi.VMInfos {
+			for _, ggi := range ggis {
+				for _, grei := range ggi.GREInfos {
 
-					created := vmi.StartTime.Format("2006/01/02 15:04:05")
-					stat := vmi.Stat
+					created := grei.StartTime.Format("2006/01/02 15:04:05")
+					stat := grei.Stat
 					if stat == "exited" {
 						ret := ":OK"
-						if len(vmi.VMErr) != 0 {
+						if len(grei.GREErr) != 0 {
 							ret = ":ERR"
 						}
 						stat = stat + ret
 					}
-					d := vmi.EndTime.Sub(vmi.StartTime)
+					d := grei.EndTime.Sub(grei.StartTime)
 					stat = fmt.Sprintf("%-10s %v", stat, d)
 
-					fmt.Printf("%s  %-16s  %-16s  %s  %s\n", vmi.ID, trimName(gvi.Name), trimName(vmi.Name), created, stat)
+					fmt.Printf("%s  %-16s  %-16s  %s  %s\n", grei.ID, trimName(ggi.Name), trimName(grei.Name), created, stat)
 				}
 			}
 		}
@@ -689,13 +689,13 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"stop", "[options] [VMIDs ...|names ...]", "Call `func Stop()` to stop one or more VMs on local/remote system"},
-		{"rm", "[options] [VMIDs ...|names ...]", "Remove one or more stopped VMs on local/remote system"},
-		{"restart", "[options] [VMIDs ...|names ...]", "Restart one or more stopped VMs on local/remote system"},
+		{"stop", "[options] [GRE IDs ...|names ...]", "Call `func Stop()` to stop one or more GREs on local/remote system"},
+		{"rm", "[options] [GRE IDs ...|names ...]", "Remove one or more stopped GREs on local/remote system"},
+		{"restart", "[options] [GRE IDs ...|names ...]", "Restart one or more stopped GREs on local/remote system"},
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
-		greName := cmd.String("e", "*", "in which gre(gshell runtime environment)")
+		grgName := cmd.String("group", "*", "in which GRG")
 
 		action := func() error {
 			lg := newLogger(log.DefaultStream, "main")
@@ -705,9 +705,9 @@ func addPatternCmds() {
 			}
 			defer conn.Close()
 
-			msg := cmdPatternAction{GreName: *greName, IDPattern: cmd.Args(), Cmd: cmdStrs[0]}
-			var vmids []*greVMIDs
-			if err := conn.SendRecv(&msg, &vmids); err != nil {
+			msg := cmdPatternAction{GRGName: *grgName, IDPattern: cmd.Args(), Cmd: cmdStrs[0]}
+			var greids []*grgGREIDs
+			if err := conn.SendRecv(&msg, &greids); err != nil {
 				return err
 			}
 
@@ -721,8 +721,8 @@ func addPatternCmds() {
 				info = "restarted"
 			}
 			var sb strings.Builder
-			for _, gvi := range vmids {
-				str := strings.Join(gvi.VMIDs, "\n")
+			for _, ggi := range greids {
+				str := strings.Join(ggi.GREIDs, "\n")
 				if len(str) != 0 {
 					fmt.Fprintln(&sb, str)
 				}
@@ -760,7 +760,7 @@ func addInfoCmd() {
 }
 
 func addLogCmd() {
-	cmd := flag.NewFlagSet(newCmd("log", "[options] <daemon|gre|VMID>", "Print target log on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("log", "[options] <daemon|grg|GRE ID>", "Print target log on local/remote system"), flag.ExitOnError)
 	follow := cmd.Bool("f", false, "follow and output appended data as the log grows")
 
 	action := func() error {
@@ -841,13 +841,14 @@ func ShellMain() error {
 
 	switch os.Args[1] {
 	case "-h", "--help":
-		help := `gshell is a supervision tool to run .go apps by a VM(yaegi interpreter) in
-gshell runtime environment(gre), which is essentially a shared memory space.
-
-gshell daemon starts a daemon which is supposed to run on each system so that
-gshell run/ps/... commands can run on a remote system with specified provider ID.
-
-gshell enters interactive mode if no options and no commands provided.
+		help := `  gshell is gshellos based service management tool.
+  gshellos is a simple pure golang service framework for linux devices.
+  One gshell daemon must have been started in the system to join the
+service network with an unique provider ID.
+  Each app/service is run in one dedicated GRE(Gshell Runtime Environment)
+which by default runs in a random GRG(Gshell Runtime Group). GREs can be
+grouped into one named GRG for better performance.
+  gshell enters interactive mode if no options and no commands provided.
 `
 		fmt.Println(help)
 		fmt.Println("Usage: [OPTIONS] COMMAND ...")

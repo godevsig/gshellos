@@ -254,7 +254,7 @@ func TestCmdRun(t *testing.T) {
 }
 
 func TestCmdRunRT(t *testing.T) {
-	out, _ := gshellRunCmd("run -e testrt -rt 50 testdata/hello.go")
+	out, _ := gshellRunCmd("run -group testrt -rt 50 testdata/hello.go")
 	t.Logf("\n%s", out)
 
 	if !strings.Contains(out, "Operation not permitted") {
@@ -263,13 +263,13 @@ func TestCmdRunRT(t *testing.T) {
 }
 
 func TestCmdKill(t *testing.T) {
-	out, err := gshellRunCmd("run -e test testdata/hello.go")
+	out, err := gshellRunCmd("run -group test testdata/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -e test2 testdata/hello.go")
+	out, err = gshellRunCmd("run -group test2 testdata/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -285,7 +285,7 @@ func TestCmdKill(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellRunCmd("ps -e test*")
+	out, err = gshellRunCmd("ps -group test*")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -302,7 +302,7 @@ func TestCmdPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "VM ID         IN GRE            NAME              START AT             STATUS") {
+	if !strings.Contains(out, "GRE ID        IN GROUP          NAME              START AT             STATU") {
 		t.Fatal("unexpected output")
 	}
 }
@@ -480,7 +480,7 @@ func TestAutoUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "VM ID         IN GRE            NAME              START AT             STATUS") {
+	if !strings.Contains(out, "GRE ID        IN GROUP          NAME              START AT             STATU") {
 		t.Fatal("unexpected output")
 	}
 }

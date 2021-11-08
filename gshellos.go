@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	// ErrBrokenGre is an error where the specified gre has problem to run.
-	ErrBrokenGre = errors.New("broken gre")
+	// ErrBrokenGRG is an error where the specified GRG has problem to run.
+	ErrBrokenGRG = errors.New("broken GRG")
 	// ErrNoUpdate is an error that no update available
 	ErrNoUpdate = errors.New("no update available")
 )

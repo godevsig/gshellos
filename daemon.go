@@ -25,20 +25,20 @@ func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgre(name, rtPriority string) (as.Connection, error) {
+func (gd *daemon) setupgrg(name, rtPriority string) (as.Connection, error) {
 	opts := []as.Option{
 		as.WithLogger(gd.lg),
 		as.WithScope(as.ScopeOS),
 	}
 	c := as.NewClient(opts...).SetDiscoverTimeout(0)
-	conn := <-c.Discover(godevsigPublisher, "gre-"+name)
+	conn := <-c.Discover(godevsigPublisher, "grg-"+name)
 	if conn != nil {
 		return conn, nil
 	}
 
-	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-e " + name
+	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + name
 	if os.Args[0] == "gshell.tester" {
-		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gre" + name + genID(3) + ".cov -- " + args
+		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + name + genID(3) + ".cov -- " + args
 	}
 	exe := os.Args[0]
 	if len(rtPriority) != 0 {
@@ -49,7 +49,7 @@ func (gd *daemon) setupgre(name, rtPriority string) (as.Connection, error) {
 	buf := &bytes.Buffer{}
 	cmd.Stdout = buf
 	cmd.Stderr = buf
-	gd.lg.Debugln("starting gre:", cmd.String())
+	gd.lg.Debugln("starting grg:", cmd.String())
 
 	err := cmd.Start()
 	if err != nil {
@@ -67,18 +67,18 @@ func (gd *daemon) setupgre(name, rtPriority string) (as.Connection, error) {
 	}()
 
 	c.SetDiscoverTimeout(3)
-	conn = <-c.Discover(godevsigPublisher, "gre-"+name)
+	conn = <-c.Discover(godevsigPublisher, "grg-"+name)
 	if conn != nil {
 		return conn, nil
 	}
 	if err == nil {
-		err = ErrBrokenGre
+		err = ErrBrokenGRG
 	}
 	return nil, err
 }
 
 type cmdKill struct {
-	GreNames []string
+	GRGNames []string
 	Force    bool
 }
 
@@ -88,20 +88,20 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var b strings.Builder
-	for _, gre := range msg.GreNames {
-		connChan := c.Discover(godevsigPublisher, "gre-"+gre)
+	for _, grg := range msg.GRGNames {
+		connChan := c.Discover(godevsigPublisher, "grg-"+grg)
 		for conn := range connChan {
 			var pInfo processInfo
 			if err := conn.SendRecv(getProcessInfo{}, &pInfo); err != nil {
-				gd.lg.Warnf("get info for %s failed: %v", gre, err)
+				gd.lg.Warnf("get info for %s failed: %v", grg, err)
 			}
 			if pInfo.pid != 0 && (pInfo.runningCnt == 0 || msg.Force) {
 				if process, err := os.FindProcess(pInfo.pid); err != nil {
-					gd.lg.Warnf("pid of %s not found: %v", pInfo.greName, err)
+					gd.lg.Warnf("pid of %s not found: %v", pInfo.grgName, err)
 				} else if err := process.Signal(syscall.SIGINT); err != nil {
-					gd.lg.Warnf("kill %s failed: %v", pInfo.greName, err)
+					gd.lg.Warnf("kill %s failed: %v", pInfo.grgName, err)
 				} else {
-					fmt.Fprintf(&b, "%s ", pInfo.greName)
+					fmt.Fprintf(&b, "%s ", pInfo.grgName)
 				}
 			}
 			conn.Close()
@@ -115,8 +115,8 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 }
 
 type cmdRun struct {
-	greCmdRun
-	GreName    string
+	grgCmdRun
+	GRGName    string
 	RtPriority string
 }
 
@@ -124,35 +124,35 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
 
-	conn, err := gd.setupgre(msg.GreName+"."+version, msg.RtPriority)
+	conn, err := gd.setupgrg(msg.GRGName+"."+version, msg.RtPriority)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	if err := conn.Send(&msg.greCmdRun); err != nil {
+	if err := conn.Send(&msg.grgCmdRun); err != nil {
 		return err
 	}
 
 	if !msg.Interactive {
-		var vmid string
-		if err := conn.Recv(&vmid); err != nil {
+		var greid string
+		if err := conn.Recv(&greid); err != nil {
 			return err
 		}
-		return vmid
+		return greid
 	}
 	client := as.NewStreamIO(stream)
-	gre := as.NewStreamIO(conn)
+	grg := as.NewStreamIO(conn)
 	gd.lg.Debugln("enter interactive io")
-	go io.Copy(gre, client)
-	io.Copy(client, gre)
+	go io.Copy(grg, client)
+	io.Copy(client, grg)
 	gd.lg.Debugln("exit interactive io")
 
 	return io.EOF
 }
 
 type cmdQuery struct {
-	GreName   string
+	GRGName   string
 	IDPattern []string
 }
 
@@ -160,56 +160,56 @@ func (msg *cmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdQuery: %v", msg)
 
-	var gvis []*greVMInfo
+	var ggis []*grgGREInfo
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
-	connChan := c.Discover(godevsigPublisher, "gre-"+msg.GreName)
+	connChan := c.Discover(godevsigPublisher, "grg-"+msg.GRGName)
 	for conn := range connChan {
-		var gvi *greVMInfo
-		if err := conn.SendRecv(&greCmdQuery{msg.IDPattern}, &gvi); err != nil {
+		var ggi *grgGREInfo
+		if err := conn.SendRecv(&grgCmdQuery{msg.IDPattern}, &ggi); err != nil {
 			gd.lg.Warnf("cmdQuery: send recv error: %v", err)
 		}
-		if gvi != nil {
-			for _, vmi := range gvi.VMInfos {
-				if vmi.Stat != "exited" {
-					vmi.EndTime = time.Now()
+		if ggi != nil {
+			for _, grei := range ggi.GREInfos {
+				if grei.Stat != "exited" {
+					grei.EndTime = time.Now()
 				}
 			}
-			gvis = append(gvis, gvi)
+			ggis = append(ggis, ggi)
 		}
 		conn.Close()
 	}
-	return gvis
+	return ggis
 }
 
 type cmdPatternAction struct {
-	GreName   string
+	GRGName   string
 	IDPattern []string
 	Cmd       string
 }
 
-type greVMIDs struct {
+type grgGREIDs struct {
 	//Name  string
-	VMIDs []string
+	GREIDs []string
 }
 
 func (msg *cmdPatternAction) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdPatternAction: %v", msg)
 
-	var gvmids []*greVMIDs
+	var ggreids []*grgGREIDs
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
-	connChan := c.Discover(godevsigPublisher, "gre-"+msg.GreName)
+	connChan := c.Discover(godevsigPublisher, "grg-"+msg.GRGName)
 	for conn := range connChan {
-		var vmids []string
-		if err := conn.SendRecv(&greCmdPatternAction{msg.IDPattern, msg.Cmd}, &vmids); err != nil {
+		var greids []string
+		if err := conn.SendRecv(&grgCmdPatternAction{msg.IDPattern, msg.Cmd}, &greids); err != nil {
 			gd.lg.Warnf("cmdPatternAction: send recv error: %v", err)
 		}
-		if vmids != nil {
-			gvmids = append(gvmids, &greVMIDs{VMIDs: vmids})
+		if greids != nil {
+			ggreids = append(ggreids, &grgGREIDs{GREIDs: greids})
 		}
 		conn.Close()
 	}
-	return gvmids
+	return ggreids
 }
 
 type cmdLog struct {
@@ -223,8 +223,8 @@ func (msg *cmdLog) Handle(stream as.ContextStream) (reply interface{}) {
 	switch msg.Target {
 	case "daemon":
 		file = workDir + "/logs/daemon.log"
-	case "gre":
-		file = workDir + "/logs/gre.log"
+	case "grg":
+		file = workDir + "/logs/grg.log"
 	default:
 		file = workDir + "/logs/" + msg.Target
 	}
@@ -404,9 +404,9 @@ func init() {
 	as.RegisterType((*cmdKill)(nil))
 	as.RegisterType((*cmdRun)(nil))
 	as.RegisterType((*cmdQuery)(nil))
-	as.RegisterType([]*greVMInfo(nil))
+	as.RegisterType([]*grgGREInfo(nil))
 	as.RegisterType((*cmdPatternAction)(nil))
-	as.RegisterType([]*greVMIDs(nil))
+	as.RegisterType([]*grgGREIDs(nil))
 	as.RegisterType((*cmdLog)(nil))
 	as.RegisterType(cmdInfo{})
 	as.RegisterType(codeRepoAddr{})
