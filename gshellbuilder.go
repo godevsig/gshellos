@@ -300,7 +300,10 @@ func addListCmd() {
 			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
 		}
-		selfID, _ := getSelfID(opts)
+		selfID, err := getSelfID(opts)
+		if err != nil {
+			return err
+		}
 
 		c := as.NewClient(opts...)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
@@ -634,7 +637,7 @@ func addPsCmd() {
 		if len(msg.IDPattern) != 0 { // info
 			for _, ggi := range ggis {
 				for _, grei := range ggi.GREInfos {
-					fmt.Println("ID        :", grei.ID)
+					fmt.Println("GRE ID    :", grei.ID)
 					fmt.Println("IN GROUP  :", ggi.Name)
 					fmt.Println("NAME      :", grei.Name)
 					fmt.Println("ARGS      :", grei.Args)
@@ -656,9 +659,9 @@ func addPsCmd() {
 				}
 			}
 		} else { // ps
-			fmt.Println("GRE ID        IN GROUP          NAME              START AT             STATU")
+			fmt.Println("GRE ID        IN GROUP            NAME                START AT             STATUS")
 			trimName := func(name string) string {
-				if len(name) > 16 {
+				if len(name) > 18 {
 					name = name[:13] + "..."
 				}
 				return name
@@ -678,7 +681,7 @@ func addPsCmd() {
 					d := grei.EndTime.Sub(grei.StartTime)
 					stat = fmt.Sprintf("%-10s %v", stat, d)
 
-					fmt.Printf("%s  %-16s  %-16s  %s  %s\n", grei.ID, trimName(ggi.Name), trimName(grei.Name), created, stat)
+					fmt.Printf("%s  %-18s  %-18s  %s  %s\n", grei.ID, trimName(ggi.Name), trimName(grei.Name), created, stat)
 				}
 			}
 		}
