@@ -25,7 +25,7 @@ gshellos is a simple pure golang service framework for linux devices that provid
     - a service is discovered in the above scope order
   - Message oriented client-server communication
     - servers define message structs, clients import message structs
-    - simple Send() Recv() API and RPC alike SendRecv() API
+    - simple Send(msg) Recv(msgPtr) API and RPC alike SendRecv(msgSnd, msgRcvPtr) API
     - data encoding/serializing when necessary
     - messages can be reordered by predefined priority
   - High concurrency model

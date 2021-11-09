@@ -67,7 +67,7 @@ with lite feature set to produce smaller binary size.
 
 Current feature set table:
 
-| lib             | lite | full |
+| lib tag         | lite | full |
 | --------------- | ---- | ---- |
 | stdbase         | Y    | Y    |
 | stdcommon       | Y    | Y    |
@@ -93,6 +93,15 @@ Current feature set table:
 | adaptiveservice | Y    | Y    |
 | shell           | Y    | Y    |
 | log             | Y    | Y    |
+
+The table will change over time, use `gshell info` to check the tags in use:
+
+```
+$ gshell info
+Version: v1.1.3
+Build tags: stdbase,stdcommon,stdruntime,stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding,stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode,debug,adaptiveservice,shell,log
+Commit: 6f579e5b1ad853c5789f946baf17585cbf99c68f
+```
 
 ### stdbase
 
