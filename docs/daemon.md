@@ -138,7 +138,9 @@ GSHELL_NOUPDATE=1 bin/gshell -loglevel info -wd .working daemon -registry 10.10.
 
 # Q&A
 
+1. service not found: godevsig_gshellDaemon
+   Start gshell daemon first before any other commands.
 1. Start gshell daemon failed with "socket already exists: [/var/tmp/adaptiveservice/builtin_serviceLister.sock]"
-   There was an old gshell daemon still running. pkill -SIGINT gshell to kill the old one, and then start the new one.
-2. gshell still failed to start?
-   Try rm -rf /var/tmp/adaptiveservice and then restart gshell daemon
+   There is an old gshell daemon still running. `pkill -SIGINT gshell` to kill the old one, and then start the new one.
+1. gshell still failed to start?
+   Try `rm -rf /var/tmp/adaptiveservice` and then restart gshell daemon

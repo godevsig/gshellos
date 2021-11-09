@@ -302,7 +302,7 @@ func TestCmdPs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "GRE ID        IN GROUP          NAME              START AT             STATUS") {
+	if !strings.Contains(out, "GRE ID        IN GROUP            NAME                START AT             STATUS") {
 		t.Fatal("unexpected output")
 	}
 }
@@ -480,7 +480,7 @@ func TestAutoUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "GRE ID        IN GROUP          NAME              START AT             STATUS") {
+	if !strings.Contains(out, "GRE ID        IN GROUP            NAME                START AT             STATUS") {
 		t.Fatal("unexpected output")
 	}
 }
