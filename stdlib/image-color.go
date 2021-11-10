@@ -62,21 +62,15 @@ type _image_color_Color struct {
 }
 
 func (W _image_color_Color) RGBA() (r uint32, g uint32, b uint32, a uint32) {
-	if W.WRGBA == nil {
-		return
-	}
 	return W.WRGBA()
 }
 
 // _image_color_Model is an interface wrapper for Model type
 type _image_color_Model struct {
 	IValue   interface{}
-	WConvert func(c color.Color) (r0 color.Color)
+	WConvert func(c color.Color) color.Color
 }
 
-func (W _image_color_Model) Convert(c color.Color) (r0 color.Color) {
-	if W.WConvert == nil {
-		return
-	}
+func (W _image_color_Model) Convert(c color.Color) color.Color {
 	return W.WConvert(c)
 }

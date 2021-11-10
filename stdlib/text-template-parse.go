@@ -72,33 +72,24 @@ func init() {
 // _text_template_parse_Node is an interface wrapper for Node type
 type _text_template_parse_Node struct {
 	IValue    interface{}
-	WCopy     func() (r0 parse.Node)
-	WPosition func() (r0 parse.Pos)
-	WString   func() (r0 string)
-	WType     func() (r0 parse.NodeType)
+	WCopy     func() parse.Node
+	WPosition func() parse.Pos
+	WString   func() string
+	WType     func() parse.NodeType
 }
 
-func (W _text_template_parse_Node) Copy() (r0 parse.Node) {
-	if W.WCopy == nil {
-		return
-	}
+func (W _text_template_parse_Node) Copy() parse.Node {
 	return W.WCopy()
 }
-func (W _text_template_parse_Node) Position() (r0 parse.Pos) {
-	if W.WPosition == nil {
-		return
-	}
+func (W _text_template_parse_Node) Position() parse.Pos {
 	return W.WPosition()
 }
-func (W _text_template_parse_Node) String() (r0 string) {
+func (W _text_template_parse_Node) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }
-func (W _text_template_parse_Node) Type() (r0 parse.NodeType) {
-	if W.WType == nil {
-		return
-	}
+func (W _text_template_parse_Node) Type() parse.NodeType {
 	return W.WType()
 }

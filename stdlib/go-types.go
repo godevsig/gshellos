@@ -163,141 +163,99 @@ func init() {
 // _go_types_Importer is an interface wrapper for Importer type
 type _go_types_Importer struct {
 	IValue  interface{}
-	WImport func(path string) (r0 *types.Package, r1 error)
+	WImport func(path string) (*types.Package, error)
 }
 
-func (W _go_types_Importer) Import(path string) (r0 *types.Package, r1 error) {
-	if W.WImport == nil {
-		return
-	}
+func (W _go_types_Importer) Import(path string) (*types.Package, error) {
 	return W.WImport(path)
 }
 
 // _go_types_ImporterFrom is an interface wrapper for ImporterFrom type
 type _go_types_ImporterFrom struct {
 	IValue      interface{}
-	WImport     func(path string) (r0 *types.Package, r1 error)
-	WImportFrom func(path string, dir string, mode types.ImportMode) (r0 *types.Package, r1 error)
+	WImport     func(path string) (*types.Package, error)
+	WImportFrom func(path string, dir string, mode types.ImportMode) (*types.Package, error)
 }
 
-func (W _go_types_ImporterFrom) Import(path string) (r0 *types.Package, r1 error) {
-	if W.WImport == nil {
-		return
-	}
+func (W _go_types_ImporterFrom) Import(path string) (*types.Package, error) {
 	return W.WImport(path)
 }
-func (W _go_types_ImporterFrom) ImportFrom(path string, dir string, mode types.ImportMode) (r0 *types.Package, r1 error) {
-	if W.WImportFrom == nil {
-		return
-	}
+func (W _go_types_ImporterFrom) ImportFrom(path string, dir string, mode types.ImportMode) (*types.Package, error) {
 	return W.WImportFrom(path, dir, mode)
 }
 
 // _go_types_Object is an interface wrapper for Object type
 type _go_types_Object struct {
 	IValue    interface{}
-	WExported func() (r0 bool)
-	WId       func() (r0 string)
-	WName     func() (r0 string)
-	WParent   func() (r0 *types.Scope)
-	WPkg      func() (r0 *types.Package)
-	WPos      func() (r0 token.Pos)
-	WString   func() (r0 string)
-	WType     func() (r0 types.Type)
+	WExported func() bool
+	WId       func() string
+	WName     func() string
+	WParent   func() *types.Scope
+	WPkg      func() *types.Package
+	WPos      func() token.Pos
+	WString   func() string
+	WType     func() types.Type
 }
 
-func (W _go_types_Object) Exported() (r0 bool) {
-	if W.WExported == nil {
-		return
-	}
+func (W _go_types_Object) Exported() bool {
 	return W.WExported()
 }
-func (W _go_types_Object) Id() (r0 string) {
-	if W.WId == nil {
-		return
-	}
+func (W _go_types_Object) Id() string {
 	return W.WId()
 }
-func (W _go_types_Object) Name() (r0 string) {
-	if W.WName == nil {
-		return
-	}
+func (W _go_types_Object) Name() string {
 	return W.WName()
 }
-func (W _go_types_Object) Parent() (r0 *types.Scope) {
-	if W.WParent == nil {
-		return
-	}
+func (W _go_types_Object) Parent() *types.Scope {
 	return W.WParent()
 }
-func (W _go_types_Object) Pkg() (r0 *types.Package) {
-	if W.WPkg == nil {
-		return
-	}
+func (W _go_types_Object) Pkg() *types.Package {
 	return W.WPkg()
 }
-func (W _go_types_Object) Pos() (r0 token.Pos) {
-	if W.WPos == nil {
-		return
-	}
+func (W _go_types_Object) Pos() token.Pos {
 	return W.WPos()
 }
-func (W _go_types_Object) String() (r0 string) {
+func (W _go_types_Object) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }
-func (W _go_types_Object) Type() (r0 types.Type) {
-	if W.WType == nil {
-		return
-	}
+func (W _go_types_Object) Type() types.Type {
 	return W.WType()
 }
 
 // _go_types_Sizes is an interface wrapper for Sizes type
 type _go_types_Sizes struct {
 	IValue     interface{}
-	WAlignof   func(T types.Type) (r0 int64)
-	WOffsetsof func(fields []*types.Var) (r0 []int64)
-	WSizeof    func(T types.Type) (r0 int64)
+	WAlignof   func(T types.Type) int64
+	WOffsetsof func(fields []*types.Var) []int64
+	WSizeof    func(T types.Type) int64
 }
 
-func (W _go_types_Sizes) Alignof(T types.Type) (r0 int64) {
-	if W.WAlignof == nil {
-		return
-	}
+func (W _go_types_Sizes) Alignof(T types.Type) int64 {
 	return W.WAlignof(T)
 }
-func (W _go_types_Sizes) Offsetsof(fields []*types.Var) (r0 []int64) {
-	if W.WOffsetsof == nil {
-		return
-	}
+func (W _go_types_Sizes) Offsetsof(fields []*types.Var) []int64 {
 	return W.WOffsetsof(fields)
 }
-func (W _go_types_Sizes) Sizeof(T types.Type) (r0 int64) {
-	if W.WSizeof == nil {
-		return
-	}
+func (W _go_types_Sizes) Sizeof(T types.Type) int64 {
 	return W.WSizeof(T)
 }
 
 // _go_types_Type is an interface wrapper for Type type
 type _go_types_Type struct {
 	IValue      interface{}
-	WString     func() (r0 string)
-	WUnderlying func() (r0 types.Type)
+	WString     func() string
+	WUnderlying func() types.Type
 }
 
-func (W _go_types_Type) String() (r0 string) {
+func (W _go_types_Type) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }
-func (W _go_types_Type) Underlying() (r0 types.Type) {
-	if W.WUnderlying == nil {
-		return
-	}
+func (W _go_types_Type) Underlying() types.Type {
 	return W.WUnderlying()
 }

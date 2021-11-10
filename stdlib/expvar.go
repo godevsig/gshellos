@@ -38,12 +38,12 @@ func init() {
 // _expvar_Var is an interface wrapper for Var type
 type _expvar_Var struct {
 	IValue  interface{}
-	WString func() (r0 string)
+	WString func() string
 }
 
-func (W _expvar_Var) String() (r0 string) {
+func (W _expvar_Var) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }

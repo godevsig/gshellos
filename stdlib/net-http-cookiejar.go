@@ -27,19 +27,16 @@ func init() {
 // _net_http_cookiejar_PublicSuffixList is an interface wrapper for PublicSuffixList type
 type _net_http_cookiejar_PublicSuffixList struct {
 	IValue        interface{}
-	WPublicSuffix func(domain string) (r0 string)
-	WString       func() (r0 string)
+	WPublicSuffix func(domain string) string
+	WString       func() string
 }
 
-func (W _net_http_cookiejar_PublicSuffixList) PublicSuffix(domain string) (r0 string) {
-	if W.WPublicSuffix == nil {
-		return
-	}
+func (W _net_http_cookiejar_PublicSuffixList) PublicSuffix(domain string) string {
 	return W.WPublicSuffix(domain)
 }
-func (W _net_http_cookiejar_PublicSuffixList) String() (r0 string) {
+func (W _net_http_cookiejar_PublicSuffixList) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }

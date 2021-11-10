@@ -92,208 +92,124 @@ func init() {
 // _reflect_Type is an interface wrapper for Type type
 type _reflect_Type struct {
 	IValue           interface{}
-	WAlign           func() (r0 int)
-	WAssignableTo    func(u reflect.Type) (r0 bool)
-	WBits            func() (r0 int)
-	WChanDir         func() (r0 reflect.ChanDir)
-	WComparable      func() (r0 bool)
-	WConvertibleTo   func(u reflect.Type) (r0 bool)
-	WElem            func() (r0 reflect.Type)
-	WField           func(i int) (r0 reflect.StructField)
-	WFieldAlign      func() (r0 int)
-	WFieldByIndex    func(index []int) (r0 reflect.StructField)
-	WFieldByName     func(name string) (r0 reflect.StructField, r1 bool)
-	WFieldByNameFunc func(match func(string) bool) (r0 reflect.StructField, r1 bool)
-	WImplements      func(u reflect.Type) (r0 bool)
-	WIn              func(i int) (r0 reflect.Type)
-	WIsVariadic      func() (r0 bool)
-	WKey             func() (r0 reflect.Type)
-	WKind            func() (r0 reflect.Kind)
-	WLen             func() (r0 int)
-	WMethod          func(a0 int) (r0 reflect.Method)
-	WMethodByName    func(a0 string) (r0 reflect.Method, r1 bool)
-	WName            func() (r0 string)
-	WNumField        func() (r0 int)
-	WNumIn           func() (r0 int)
-	WNumMethod       func() (r0 int)
-	WNumOut          func() (r0 int)
-	WOut             func(i int) (r0 reflect.Type)
-	WPkgPath         func() (r0 string)
-	WSize            func() (r0 uintptr)
-	WString          func() (r0 string)
+	WAlign           func() int
+	WAssignableTo    func(u reflect.Type) bool
+	WBits            func() int
+	WChanDir         func() reflect.ChanDir
+	WComparable      func() bool
+	WConvertibleTo   func(u reflect.Type) bool
+	WElem            func() reflect.Type
+	WField           func(i int) reflect.StructField
+	WFieldAlign      func() int
+	WFieldByIndex    func(index []int) reflect.StructField
+	WFieldByName     func(name string) (reflect.StructField, bool)
+	WFieldByNameFunc func(match func(string) bool) (reflect.StructField, bool)
+	WImplements      func(u reflect.Type) bool
+	WIn              func(i int) reflect.Type
+	WIsVariadic      func() bool
+	WKey             func() reflect.Type
+	WKind            func() reflect.Kind
+	WLen             func() int
+	WMethod          func(a0 int) reflect.Method
+	WMethodByName    func(a0 string) (reflect.Method, bool)
+	WName            func() string
+	WNumField        func() int
+	WNumIn           func() int
+	WNumMethod       func() int
+	WNumOut          func() int
+	WOut             func(i int) reflect.Type
+	WPkgPath         func() string
+	WSize            func() uintptr
+	WString          func() string
 }
 
-func (W _reflect_Type) Align() (r0 int) {
-	if W.WAlign == nil {
-		return
-	}
+func (W _reflect_Type) Align() int {
 	return W.WAlign()
 }
-func (W _reflect_Type) AssignableTo(u reflect.Type) (r0 bool) {
-	if W.WAssignableTo == nil {
-		return
-	}
+func (W _reflect_Type) AssignableTo(u reflect.Type) bool {
 	return W.WAssignableTo(u)
 }
-func (W _reflect_Type) Bits() (r0 int) {
-	if W.WBits == nil {
-		return
-	}
+func (W _reflect_Type) Bits() int {
 	return W.WBits()
 }
-func (W _reflect_Type) ChanDir() (r0 reflect.ChanDir) {
-	if W.WChanDir == nil {
-		return
-	}
+func (W _reflect_Type) ChanDir() reflect.ChanDir {
 	return W.WChanDir()
 }
-func (W _reflect_Type) Comparable() (r0 bool) {
-	if W.WComparable == nil {
-		return
-	}
+func (W _reflect_Type) Comparable() bool {
 	return W.WComparable()
 }
-func (W _reflect_Type) ConvertibleTo(u reflect.Type) (r0 bool) {
-	if W.WConvertibleTo == nil {
-		return
-	}
+func (W _reflect_Type) ConvertibleTo(u reflect.Type) bool {
 	return W.WConvertibleTo(u)
 }
-func (W _reflect_Type) Elem() (r0 reflect.Type) {
-	if W.WElem == nil {
-		return
-	}
+func (W _reflect_Type) Elem() reflect.Type {
 	return W.WElem()
 }
-func (W _reflect_Type) Field(i int) (r0 reflect.StructField) {
-	if W.WField == nil {
-		return
-	}
+func (W _reflect_Type) Field(i int) reflect.StructField {
 	return W.WField(i)
 }
-func (W _reflect_Type) FieldAlign() (r0 int) {
-	if W.WFieldAlign == nil {
-		return
-	}
+func (W _reflect_Type) FieldAlign() int {
 	return W.WFieldAlign()
 }
-func (W _reflect_Type) FieldByIndex(index []int) (r0 reflect.StructField) {
-	if W.WFieldByIndex == nil {
-		return
-	}
+func (W _reflect_Type) FieldByIndex(index []int) reflect.StructField {
 	return W.WFieldByIndex(index)
 }
-func (W _reflect_Type) FieldByName(name string) (r0 reflect.StructField, r1 bool) {
-	if W.WFieldByName == nil {
-		return
-	}
+func (W _reflect_Type) FieldByName(name string) (reflect.StructField, bool) {
 	return W.WFieldByName(name)
 }
-func (W _reflect_Type) FieldByNameFunc(match func(string) bool) (r0 reflect.StructField, r1 bool) {
-	if W.WFieldByNameFunc == nil {
-		return
-	}
+func (W _reflect_Type) FieldByNameFunc(match func(string) bool) (reflect.StructField, bool) {
 	return W.WFieldByNameFunc(match)
 }
-func (W _reflect_Type) Implements(u reflect.Type) (r0 bool) {
-	if W.WImplements == nil {
-		return
-	}
+func (W _reflect_Type) Implements(u reflect.Type) bool {
 	return W.WImplements(u)
 }
-func (W _reflect_Type) In(i int) (r0 reflect.Type) {
-	if W.WIn == nil {
-		return
-	}
+func (W _reflect_Type) In(i int) reflect.Type {
 	return W.WIn(i)
 }
-func (W _reflect_Type) IsVariadic() (r0 bool) {
-	if W.WIsVariadic == nil {
-		return
-	}
+func (W _reflect_Type) IsVariadic() bool {
 	return W.WIsVariadic()
 }
-func (W _reflect_Type) Key() (r0 reflect.Type) {
-	if W.WKey == nil {
-		return
-	}
+func (W _reflect_Type) Key() reflect.Type {
 	return W.WKey()
 }
-func (W _reflect_Type) Kind() (r0 reflect.Kind) {
-	if W.WKind == nil {
-		return
-	}
+func (W _reflect_Type) Kind() reflect.Kind {
 	return W.WKind()
 }
-func (W _reflect_Type) Len() (r0 int) {
-	if W.WLen == nil {
-		return
-	}
+func (W _reflect_Type) Len() int {
 	return W.WLen()
 }
-func (W _reflect_Type) Method(a0 int) (r0 reflect.Method) {
-	if W.WMethod == nil {
-		return
-	}
+func (W _reflect_Type) Method(a0 int) reflect.Method {
 	return W.WMethod(a0)
 }
-func (W _reflect_Type) MethodByName(a0 string) (r0 reflect.Method, r1 bool) {
-	if W.WMethodByName == nil {
-		return
-	}
+func (W _reflect_Type) MethodByName(a0 string) (reflect.Method, bool) {
 	return W.WMethodByName(a0)
 }
-func (W _reflect_Type) Name() (r0 string) {
-	if W.WName == nil {
-		return
-	}
+func (W _reflect_Type) Name() string {
 	return W.WName()
 }
-func (W _reflect_Type) NumField() (r0 int) {
-	if W.WNumField == nil {
-		return
-	}
+func (W _reflect_Type) NumField() int {
 	return W.WNumField()
 }
-func (W _reflect_Type) NumIn() (r0 int) {
-	if W.WNumIn == nil {
-		return
-	}
+func (W _reflect_Type) NumIn() int {
 	return W.WNumIn()
 }
-func (W _reflect_Type) NumMethod() (r0 int) {
-	if W.WNumMethod == nil {
-		return
-	}
+func (W _reflect_Type) NumMethod() int {
 	return W.WNumMethod()
 }
-func (W _reflect_Type) NumOut() (r0 int) {
-	if W.WNumOut == nil {
-		return
-	}
+func (W _reflect_Type) NumOut() int {
 	return W.WNumOut()
 }
-func (W _reflect_Type) Out(i int) (r0 reflect.Type) {
-	if W.WOut == nil {
-		return
-	}
+func (W _reflect_Type) Out(i int) reflect.Type {
 	return W.WOut(i)
 }
-func (W _reflect_Type) PkgPath() (r0 string) {
-	if W.WPkgPath == nil {
-		return
-	}
+func (W _reflect_Type) PkgPath() string {
 	return W.WPkgPath()
 }
-func (W _reflect_Type) Size() (r0 uintptr) {
-	if W.WSize == nil {
-		return
-	}
+func (W _reflect_Type) Size() uintptr {
 	return W.WSize()
 }
-func (W _reflect_Type) String() (r0 string) {
+func (W _reflect_Type) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }

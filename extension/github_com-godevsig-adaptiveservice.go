@@ -84,143 +84,89 @@ func init() {
 type _github_com_godevsig_adaptiveservice_Connection struct {
 	IValue      interface{}
 	WClose      func()
-	WGetNetconn func() (r0 adaptiveservice.Netconn)
-	WNewStream  func() (r0 adaptiveservice.Stream)
-	WRecv       func(msgPtr interface{}) (r0 error)
-	WSend       func(msg interface{}) (r0 error)
-	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
+	WGetNetconn func() adaptiveservice.Netconn
+	WNewStream  func() adaptiveservice.Stream
+	WRecv       func(msgPtr interface{}) error
+	WSend       func(msg interface{}) error
+	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) error
 }
 
 func (W _github_com_godevsig_adaptiveservice_Connection) Close() {
-	if W.WClose == nil {
-		return
-	}
 	W.WClose()
 }
-func (W _github_com_godevsig_adaptiveservice_Connection) GetNetconn() (r0 adaptiveservice.Netconn) {
-	if W.WGetNetconn == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Connection) GetNetconn() adaptiveservice.Netconn {
 	return W.WGetNetconn()
 }
-func (W _github_com_godevsig_adaptiveservice_Connection) NewStream() (r0 adaptiveservice.Stream) {
-	if W.WNewStream == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Connection) NewStream() adaptiveservice.Stream {
 	return W.WNewStream()
 }
-func (W _github_com_godevsig_adaptiveservice_Connection) Recv(msgPtr interface{}) (r0 error) {
-	if W.WRecv == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Connection) Recv(msgPtr interface{}) error {
 	return W.WRecv(msgPtr)
 }
-func (W _github_com_godevsig_adaptiveservice_Connection) Send(msg interface{}) (r0 error) {
-	if W.WSend == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Connection) Send(msg interface{}) error {
 	return W.WSend(msg)
 }
-func (W _github_com_godevsig_adaptiveservice_Connection) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) (r0 error) {
-	if W.WSendRecv == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Connection) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) error {
 	return W.WSendRecv(msgSnd, msgRcvPtr)
 }
 
 // _github_com_godevsig_adaptiveservice_Context is an interface wrapper for Context type
 type _github_com_godevsig_adaptiveservice_Context struct {
 	IValue      interface{}
-	WGetContext func() (r0 interface{})
+	WGetContext func() interface{}
 	WGetVar     func(v interface{})
 	WPutVar     func(v interface{})
 	WSetContext func(v interface{})
 }
 
-func (W _github_com_godevsig_adaptiveservice_Context) GetContext() (r0 interface{}) {
-	if W.WGetContext == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Context) GetContext() interface{} {
 	return W.WGetContext()
 }
 func (W _github_com_godevsig_adaptiveservice_Context) GetVar(v interface{}) {
-	if W.WGetVar == nil {
-		return
-	}
 	W.WGetVar(v)
 }
 func (W _github_com_godevsig_adaptiveservice_Context) PutVar(v interface{}) {
-	if W.WPutVar == nil {
-		return
-	}
 	W.WPutVar(v)
 }
 func (W _github_com_godevsig_adaptiveservice_Context) SetContext(v interface{}) {
-	if W.WSetContext == nil {
-		return
-	}
 	W.WSetContext(v)
 }
 
 // _github_com_godevsig_adaptiveservice_ContextStream is an interface wrapper for ContextStream type
 type _github_com_godevsig_adaptiveservice_ContextStream struct {
 	IValue      interface{}
-	WGetContext func() (r0 interface{})
-	WGetNetconn func() (r0 adaptiveservice.Netconn)
+	WGetContext func() interface{}
+	WGetNetconn func() adaptiveservice.Netconn
 	WGetVar     func(v interface{})
 	WPutVar     func(v interface{})
-	WRecv       func(msgPtr interface{}) (r0 error)
-	WSend       func(msg interface{}) (r0 error)
-	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
+	WRecv       func(msgPtr interface{}) error
+	WSend       func(msg interface{}) error
+	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) error
 	WSetContext func(v interface{})
 }
 
-func (W _github_com_godevsig_adaptiveservice_ContextStream) GetContext() (r0 interface{}) {
-	if W.WGetContext == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) GetContext() interface{} {
 	return W.WGetContext()
 }
-func (W _github_com_godevsig_adaptiveservice_ContextStream) GetNetconn() (r0 adaptiveservice.Netconn) {
-	if W.WGetNetconn == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) GetNetconn() adaptiveservice.Netconn {
 	return W.WGetNetconn()
 }
 func (W _github_com_godevsig_adaptiveservice_ContextStream) GetVar(v interface{}) {
-	if W.WGetVar == nil {
-		return
-	}
 	W.WGetVar(v)
 }
 func (W _github_com_godevsig_adaptiveservice_ContextStream) PutVar(v interface{}) {
-	if W.WPutVar == nil {
-		return
-	}
 	W.WPutVar(v)
 }
-func (W _github_com_godevsig_adaptiveservice_ContextStream) Recv(msgPtr interface{}) (r0 error) {
-	if W.WRecv == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) Recv(msgPtr interface{}) error {
 	return W.WRecv(msgPtr)
 }
-func (W _github_com_godevsig_adaptiveservice_ContextStream) Send(msg interface{}) (r0 error) {
-	if W.WSend == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) Send(msg interface{}) error {
 	return W.WSend(msg)
 }
-func (W _github_com_godevsig_adaptiveservice_ContextStream) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) (r0 error) {
-	if W.WSendRecv == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) error {
 	return W.WSendRecv(msgSnd, msgRcvPtr)
 }
 func (W _github_com_godevsig_adaptiveservice_ContextStream) SetContext(v interface{}) {
-	if W.WSetContext == nil {
-		return
-	}
 	W.WSetContext(v)
 }
 
@@ -232,15 +178,9 @@ type _github_com_godevsig_adaptiveservice_HighPriorityMessage struct {
 }
 
 func (W _github_com_godevsig_adaptiveservice_HighPriorityMessage) Handle(stream adaptiveservice.ContextStream) (reply interface{}) {
-	if W.WHandle == nil {
-		return
-	}
 	return W.WHandle(stream)
 }
 func (W _github_com_godevsig_adaptiveservice_HighPriorityMessage) IsHighPriority() {
-	if W.WIsHighPriority == nil {
-		return
-	}
 	W.WIsHighPriority()
 }
 
@@ -251,9 +191,6 @@ type _github_com_godevsig_adaptiveservice_KnownMessage struct {
 }
 
 func (W _github_com_godevsig_adaptiveservice_KnownMessage) Handle(stream adaptiveservice.ContextStream) (reply interface{}) {
-	if W.WHandle == nil {
-		return
-	}
 	return W.WHandle(stream)
 }
 
@@ -267,27 +204,15 @@ type _github_com_godevsig_adaptiveservice_Logger struct {
 }
 
 func (W _github_com_godevsig_adaptiveservice_Logger) Debugf(format string, args ...interface{}) {
-	if W.WDebugf == nil {
-		return
-	}
 	W.WDebugf(format, args...)
 }
 func (W _github_com_godevsig_adaptiveservice_Logger) Errorf(format string, args ...interface{}) {
-	if W.WErrorf == nil {
-		return
-	}
 	W.WErrorf(format, args...)
 }
 func (W _github_com_godevsig_adaptiveservice_Logger) Infof(format string, args ...interface{}) {
-	if W.WInfof == nil {
-		return
-	}
 	W.WInfof(format, args...)
 }
 func (W _github_com_godevsig_adaptiveservice_Logger) Warnf(format string, args ...interface{}) {
-	if W.WWarnf == nil {
-		return
-	}
 	W.WWarnf(format, args...)
 }
 
@@ -299,75 +224,48 @@ type _github_com_godevsig_adaptiveservice_LowPriorityMessage struct {
 }
 
 func (W _github_com_godevsig_adaptiveservice_LowPriorityMessage) Handle(stream adaptiveservice.ContextStream) (reply interface{}) {
-	if W.WHandle == nil {
-		return
-	}
 	return W.WHandle(stream)
 }
 func (W _github_com_godevsig_adaptiveservice_LowPriorityMessage) IsLowPriority() {
-	if W.WIsLowPriority == nil {
-		return
-	}
 	W.WIsLowPriority()
 }
 
 // _github_com_godevsig_adaptiveservice_Netconn is an interface wrapper for Netconn type
 type _github_com_godevsig_adaptiveservice_Netconn struct {
 	IValue      interface{}
-	WClose      func() (r0 error)
-	WLocalAddr  func() (r0 net.Addr)
-	WRemoteAddr func() (r0 net.Addr)
+	WClose      func() error
+	WLocalAddr  func() net.Addr
+	WRemoteAddr func() net.Addr
 }
 
-func (W _github_com_godevsig_adaptiveservice_Netconn) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Netconn) Close() error {
 	return W.WClose()
 }
-func (W _github_com_godevsig_adaptiveservice_Netconn) LocalAddr() (r0 net.Addr) {
-	if W.WLocalAddr == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Netconn) LocalAddr() net.Addr {
 	return W.WLocalAddr()
 }
-func (W _github_com_godevsig_adaptiveservice_Netconn) RemoteAddr() (r0 net.Addr) {
-	if W.WRemoteAddr == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Netconn) RemoteAddr() net.Addr {
 	return W.WRemoteAddr()
 }
 
 // _github_com_godevsig_adaptiveservice_Stream is an interface wrapper for Stream type
 type _github_com_godevsig_adaptiveservice_Stream struct {
 	IValue      interface{}
-	WGetNetconn func() (r0 adaptiveservice.Netconn)
-	WRecv       func(msgPtr interface{}) (r0 error)
-	WSend       func(msg interface{}) (r0 error)
-	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) (r0 error)
+	WGetNetconn func() adaptiveservice.Netconn
+	WRecv       func(msgPtr interface{}) error
+	WSend       func(msg interface{}) error
+	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) error
 }
 
-func (W _github_com_godevsig_adaptiveservice_Stream) GetNetconn() (r0 adaptiveservice.Netconn) {
-	if W.WGetNetconn == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Stream) GetNetconn() adaptiveservice.Netconn {
 	return W.WGetNetconn()
 }
-func (W _github_com_godevsig_adaptiveservice_Stream) Recv(msgPtr interface{}) (r0 error) {
-	if W.WRecv == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Stream) Recv(msgPtr interface{}) error {
 	return W.WRecv(msgPtr)
 }
-func (W _github_com_godevsig_adaptiveservice_Stream) Send(msg interface{}) (r0 error) {
-	if W.WSend == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Stream) Send(msg interface{}) error {
 	return W.WSend(msg)
 }
-func (W _github_com_godevsig_adaptiveservice_Stream) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) (r0 error) {
-	if W.WSendRecv == nil {
-		return
-	}
+func (W _github_com_godevsig_adaptiveservice_Stream) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) error {
 	return W.WSendRecv(msgSnd, msgRcvPtr)
 }

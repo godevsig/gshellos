@@ -113,7 +113,7 @@ func init() {
 
 - `GetObservedIP{}` is a known message to service "IPObserver".
 - When client calls `conn.SendRecv(as.GetObservedIP{}, &ip)`, the request message is then
-  delivered to the server's mesage queue waitting one "idle" worker from worker pool to pick
+  delivered to the server's message queue waitting one "idle" worker from worker pool to pick
   up the message and call the handler `GetObservedIP.Handle()`.
 - Many clients can send the request simultaneously and the handlers will be called also
   in parallel on server side.

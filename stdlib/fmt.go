@@ -57,22 +57,16 @@ type _fmt_Formatter struct {
 }
 
 func (W _fmt_Formatter) Format(f fmt.State, verb rune) {
-	if W.WFormat == nil {
-		return
-	}
 	W.WFormat(f, verb)
 }
 
 // _fmt_GoStringer is an interface wrapper for GoStringer type
 type _fmt_GoStringer struct {
 	IValue    interface{}
-	WGoString func() (r0 string)
+	WGoString func() string
 }
 
-func (W _fmt_GoStringer) GoString() (r0 string) {
-	if W.WGoString == nil {
-		return
-	}
+func (W _fmt_GoStringer) GoString() string {
 	return W.WGoString()
 }
 
@@ -83,103 +77,70 @@ type _fmt_ScanState struct {
 	WReadRune   func() (r rune, size int, err error)
 	WSkipSpace  func()
 	WToken      func(skipSpace bool, f func(rune) bool) (token []byte, err error)
-	WUnreadRune func() (r0 error)
+	WUnreadRune func() error
 	WWidth      func() (wid int, ok bool)
 }
 
 func (W _fmt_ScanState) Read(buf []byte) (n int, err error) {
-	if W.WRead == nil {
-		return
-	}
 	return W.WRead(buf)
 }
 func (W _fmt_ScanState) ReadRune() (r rune, size int, err error) {
-	if W.WReadRune == nil {
-		return
-	}
 	return W.WReadRune()
 }
 func (W _fmt_ScanState) SkipSpace() {
-	if W.WSkipSpace == nil {
-		return
-	}
 	W.WSkipSpace()
 }
 func (W _fmt_ScanState) Token(skipSpace bool, f func(rune) bool) (token []byte, err error) {
-	if W.WToken == nil {
-		return
-	}
 	return W.WToken(skipSpace, f)
 }
-func (W _fmt_ScanState) UnreadRune() (r0 error) {
-	if W.WUnreadRune == nil {
-		return
-	}
+func (W _fmt_ScanState) UnreadRune() error {
 	return W.WUnreadRune()
 }
 func (W _fmt_ScanState) Width() (wid int, ok bool) {
-	if W.WWidth == nil {
-		return
-	}
 	return W.WWidth()
 }
 
 // _fmt_Scanner is an interface wrapper for Scanner type
 type _fmt_Scanner struct {
 	IValue interface{}
-	WScan  func(state fmt.ScanState, verb rune) (r0 error)
+	WScan  func(state fmt.ScanState, verb rune) error
 }
 
-func (W _fmt_Scanner) Scan(state fmt.ScanState, verb rune) (r0 error) {
-	if W.WScan == nil {
-		return
-	}
+func (W _fmt_Scanner) Scan(state fmt.ScanState, verb rune) error {
 	return W.WScan(state, verb)
 }
 
 // _fmt_State is an interface wrapper for State type
 type _fmt_State struct {
 	IValue     interface{}
-	WFlag      func(c int) (r0 bool)
+	WFlag      func(c int) bool
 	WPrecision func() (prec int, ok bool)
 	WWidth     func() (wid int, ok bool)
 	WWrite     func(b []byte) (n int, err error)
 }
 
-func (W _fmt_State) Flag(c int) (r0 bool) {
-	if W.WFlag == nil {
-		return
-	}
+func (W _fmt_State) Flag(c int) bool {
 	return W.WFlag(c)
 }
 func (W _fmt_State) Precision() (prec int, ok bool) {
-	if W.WPrecision == nil {
-		return
-	}
 	return W.WPrecision()
 }
 func (W _fmt_State) Width() (wid int, ok bool) {
-	if W.WWidth == nil {
-		return
-	}
 	return W.WWidth()
 }
 func (W _fmt_State) Write(b []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
 	return W.WWrite(b)
 }
 
 // _fmt_Stringer is an interface wrapper for Stringer type
 type _fmt_Stringer struct {
 	IValue  interface{}
-	WString func() (r0 string)
+	WString func() string
 }
 
-func (W _fmt_Stringer) String() (r0 string) {
+func (W _fmt_Stringer) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }

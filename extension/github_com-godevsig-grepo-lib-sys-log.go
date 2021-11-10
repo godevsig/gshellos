@@ -21,10 +21,12 @@ func init() {
 		"Lfatal":              reflect.ValueOf(log.Lfatal),
 		"Lfileline":           reflect.ValueOf(log.Lfileline),
 		"Linfo":               reflect.ValueOf(log.Linfo),
+		"Linvalid":            reflect.ValueOf(log.Linvalid),
 		"Ltrace":              reflect.ValueOf(log.Ltrace),
 		"Lwarn":               reflect.ValueOf(log.Lwarn),
 		"NewStream":           reflect.ValueOf(log.NewStream),
 		"RegOutputterFactory": reflect.ValueOf(log.RegOutputterFactory),
+		"StringToLoglevel":    reflect.ValueOf(log.StringToLoglevel),
 
 		// type definitions
 		"Flag":             reflect.ValueOf((*log.Flag)(nil)),
@@ -47,21 +49,15 @@ type _github_com_godevsig_grepo_lib_sys_log_Outputter struct {
 }
 
 func (W _github_com_godevsig_grepo_lib_sys_log_Outputter) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
 	return W.WWrite(p)
 }
 
 // _github_com_godevsig_grepo_lib_sys_log_OutputterFactory is an interface wrapper for OutputterFactory type
 type _github_com_godevsig_grepo_lib_sys_log_OutputterFactory struct {
 	IValue        interface{}
-	WNewOutputter func(description string) (r0 log.Outputter, r1 error)
+	WNewOutputter func(description string) (log.Outputter, error)
 }
 
-func (W _github_com_godevsig_grepo_lib_sys_log_OutputterFactory) NewOutputter(description string) (r0 log.Outputter, r1 error) {
-	if W.WNewOutputter == nil {
-		return
-	}
+func (W _github_com_godevsig_grepo_lib_sys_log_OutputterFactory) NewOutputter(description string) (log.Outputter, error) {
 	return W.WNewOutputter(description)
 }

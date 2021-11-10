@@ -32,33 +32,21 @@ func init() {
 // _mime_multipart_File is an interface wrapper for File type
 type _mime_multipart_File struct {
 	IValue  interface{}
-	WClose  func() (r0 error)
+	WClose  func() error
 	WRead   func(p []byte) (n int, err error)
 	WReadAt func(p []byte, off int64) (n int, err error)
-	WSeek   func(offset int64, whence int) (r0 int64, r1 error)
+	WSeek   func(offset int64, whence int) (int64, error)
 }
 
-func (W _mime_multipart_File) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _mime_multipart_File) Close() error {
 	return W.WClose()
 }
 func (W _mime_multipart_File) Read(p []byte) (n int, err error) {
-	if W.WRead == nil {
-		return
-	}
 	return W.WRead(p)
 }
 func (W _mime_multipart_File) ReadAt(p []byte, off int64) (n int, err error) {
-	if W.WReadAt == nil {
-		return
-	}
 	return W.WReadAt(p, off)
 }
-func (W _mime_multipart_File) Seek(offset int64, whence int) (r0 int64, r1 error) {
-	if W.WSeek == nil {
-		return
-	}
+func (W _mime_multipart_File) Seek(offset int64, whence int) (int64, error) {
 	return W.WSeek(offset, whence)
 }

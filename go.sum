@@ -6,8 +6,6 @@ github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177 h1:Ga+4dO0xF4eju
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177/go.mod h1:QdEauSzqdF5tbLIVtGYO6sqOhUKVPSZGd5x7xK5oeS4=
 github.com/godevsig/grepo v0.0.3 h1:9YXYCXTIBQksarJ94nTcb3ZIGikd+EOrW0usQ2H06AE=
 github.com/godevsig/grepo v0.0.3/go.mod h1:TTod4iAuz7pl2bjVxqA7AECNLYlrYgChOK1IHzJz380=
-github.com/godevsig/yaegi v0.9.24-0.20210930011514-bda5fa8f8db4 h1:vr29trcd+DC5F5hlRTBHygISgDL3fP+W5qhDLWUrC1I=
-github.com/godevsig/yaegi v0.9.24-0.20210930011514-bda5fa8f8db4/go.mod h1:RuCwD8/wsX7b6KoQHOaIFUfuH3gQIK4KWnFFmJMw5VA=
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-runewidth v0.0.13 h1:lTGmDsbAYt5DmK6OnoV7EuIF1wEIFAcxld6ypU4OSgU=
 github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=
@@ -17,3 +15,5 @@ github.com/peterh/liner v1.2.1 h1:O4BlKaq/LWu6VRWmol4ByWfzx6MfXc5Op5HETyIy5yg=
 github.com/peterh/liner v1.2.1/go.mod h1:CRroGNssyjTd/qIG2FyxByd2S8JEAZXBl4qUrZf8GS0=
 github.com/rivo/uniseg v0.2.0 h1:S1pD9weZBuJdFmowNwbpi7BJ8TNftyUImj/0WQi72jY=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
+github.com/traefik/yaegi v0.11.0 h1:aHHIZDrla3W7PYYsmw5ktf6/D+iP1N/hUQvNN46lmGM=
+github.com/traefik/yaegi v0.11.0/go.mod h1:RuCwD8/wsX7b6KoQHOaIFUfuH3gQIK4KWnFFmJMw5VA=

@@ -504,10 +504,11 @@ func TestMain(m *testing.M) {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Second)
 		ret := m.Run() // run tests
+		time.Sleep(time.Second)
 		exec.Command("pkill", "-SIGINT", "gshell.tester").Run()
-		time.Sleep(3 * time.Second)
+		time.Sleep(time.Second)
 		os.Exit(ret)
 	} else {
 		os.Exit(m.Run())

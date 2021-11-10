@@ -36,19 +36,13 @@ func init() {
 // _image_png_EncoderBufferPool is an interface wrapper for EncoderBufferPool type
 type _image_png_EncoderBufferPool struct {
 	IValue interface{}
-	WGet   func() (r0 *png.EncoderBuffer)
+	WGet   func() *png.EncoderBuffer
 	WPut   func(a0 *png.EncoderBuffer)
 }
 
-func (W _image_png_EncoderBufferPool) Get() (r0 *png.EncoderBuffer) {
-	if W.WGet == nil {
-		return
-	}
+func (W _image_png_EncoderBufferPool) Get() *png.EncoderBuffer {
 	return W.WGet()
 }
 func (W _image_png_EncoderBufferPool) Put(a0 *png.EncoderBuffer) {
-	if W.WPut == nil {
-		return
-	}
 	W.WPut(a0)
 }

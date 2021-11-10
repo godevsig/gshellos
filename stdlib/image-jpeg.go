@@ -34,18 +34,12 @@ func init() {
 type _image_jpeg_Reader struct {
 	IValue    interface{}
 	WRead     func(p []byte) (n int, err error)
-	WReadByte func() (r0 byte, r1 error)
+	WReadByte func() (byte, error)
 }
 
 func (W _image_jpeg_Reader) Read(p []byte) (n int, err error) {
-	if W.WRead == nil {
-		return
-	}
 	return W.WRead(p)
 }
-func (W _image_jpeg_Reader) ReadByte() (r0 byte, r1 error) {
-	if W.WReadByte == nil {
-		return
-	}
+func (W _image_jpeg_Reader) ReadByte() (byte, error) {
 	return W.WReadByte()
 }

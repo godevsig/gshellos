@@ -26,136 +26,85 @@ func init() {
 // _hash_Hash is an interface wrapper for Hash type
 type _hash_Hash struct {
 	IValue     interface{}
-	WBlockSize func() (r0 int)
+	WBlockSize func() int
 	WReset     func()
-	WSize      func() (r0 int)
-	WSum       func(b []byte) (r0 []byte)
+	WSize      func() int
+	WSum       func(b []byte) []byte
 	WWrite     func(p []byte) (n int, err error)
 }
 
-func (W _hash_Hash) BlockSize() (r0 int) {
-	if W.WBlockSize == nil {
-		return
-	}
+func (W _hash_Hash) BlockSize() int {
 	return W.WBlockSize()
 }
 func (W _hash_Hash) Reset() {
-	if W.WReset == nil {
-		return
-	}
 	W.WReset()
 }
-func (W _hash_Hash) Size() (r0 int) {
-	if W.WSize == nil {
-		return
-	}
+func (W _hash_Hash) Size() int {
 	return W.WSize()
 }
-func (W _hash_Hash) Sum(b []byte) (r0 []byte) {
-	if W.WSum == nil {
-		return
-	}
+func (W _hash_Hash) Sum(b []byte) []byte {
 	return W.WSum(b)
 }
 func (W _hash_Hash) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
 	return W.WWrite(p)
 }
 
 // _hash_Hash32 is an interface wrapper for Hash32 type
 type _hash_Hash32 struct {
 	IValue     interface{}
-	WBlockSize func() (r0 int)
+	WBlockSize func() int
 	WReset     func()
-	WSize      func() (r0 int)
-	WSum       func(b []byte) (r0 []byte)
-	WSum32     func() (r0 uint32)
+	WSize      func() int
+	WSum       func(b []byte) []byte
+	WSum32     func() uint32
 	WWrite     func(p []byte) (n int, err error)
 }
 
-func (W _hash_Hash32) BlockSize() (r0 int) {
-	if W.WBlockSize == nil {
-		return
-	}
+func (W _hash_Hash32) BlockSize() int {
 	return W.WBlockSize()
 }
 func (W _hash_Hash32) Reset() {
-	if W.WReset == nil {
-		return
-	}
 	W.WReset()
 }
-func (W _hash_Hash32) Size() (r0 int) {
-	if W.WSize == nil {
-		return
-	}
+func (W _hash_Hash32) Size() int {
 	return W.WSize()
 }
-func (W _hash_Hash32) Sum(b []byte) (r0 []byte) {
-	if W.WSum == nil {
-		return
-	}
+func (W _hash_Hash32) Sum(b []byte) []byte {
 	return W.WSum(b)
 }
-func (W _hash_Hash32) Sum32() (r0 uint32) {
-	if W.WSum32 == nil {
-		return
-	}
+func (W _hash_Hash32) Sum32() uint32 {
 	return W.WSum32()
 }
 func (W _hash_Hash32) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
 	return W.WWrite(p)
 }
 
 // _hash_Hash64 is an interface wrapper for Hash64 type
 type _hash_Hash64 struct {
 	IValue     interface{}
-	WBlockSize func() (r0 int)
+	WBlockSize func() int
 	WReset     func()
-	WSize      func() (r0 int)
-	WSum       func(b []byte) (r0 []byte)
-	WSum64     func() (r0 uint64)
+	WSize      func() int
+	WSum       func(b []byte) []byte
+	WSum64     func() uint64
 	WWrite     func(p []byte) (n int, err error)
 }
 
-func (W _hash_Hash64) BlockSize() (r0 int) {
-	if W.WBlockSize == nil {
-		return
-	}
+func (W _hash_Hash64) BlockSize() int {
 	return W.WBlockSize()
 }
 func (W _hash_Hash64) Reset() {
-	if W.WReset == nil {
-		return
-	}
 	W.WReset()
 }
-func (W _hash_Hash64) Size() (r0 int) {
-	if W.WSize == nil {
-		return
-	}
+func (W _hash_Hash64) Size() int {
 	return W.WSize()
 }
-func (W _hash_Hash64) Sum(b []byte) (r0 []byte) {
-	if W.WSum == nil {
-		return
-	}
+func (W _hash_Hash64) Sum(b []byte) []byte {
 	return W.WSum(b)
 }
-func (W _hash_Hash64) Sum64() (r0 uint64) {
-	if W.WSum64 == nil {
-		return
-	}
+func (W _hash_Hash64) Sum64() uint64 {
 	return W.WSum64()
 }
 func (W _hash_Hash64) Write(p []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
 	return W.WWrite(p)
 }

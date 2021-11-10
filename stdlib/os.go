@@ -143,82 +143,52 @@ func init() {
 // _os_DirEntry is an interface wrapper for DirEntry type
 type _os_DirEntry struct {
 	IValue interface{}
-	WInfo  func() (r0 fs.FileInfo, r1 error)
-	WIsDir func() (r0 bool)
-	WName  func() (r0 string)
-	WType  func() (r0 fs.FileMode)
+	WInfo  func() (fs.FileInfo, error)
+	WIsDir func() bool
+	WName  func() string
+	WType  func() fs.FileMode
 }
 
-func (W _os_DirEntry) Info() (r0 fs.FileInfo, r1 error) {
-	if W.WInfo == nil {
-		return
-	}
+func (W _os_DirEntry) Info() (fs.FileInfo, error) {
 	return W.WInfo()
 }
-func (W _os_DirEntry) IsDir() (r0 bool) {
-	if W.WIsDir == nil {
-		return
-	}
+func (W _os_DirEntry) IsDir() bool {
 	return W.WIsDir()
 }
-func (W _os_DirEntry) Name() (r0 string) {
-	if W.WName == nil {
-		return
-	}
+func (W _os_DirEntry) Name() string {
 	return W.WName()
 }
-func (W _os_DirEntry) Type() (r0 fs.FileMode) {
-	if W.WType == nil {
-		return
-	}
+func (W _os_DirEntry) Type() fs.FileMode {
 	return W.WType()
 }
 
 // _os_FileInfo is an interface wrapper for FileInfo type
 type _os_FileInfo struct {
 	IValue   interface{}
-	WIsDir   func() (r0 bool)
-	WModTime func() (r0 time.Time)
-	WMode    func() (r0 fs.FileMode)
-	WName    func() (r0 string)
-	WSize    func() (r0 int64)
-	WSys     func() (r0 interface{})
+	WIsDir   func() bool
+	WModTime func() time.Time
+	WMode    func() fs.FileMode
+	WName    func() string
+	WSize    func() int64
+	WSys     func() interface{}
 }
 
-func (W _os_FileInfo) IsDir() (r0 bool) {
-	if W.WIsDir == nil {
-		return
-	}
+func (W _os_FileInfo) IsDir() bool {
 	return W.WIsDir()
 }
-func (W _os_FileInfo) ModTime() (r0 time.Time) {
-	if W.WModTime == nil {
-		return
-	}
+func (W _os_FileInfo) ModTime() time.Time {
 	return W.WModTime()
 }
-func (W _os_FileInfo) Mode() (r0 fs.FileMode) {
-	if W.WMode == nil {
-		return
-	}
+func (W _os_FileInfo) Mode() fs.FileMode {
 	return W.WMode()
 }
-func (W _os_FileInfo) Name() (r0 string) {
-	if W.WName == nil {
-		return
-	}
+func (W _os_FileInfo) Name() string {
 	return W.WName()
 }
-func (W _os_FileInfo) Size() (r0 int64) {
-	if W.WSize == nil {
-		return
-	}
+func (W _os_FileInfo) Size() int64 {
 	return W.WSize()
 }
-func (W _os_FileInfo) Sys() (r0 interface{}) {
-	if W.WSys == nil {
-		return
-	}
+func (W _os_FileInfo) Sys() interface{} {
 	return W.WSys()
 }
 
@@ -226,18 +196,15 @@ func (W _os_FileInfo) Sys() (r0 interface{}) {
 type _os_Signal struct {
 	IValue  interface{}
 	WSignal func()
-	WString func() (r0 string)
+	WString func() string
 }
 
 func (W _os_Signal) Signal() {
-	if W.WSignal == nil {
-		return
-	}
 	W.WSignal()
 }
-func (W _os_Signal) String() (r0 string) {
+func (W _os_Signal) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }

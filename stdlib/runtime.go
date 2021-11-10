@@ -69,19 +69,13 @@ func init() {
 // _runtime_Error is an interface wrapper for Error type
 type _runtime_Error struct {
 	IValue        interface{}
-	WError        func() (r0 string)
+	WError        func() string
 	WRuntimeError func()
 }
 
-func (W _runtime_Error) Error() (r0 string) {
-	if W.WError == nil {
-		return
-	}
+func (W _runtime_Error) Error() string {
 	return W.WError()
 }
 func (W _runtime_Error) RuntimeError() {
-	if W.WRuntimeError == nil {
-		return
-	}
 	W.WRuntimeError()
 }

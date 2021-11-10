@@ -32,12 +32,9 @@ func init() {
 // _testing_quick_Generator is an interface wrapper for Generator type
 type _testing_quick_Generator struct {
 	IValue    interface{}
-	WGenerate func(rand *rand.Rand, size int) (r0 reflect.Value)
+	WGenerate func(rand *rand.Rand, size int) reflect.Value
 }
 
-func (W _testing_quick_Generator) Generate(rand *rand.Rand, size int) (r0 reflect.Value) {
-	if W.WGenerate == nil {
-		return
-	}
+func (W _testing_quick_Generator) Generate(rand *rand.Rand, size int) reflect.Value {
 	return W.WGenerate(rand, size)
 }

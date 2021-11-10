@@ -25,7 +25,7 @@ func extractCmd() error {
 	flag.StringVar(&name, "name", "", "the namespace for the extracted symbols")
 	flag.StringVar(&exclude, "exclude", "", "comma separated list of regexp matching symbols to exclude")
 	flag.StringVar(&include, "include", "", "comma separated list of regexp matching symbols to include")
-	flag.StringVar(&tag, "tag", "", "build tag to be added to the created package")
+	flag.StringVar(&tag, "tag", "", "comma separated list of build tags to be added to the created package")
 
 	flag.Parse()
 
@@ -50,7 +50,9 @@ func extractCmd() error {
 	ext := extract.Extractor{
 		Dest:    name,
 		License: license,
-		Tag:     tag,
+	}
+	if tag != "" {
+		ext.Tag = strings.Split(tag, ",")
 	}
 
 	if exclude != "" {

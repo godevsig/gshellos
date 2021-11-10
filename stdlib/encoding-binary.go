@@ -43,51 +43,33 @@ type _encoding_binary_ByteOrder struct {
 	WPutUint16 func(a0 []byte, a1 uint16)
 	WPutUint32 func(a0 []byte, a1 uint32)
 	WPutUint64 func(a0 []byte, a1 uint64)
-	WString    func() (r0 string)
-	WUint16    func(a0 []byte) (r0 uint16)
-	WUint32    func(a0 []byte) (r0 uint32)
-	WUint64    func(a0 []byte) (r0 uint64)
+	WString    func() string
+	WUint16    func(a0 []byte) uint16
+	WUint32    func(a0 []byte) uint32
+	WUint64    func(a0 []byte) uint64
 }
 
 func (W _encoding_binary_ByteOrder) PutUint16(a0 []byte, a1 uint16) {
-	if W.WPutUint16 == nil {
-		return
-	}
 	W.WPutUint16(a0, a1)
 }
 func (W _encoding_binary_ByteOrder) PutUint32(a0 []byte, a1 uint32) {
-	if W.WPutUint32 == nil {
-		return
-	}
 	W.WPutUint32(a0, a1)
 }
 func (W _encoding_binary_ByteOrder) PutUint64(a0 []byte, a1 uint64) {
-	if W.WPutUint64 == nil {
-		return
-	}
 	W.WPutUint64(a0, a1)
 }
-func (W _encoding_binary_ByteOrder) String() (r0 string) {
+func (W _encoding_binary_ByteOrder) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }
-func (W _encoding_binary_ByteOrder) Uint16(a0 []byte) (r0 uint16) {
-	if W.WUint16 == nil {
-		return
-	}
+func (W _encoding_binary_ByteOrder) Uint16(a0 []byte) uint16 {
 	return W.WUint16(a0)
 }
-func (W _encoding_binary_ByteOrder) Uint32(a0 []byte) (r0 uint32) {
-	if W.WUint32 == nil {
-		return
-	}
+func (W _encoding_binary_ByteOrder) Uint32(a0 []byte) uint32 {
 	return W.WUint32(a0)
 }
-func (W _encoding_binary_ByteOrder) Uint64(a0 []byte) (r0 uint64) {
-	if W.WUint64 == nil {
-		return
-	}
+func (W _encoding_binary_ByteOrder) Uint64(a0 []byte) uint64 {
 	return W.WUint64(a0)
 }

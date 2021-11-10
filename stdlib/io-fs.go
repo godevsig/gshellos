@@ -74,255 +74,171 @@ func init() {
 // _io_fs_DirEntry is an interface wrapper for DirEntry type
 type _io_fs_DirEntry struct {
 	IValue interface{}
-	WInfo  func() (r0 fs.FileInfo, r1 error)
-	WIsDir func() (r0 bool)
-	WName  func() (r0 string)
-	WType  func() (r0 fs.FileMode)
+	WInfo  func() (fs.FileInfo, error)
+	WIsDir func() bool
+	WName  func() string
+	WType  func() fs.FileMode
 }
 
-func (W _io_fs_DirEntry) Info() (r0 fs.FileInfo, r1 error) {
-	if W.WInfo == nil {
-		return
-	}
+func (W _io_fs_DirEntry) Info() (fs.FileInfo, error) {
 	return W.WInfo()
 }
-func (W _io_fs_DirEntry) IsDir() (r0 bool) {
-	if W.WIsDir == nil {
-		return
-	}
+func (W _io_fs_DirEntry) IsDir() bool {
 	return W.WIsDir()
 }
-func (W _io_fs_DirEntry) Name() (r0 string) {
-	if W.WName == nil {
-		return
-	}
+func (W _io_fs_DirEntry) Name() string {
 	return W.WName()
 }
-func (W _io_fs_DirEntry) Type() (r0 fs.FileMode) {
-	if W.WType == nil {
-		return
-	}
+func (W _io_fs_DirEntry) Type() fs.FileMode {
 	return W.WType()
 }
 
 // _io_fs_FS is an interface wrapper for FS type
 type _io_fs_FS struct {
 	IValue interface{}
-	WOpen  func(name string) (r0 fs.File, r1 error)
+	WOpen  func(name string) (fs.File, error)
 }
 
-func (W _io_fs_FS) Open(name string) (r0 fs.File, r1 error) {
-	if W.WOpen == nil {
-		return
-	}
+func (W _io_fs_FS) Open(name string) (fs.File, error) {
 	return W.WOpen(name)
 }
 
 // _io_fs_File is an interface wrapper for File type
 type _io_fs_File struct {
 	IValue interface{}
-	WClose func() (r0 error)
-	WRead  func(a0 []byte) (r0 int, r1 error)
-	WStat  func() (r0 fs.FileInfo, r1 error)
+	WClose func() error
+	WRead  func(a0 []byte) (int, error)
+	WStat  func() (fs.FileInfo, error)
 }
 
-func (W _io_fs_File) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _io_fs_File) Close() error {
 	return W.WClose()
 }
-func (W _io_fs_File) Read(a0 []byte) (r0 int, r1 error) {
-	if W.WRead == nil {
-		return
-	}
+func (W _io_fs_File) Read(a0 []byte) (int, error) {
 	return W.WRead(a0)
 }
-func (W _io_fs_File) Stat() (r0 fs.FileInfo, r1 error) {
-	if W.WStat == nil {
-		return
-	}
+func (W _io_fs_File) Stat() (fs.FileInfo, error) {
 	return W.WStat()
 }
 
 // _io_fs_FileInfo is an interface wrapper for FileInfo type
 type _io_fs_FileInfo struct {
 	IValue   interface{}
-	WIsDir   func() (r0 bool)
-	WModTime func() (r0 time.Time)
-	WMode    func() (r0 fs.FileMode)
-	WName    func() (r0 string)
-	WSize    func() (r0 int64)
-	WSys     func() (r0 interface{})
+	WIsDir   func() bool
+	WModTime func() time.Time
+	WMode    func() fs.FileMode
+	WName    func() string
+	WSize    func() int64
+	WSys     func() interface{}
 }
 
-func (W _io_fs_FileInfo) IsDir() (r0 bool) {
-	if W.WIsDir == nil {
-		return
-	}
+func (W _io_fs_FileInfo) IsDir() bool {
 	return W.WIsDir()
 }
-func (W _io_fs_FileInfo) ModTime() (r0 time.Time) {
-	if W.WModTime == nil {
-		return
-	}
+func (W _io_fs_FileInfo) ModTime() time.Time {
 	return W.WModTime()
 }
-func (W _io_fs_FileInfo) Mode() (r0 fs.FileMode) {
-	if W.WMode == nil {
-		return
-	}
+func (W _io_fs_FileInfo) Mode() fs.FileMode {
 	return W.WMode()
 }
-func (W _io_fs_FileInfo) Name() (r0 string) {
-	if W.WName == nil {
-		return
-	}
+func (W _io_fs_FileInfo) Name() string {
 	return W.WName()
 }
-func (W _io_fs_FileInfo) Size() (r0 int64) {
-	if W.WSize == nil {
-		return
-	}
+func (W _io_fs_FileInfo) Size() int64 {
 	return W.WSize()
 }
-func (W _io_fs_FileInfo) Sys() (r0 interface{}) {
-	if W.WSys == nil {
-		return
-	}
+func (W _io_fs_FileInfo) Sys() interface{} {
 	return W.WSys()
 }
 
 // _io_fs_GlobFS is an interface wrapper for GlobFS type
 type _io_fs_GlobFS struct {
 	IValue interface{}
-	WGlob  func(pattern string) (r0 []string, r1 error)
-	WOpen  func(name string) (r0 fs.File, r1 error)
+	WGlob  func(pattern string) ([]string, error)
+	WOpen  func(name string) (fs.File, error)
 }
 
-func (W _io_fs_GlobFS) Glob(pattern string) (r0 []string, r1 error) {
-	if W.WGlob == nil {
-		return
-	}
+func (W _io_fs_GlobFS) Glob(pattern string) ([]string, error) {
 	return W.WGlob(pattern)
 }
-func (W _io_fs_GlobFS) Open(name string) (r0 fs.File, r1 error) {
-	if W.WOpen == nil {
-		return
-	}
+func (W _io_fs_GlobFS) Open(name string) (fs.File, error) {
 	return W.WOpen(name)
 }
 
 // _io_fs_ReadDirFS is an interface wrapper for ReadDirFS type
 type _io_fs_ReadDirFS struct {
 	IValue   interface{}
-	WOpen    func(name string) (r0 fs.File, r1 error)
-	WReadDir func(name string) (r0 []fs.DirEntry, r1 error)
+	WOpen    func(name string) (fs.File, error)
+	WReadDir func(name string) ([]fs.DirEntry, error)
 }
 
-func (W _io_fs_ReadDirFS) Open(name string) (r0 fs.File, r1 error) {
-	if W.WOpen == nil {
-		return
-	}
+func (W _io_fs_ReadDirFS) Open(name string) (fs.File, error) {
 	return W.WOpen(name)
 }
-func (W _io_fs_ReadDirFS) ReadDir(name string) (r0 []fs.DirEntry, r1 error) {
-	if W.WReadDir == nil {
-		return
-	}
+func (W _io_fs_ReadDirFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	return W.WReadDir(name)
 }
 
 // _io_fs_ReadDirFile is an interface wrapper for ReadDirFile type
 type _io_fs_ReadDirFile struct {
 	IValue   interface{}
-	WClose   func() (r0 error)
-	WRead    func(a0 []byte) (r0 int, r1 error)
-	WReadDir func(n int) (r0 []fs.DirEntry, r1 error)
-	WStat    func() (r0 fs.FileInfo, r1 error)
+	WClose   func() error
+	WRead    func(a0 []byte) (int, error)
+	WReadDir func(n int) ([]fs.DirEntry, error)
+	WStat    func() (fs.FileInfo, error)
 }
 
-func (W _io_fs_ReadDirFile) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _io_fs_ReadDirFile) Close() error {
 	return W.WClose()
 }
-func (W _io_fs_ReadDirFile) Read(a0 []byte) (r0 int, r1 error) {
-	if W.WRead == nil {
-		return
-	}
+func (W _io_fs_ReadDirFile) Read(a0 []byte) (int, error) {
 	return W.WRead(a0)
 }
-func (W _io_fs_ReadDirFile) ReadDir(n int) (r0 []fs.DirEntry, r1 error) {
-	if W.WReadDir == nil {
-		return
-	}
+func (W _io_fs_ReadDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	return W.WReadDir(n)
 }
-func (W _io_fs_ReadDirFile) Stat() (r0 fs.FileInfo, r1 error) {
-	if W.WStat == nil {
-		return
-	}
+func (W _io_fs_ReadDirFile) Stat() (fs.FileInfo, error) {
 	return W.WStat()
 }
 
 // _io_fs_ReadFileFS is an interface wrapper for ReadFileFS type
 type _io_fs_ReadFileFS struct {
 	IValue    interface{}
-	WOpen     func(name string) (r0 fs.File, r1 error)
-	WReadFile func(name string) (r0 []byte, r1 error)
+	WOpen     func(name string) (fs.File, error)
+	WReadFile func(name string) ([]byte, error)
 }
 
-func (W _io_fs_ReadFileFS) Open(name string) (r0 fs.File, r1 error) {
-	if W.WOpen == nil {
-		return
-	}
+func (W _io_fs_ReadFileFS) Open(name string) (fs.File, error) {
 	return W.WOpen(name)
 }
-func (W _io_fs_ReadFileFS) ReadFile(name string) (r0 []byte, r1 error) {
-	if W.WReadFile == nil {
-		return
-	}
+func (W _io_fs_ReadFileFS) ReadFile(name string) ([]byte, error) {
 	return W.WReadFile(name)
 }
 
 // _io_fs_StatFS is an interface wrapper for StatFS type
 type _io_fs_StatFS struct {
 	IValue interface{}
-	WOpen  func(name string) (r0 fs.File, r1 error)
-	WStat  func(name string) (r0 fs.FileInfo, r1 error)
+	WOpen  func(name string) (fs.File, error)
+	WStat  func(name string) (fs.FileInfo, error)
 }
 
-func (W _io_fs_StatFS) Open(name string) (r0 fs.File, r1 error) {
-	if W.WOpen == nil {
-		return
-	}
+func (W _io_fs_StatFS) Open(name string) (fs.File, error) {
 	return W.WOpen(name)
 }
-func (W _io_fs_StatFS) Stat(name string) (r0 fs.FileInfo, r1 error) {
-	if W.WStat == nil {
-		return
-	}
+func (W _io_fs_StatFS) Stat(name string) (fs.FileInfo, error) {
 	return W.WStat(name)
 }
 
 // _io_fs_SubFS is an interface wrapper for SubFS type
 type _io_fs_SubFS struct {
 	IValue interface{}
-	WOpen  func(name string) (r0 fs.File, r1 error)
-	WSub   func(dir string) (r0 fs.FS, r1 error)
+	WOpen  func(name string) (fs.File, error)
+	WSub   func(dir string) (fs.FS, error)
 }
 
-func (W _io_fs_SubFS) Open(name string) (r0 fs.File, r1 error) {
-	if W.WOpen == nil {
-		return
-	}
+func (W _io_fs_SubFS) Open(name string) (fs.File, error) {
 	return W.WOpen(name)
 }
-func (W _io_fs_SubFS) Sub(dir string) (r0 fs.FS, r1 error) {
-	if W.WSub == nil {
-		return
-	}
+func (W _io_fs_SubFS) Sub(dir string) (fs.FS, error) {
 	return W.WSub(dir)
 }

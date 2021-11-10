@@ -71,9 +71,9 @@ Usage of daemon [options]
         url of artifacts to update gshell, require -root
 ```
 
-- use `-bcast` if you want to enable gshell discovery in LAN scope
-- use `-registry` if you want to enable gshell discovery in WAN scope
-  NOTE: in WAN scope, a root registry is required to run, see below
+- use `-bcast` if you want to enable gshell discovery in LAN scope.
+- use `-registry` if you want to enable gshell discovery in WAN scope.
+  NOTE: in WAN scope, a root registry is required to run, see below.
 - `-root` makes this gshell daemon root registry, only one "public" system can be root.
   Public means all the other gshell enabled systems can have IP connectivity to the root.
 
@@ -114,6 +114,22 @@ bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -b
 
 ## Example: deploy coordinated daemons
 
+Follow the same steps of the root registry, except `gshell daemon` command:
+
+```shell
+# in gshell work dir
+cd /path/to/gshell
+
+# run gshell daemon
+bin/gshell -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 &
+
+# or better to test if gshell deamon is already running
+bin/gshell info || bin/gshell -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 &
+```
+
+- registry: specify the root registry IP address
+- bcast: LAN broadcast port
+
 ## Auto update gshell binary
 
 After started, gshell daemon will always try to update itself automatically,
@@ -140,7 +156,7 @@ GSHELL_NOUPDATE=1 bin/gshell -loglevel info -wd .working daemon -registry 10.10.
 
 1. service not found: godevsig_gshellDaemon  
    Start gshell daemon first before any other commands.
-1. Start gshell daemon failed with "socket already exists: [/var/tmp/adaptiveservice/builtin_serviceLister.sock]"
+1. Start gshell daemon failed with "socket already exists: [/var/tmp/adaptiveservice/builtin_serviceLister.sock]"  
    There is an old gshell daemon still running. `pkill -SIGINT gshell` to kill the old one, and then start the new one.
-1. gshell still failed to start?
+1. gshell still failed to start?  
    Try `rm -rf /var/tmp/adaptiveservice` and then restart gshell daemon.

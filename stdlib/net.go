@@ -128,19 +128,16 @@ func init() {
 // _net_Addr is an interface wrapper for Addr type
 type _net_Addr struct {
 	IValue   interface{}
-	WNetwork func() (r0 string)
-	WString  func() (r0 string)
+	WNetwork func() string
+	WString  func() string
 }
 
-func (W _net_Addr) Network() (r0 string) {
-	if W.WNetwork == nil {
-		return
-	}
+func (W _net_Addr) Network() string {
 	return W.WNetwork()
 }
-func (W _net_Addr) String() (r0 string) {
+func (W _net_Addr) String() string {
 	if W.WString == nil {
-		return
+		return ""
 	}
 	return W.WString()
 }
@@ -148,170 +145,107 @@ func (W _net_Addr) String() (r0 string) {
 // _net_Conn is an interface wrapper for Conn type
 type _net_Conn struct {
 	IValue            interface{}
-	WClose            func() (r0 error)
-	WLocalAddr        func() (r0 net.Addr)
+	WClose            func() error
+	WLocalAddr        func() net.Addr
 	WRead             func(b []byte) (n int, err error)
-	WRemoteAddr       func() (r0 net.Addr)
-	WSetDeadline      func(t time.Time) (r0 error)
-	WSetReadDeadline  func(t time.Time) (r0 error)
-	WSetWriteDeadline func(t time.Time) (r0 error)
+	WRemoteAddr       func() net.Addr
+	WSetDeadline      func(t time.Time) error
+	WSetReadDeadline  func(t time.Time) error
+	WSetWriteDeadline func(t time.Time) error
 	WWrite            func(b []byte) (n int, err error)
 }
 
-func (W _net_Conn) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _net_Conn) Close() error {
 	return W.WClose()
 }
-func (W _net_Conn) LocalAddr() (r0 net.Addr) {
-	if W.WLocalAddr == nil {
-		return
-	}
+func (W _net_Conn) LocalAddr() net.Addr {
 	return W.WLocalAddr()
 }
 func (W _net_Conn) Read(b []byte) (n int, err error) {
-	if W.WRead == nil {
-		return
-	}
 	return W.WRead(b)
 }
-func (W _net_Conn) RemoteAddr() (r0 net.Addr) {
-	if W.WRemoteAddr == nil {
-		return
-	}
+func (W _net_Conn) RemoteAddr() net.Addr {
 	return W.WRemoteAddr()
 }
-func (W _net_Conn) SetDeadline(t time.Time) (r0 error) {
-	if W.WSetDeadline == nil {
-		return
-	}
+func (W _net_Conn) SetDeadline(t time.Time) error {
 	return W.WSetDeadline(t)
 }
-func (W _net_Conn) SetReadDeadline(t time.Time) (r0 error) {
-	if W.WSetReadDeadline == nil {
-		return
-	}
+func (W _net_Conn) SetReadDeadline(t time.Time) error {
 	return W.WSetReadDeadline(t)
 }
-func (W _net_Conn) SetWriteDeadline(t time.Time) (r0 error) {
-	if W.WSetWriteDeadline == nil {
-		return
-	}
+func (W _net_Conn) SetWriteDeadline(t time.Time) error {
 	return W.WSetWriteDeadline(t)
 }
 func (W _net_Conn) Write(b []byte) (n int, err error) {
-	if W.WWrite == nil {
-		return
-	}
 	return W.WWrite(b)
 }
 
 // _net_Error is an interface wrapper for Error type
 type _net_Error struct {
 	IValue     interface{}
-	WError     func() (r0 string)
-	WTemporary func() (r0 bool)
-	WTimeout   func() (r0 bool)
+	WError     func() string
+	WTemporary func() bool
+	WTimeout   func() bool
 }
 
-func (W _net_Error) Error() (r0 string) {
-	if W.WError == nil {
-		return
-	}
+func (W _net_Error) Error() string {
 	return W.WError()
 }
-func (W _net_Error) Temporary() (r0 bool) {
-	if W.WTemporary == nil {
-		return
-	}
+func (W _net_Error) Temporary() bool {
 	return W.WTemporary()
 }
-func (W _net_Error) Timeout() (r0 bool) {
-	if W.WTimeout == nil {
-		return
-	}
+func (W _net_Error) Timeout() bool {
 	return W.WTimeout()
 }
 
 // _net_Listener is an interface wrapper for Listener type
 type _net_Listener struct {
 	IValue  interface{}
-	WAccept func() (r0 net.Conn, r1 error)
-	WAddr   func() (r0 net.Addr)
-	WClose  func() (r0 error)
+	WAccept func() (net.Conn, error)
+	WAddr   func() net.Addr
+	WClose  func() error
 }
 
-func (W _net_Listener) Accept() (r0 net.Conn, r1 error) {
-	if W.WAccept == nil {
-		return
-	}
+func (W _net_Listener) Accept() (net.Conn, error) {
 	return W.WAccept()
 }
-func (W _net_Listener) Addr() (r0 net.Addr) {
-	if W.WAddr == nil {
-		return
-	}
+func (W _net_Listener) Addr() net.Addr {
 	return W.WAddr()
 }
-func (W _net_Listener) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _net_Listener) Close() error {
 	return W.WClose()
 }
 
 // _net_PacketConn is an interface wrapper for PacketConn type
 type _net_PacketConn struct {
 	IValue            interface{}
-	WClose            func() (r0 error)
-	WLocalAddr        func() (r0 net.Addr)
+	WClose            func() error
+	WLocalAddr        func() net.Addr
 	WReadFrom         func(p []byte) (n int, addr net.Addr, err error)
-	WSetDeadline      func(t time.Time) (r0 error)
-	WSetReadDeadline  func(t time.Time) (r0 error)
-	WSetWriteDeadline func(t time.Time) (r0 error)
+	WSetDeadline      func(t time.Time) error
+	WSetReadDeadline  func(t time.Time) error
+	WSetWriteDeadline func(t time.Time) error
 	WWriteTo          func(p []byte, addr net.Addr) (n int, err error)
 }
 
-func (W _net_PacketConn) Close() (r0 error) {
-	if W.WClose == nil {
-		return
-	}
+func (W _net_PacketConn) Close() error {
 	return W.WClose()
 }
-func (W _net_PacketConn) LocalAddr() (r0 net.Addr) {
-	if W.WLocalAddr == nil {
-		return
-	}
+func (W _net_PacketConn) LocalAddr() net.Addr {
 	return W.WLocalAddr()
 }
 func (W _net_PacketConn) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
-	if W.WReadFrom == nil {
-		return
-	}
 	return W.WReadFrom(p)
 }
-func (W _net_PacketConn) SetDeadline(t time.Time) (r0 error) {
-	if W.WSetDeadline == nil {
-		return
-	}
+func (W _net_PacketConn) SetDeadline(t time.Time) error {
 	return W.WSetDeadline(t)
 }
-func (W _net_PacketConn) SetReadDeadline(t time.Time) (r0 error) {
-	if W.WSetReadDeadline == nil {
-		return
-	}
+func (W _net_PacketConn) SetReadDeadline(t time.Time) error {
 	return W.WSetReadDeadline(t)
 }
-func (W _net_PacketConn) SetWriteDeadline(t time.Time) (r0 error) {
-	if W.WSetWriteDeadline == nil {
-		return
-	}
+func (W _net_PacketConn) SetWriteDeadline(t time.Time) error {
 	return W.WSetWriteDeadline(t)
 }
 func (W _net_PacketConn) WriteTo(p []byte, addr net.Addr) (n int, err error) {
-	if W.WWriteTo == nil {
-		return
-	}
 	return W.WWriteTo(p, addr)
 }

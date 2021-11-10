@@ -61,32 +61,23 @@ func init() {
 // _database_sql_Result is an interface wrapper for Result type
 type _database_sql_Result struct {
 	IValue        interface{}
-	WLastInsertId func() (r0 int64, r1 error)
-	WRowsAffected func() (r0 int64, r1 error)
+	WLastInsertId func() (int64, error)
+	WRowsAffected func() (int64, error)
 }
 
-func (W _database_sql_Result) LastInsertId() (r0 int64, r1 error) {
-	if W.WLastInsertId == nil {
-		return
-	}
+func (W _database_sql_Result) LastInsertId() (int64, error) {
 	return W.WLastInsertId()
 }
-func (W _database_sql_Result) RowsAffected() (r0 int64, r1 error) {
-	if W.WRowsAffected == nil {
-		return
-	}
+func (W _database_sql_Result) RowsAffected() (int64, error) {
 	return W.WRowsAffected()
 }
 
 // _database_sql_Scanner is an interface wrapper for Scanner type
 type _database_sql_Scanner struct {
 	IValue interface{}
-	WScan  func(src interface{}) (r0 error)
+	WScan  func(src interface{}) error
 }
 
-func (W _database_sql_Scanner) Scan(src interface{}) (r0 error) {
-	if W.WScan == nil {
-		return
-	}
+func (W _database_sql_Scanner) Scan(src interface{}) error {
 	return W.WScan(src)
 }

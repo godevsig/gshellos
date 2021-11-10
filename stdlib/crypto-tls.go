@@ -114,14 +114,8 @@ type _crypto_tls_ClientSessionCache struct {
 }
 
 func (W _crypto_tls_ClientSessionCache) Get(sessionKey string) (session *tls.ClientSessionState, ok bool) {
-	if W.WGet == nil {
-		return
-	}
 	return W.WGet(sessionKey)
 }
 func (W _crypto_tls_ClientSessionCache) Put(sessionKey string, cs *tls.ClientSessionState) {
-	if W.WPut == nil {
-		return
-	}
 	W.WPut(sessionKey, cs)
 }
