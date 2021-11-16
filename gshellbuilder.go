@@ -20,7 +20,7 @@ import (
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/grepo/lib-sys/log"
+	"github.com/godevsig/grepo/lib/sys/log"
 	"github.com/traefik/yaegi/interp"
 )
 
@@ -161,6 +161,8 @@ func addDeamonCmd() {
 		s := as.NewServer(opts...).
 			SetPublisher(godevsigPublisher).
 			EnableServiceLister()
+		defer s.Close()
+
 		if len(*lanBroadcastPort) != 0 {
 			s.SetBroadcastPort(*lanBroadcastPort)
 		}
@@ -172,6 +174,9 @@ func addDeamonCmd() {
 			s.EnableIPObserver()
 
 			if len(repoInfo) == 4 {
+				if httpGet == nil {
+					return errors.New("http feature not enabled, check build tags")
+				}
 				crs := &codeRepoSvc{repoInfo: repoInfo}
 				if err := s.Publish("codeRepo",
 					codeRepoKnownMsgs,
@@ -182,6 +187,9 @@ func addDeamonCmd() {
 			}
 
 			if len(*updateURL) != 0 {
+				if httpGet == nil {
+					return errors.New("http feature not enabled, check build tags")
+				}
 				updtr := &updater{urlFmt: *updateURL, lg: lg}
 				if err := s.Publish("updater",
 					updaterKnownMsgs,

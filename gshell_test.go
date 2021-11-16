@@ -500,10 +500,11 @@ func TestMain(m *testing.M) {
 		cmdstr += "-wd .working -loglevel debug daemon -registry 127.0.0.1:11985 -bcast 9923 "
 		cmdstr += "-root -repo github.com/godevsig/gshellos/master "
 		cmdstr += "-update http://127.0.0.1:9001/%s"
-		if err := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).Start(); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		go func() {
+			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).CombinedOutput()
+			fmt.Println(string(output))
+		}()
+
 		time.Sleep(time.Second)
 		ret := m.Run() // run tests
 		time.Sleep(time.Second)

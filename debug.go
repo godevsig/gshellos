@@ -7,7 +7,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/godevsig/grepo/lib-sys/log"
+	"github.com/godevsig/grepo/lib/sys/log"
 )
 
 func init() {

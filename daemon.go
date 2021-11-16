@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -14,7 +13,7 @@ import (
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/grepo/lib-sys/log"
+	"github.com/godevsig/grepo/lib/sys/log"
 )
 
 type daemon struct {
@@ -273,23 +272,7 @@ var daemonKnownMsgs = []as.KnownMessage{
 	cmdInfo{},
 }
 
-func httpGet(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("url: %s not found: %d error", url, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
-}
+var httpGet func(url string) ([]byte, error)
 
 type updater struct {
 	urlFmt string

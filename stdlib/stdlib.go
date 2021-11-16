@@ -15,13 +15,13 @@ func init() {
 // Provide access to go standard library (http://golang.org/pkg/)
 // go list std | grep -v internal | grep -v '\.' | grep -v unsafe | grep -v syscall
 
-//go:generate ../cmd/extract/extract -name stdlib -tag stdbase bufio bytes context errors expvar flag fmt
+//go:generate ../cmd/extract/extract -name stdlib -tag stdbase bufio bytes context errors flag fmt
 //go:generate ../cmd/extract/extract -name stdlib -tag stdbase io io/fs io/ioutil net os os/exec os/signal os/user
 //go:generate ../cmd/extract/extract -name stdlib -tag stdbase path path/filepath reflect
 //go:generate ../cmd/extract/extract -name stdlib -tag stdbase sort strconv strings sync sync/atomic time
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdcommon archive/tar compress/gzip crypto/md5 crypto/rand
-//go:generate ../cmd/extract/extract -name stdlib -tag stdcommon encoding/binary encoding/hex encoding/json net/http
+//go:generate ../cmd/extract/extract -name stdlib -tag stdcommon encoding/binary encoding/gob encoding/hex encoding/json
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdext embed plugin
 
@@ -40,7 +40,7 @@ func init() {
 //go:generate ../cmd/extract/extract -name stdlib -tag stddebug debug/dwarf debug/elf debug/gosym debug/macho debug/pe debug/plan9obj
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdencoding encoding encoding/ascii85 encoding/asn1 encoding/base32 encoding/base64
-//go:generate ../cmd/extract/extract -name stdlib -tag stdencoding encoding/csv encoding/gob encoding/pem encoding/xml
+//go:generate ../cmd/extract/extract -name stdlib -tag stdencoding encoding/csv encoding/pem encoding/xml
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdgo go/ast go/build go/build/constraint go/constant go/doc go/format go/importer go/parser go/printer go/scanner go/token go/types
 
@@ -58,8 +58,8 @@ func init() {
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdmime mime mime/multipart mime/quotedprintable
 
-//go:generate ../cmd/extract/extract -name stdlib -tag stdhttp net/http/cgi net/http/cookiejar net/http/fcgi net/http/httptest net/http/httptrace
-//go:generate ../cmd/extract/extract -name stdlib -tag stdhttp net/http/httputil net/http/pprof net/textproto net/url
+//go:generate ../cmd/extract/extract -name stdlib -tag stdhttp net/http net/http/cgi net/http/cookiejar net/http/fcgi net/http/httptest net/http/httptrace
+//go:generate ../cmd/extract/extract -name stdlib -tag stdhttp net/http/httputil net/http/pprof net/textproto net/url expvar
 //go:generate ../cmd/extract/extract -name stdlib -tag stdmail net/mail net/smtp
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdrpc net/rpc net/rpc/jsonrpc
