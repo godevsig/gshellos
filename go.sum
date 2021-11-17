@@ -1,11 +1,11 @@
 github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4 h1:iBbhlt5YmtL9QXsMVf/XPXgYBQLifn38Cdjc0J/+uYg=
 github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4/go.mod h1:hiVxq5OP2bUGBRNS3Z/bt/reCLFNbdcST6gISi1fiOM=
-github.com/godevsig/adaptiveservice v0.9.8 h1:SQezkWCMRifiwWJKSg1kcMDUh5THCVxfdkS2raU6b4E=
-github.com/godevsig/adaptiveservice v0.9.8/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
+github.com/godevsig/adaptiveservice v0.9.9 h1:V+/LjLRJ+HGHPZHLEztEzSJQcn3Wmuc+NnL5hvhYc5s=
+github.com/godevsig/adaptiveservice v0.9.9/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177 h1:Ga+4dO0xF4ejuZfKnHfEA/bqlNUc2XKNjpopVDhMjLM=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177/go.mod h1:QdEauSzqdF5tbLIVtGYO6sqOhUKVPSZGd5x7xK5oeS4=
-github.com/godevsig/grepo v0.0.4 h1:L3GY9OncfwKTXEnG5EUC02wiUGwR01L2QEfp8K8b16I=
-github.com/godevsig/grepo v0.0.4/go.mod h1:TTod4iAuz7pl2bjVxqA7AECNLYlrYgChOK1IHzJz380=
+github.com/godevsig/grepo v0.0.5 h1:Dh+XQy03NRnmOuld2vxeL81OWeUIEBWA+oCvNTVOXnw=
+github.com/godevsig/grepo v0.0.5/go.mod h1:TTod4iAuz7pl2bjVxqA7AECNLYlrYgChOK1IHzJz380=
 github.com/mattn/go-runewidth v0.0.3/go.mod h1:LwmH8dsx7+W8Uxz3IHJYH5QSwggIsqBzpuz5H//U1FU=
 github.com/mattn/go-runewidth v0.0.13 h1:lTGmDsbAYt5DmK6OnoV7EuIF1wEIFAcxld6ypU4OSgU=
 github.com/mattn/go-runewidth v0.0.13/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh153qUoGf23w=

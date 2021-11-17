@@ -206,6 +206,26 @@ func gshellRunCmdTimeout(cmdstr string, nSec int) (string, error) {
 	return out.String(), err
 }
 
+func TestCmdRunWrongGRGVer(t *testing.T) {
+	out, err := gshellRunCmd("run -group testgrg testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("run -group testgrg -ver 111 testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err == nil {
+		t.Fatal("expected version not found error")
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCmdList(t *testing.T) {
 	out, err := gshellRunCmd("list")
 	t.Logf("\n%s", out)

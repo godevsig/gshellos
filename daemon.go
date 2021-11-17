@@ -24,7 +24,11 @@ func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgrg(name, rtPriority string) (as.Connection, error) {
+func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string) (as.Connection, error) {
+	if len(grgVer) == 0 {
+		grgVer = version
+	}
+	name := grgName + "." + grgVer
 	opts := []as.Option{
 		as.WithLogger(gd.lg),
 		as.WithScope(as.ScopeOS),
@@ -33,6 +37,9 @@ func (gd *daemon) setupgrg(name, rtPriority string) (as.Connection, error) {
 	conn := <-c.Discover(godevsigPublisher, "grg-"+name)
 	if conn != nil {
 		return conn, nil
+	}
+	if grgVer != version {
+		return nil, fmt.Errorf("running GRG version %s not found", grgVer)
 	}
 
 	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + name
@@ -78,6 +85,7 @@ func (gd *daemon) setupgrg(name, rtPriority string) (as.Connection, error) {
 
 type cmdKill struct {
 	GRGNames []string
+	GRGVer   string
 	Force    bool
 }
 
@@ -85,10 +93,15 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdKill: %v", msg)
 
+	grgVer := msg.GRGVer
+	if len(grgVer) == 0 {
+		grgVer = version
+	}
+
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var b strings.Builder
 	for _, grg := range msg.GRGNames {
-		connChan := c.Discover(godevsigPublisher, "grg-"+grg)
+		connChan := c.Discover(godevsigPublisher, "grg-"+grg+"."+grgVer)
 		for conn := range connChan {
 			var pInfo processInfo
 			if err := conn.SendRecv(getProcessInfo{}, &pInfo); err != nil {
@@ -116,6 +129,7 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 type cmdRun struct {
 	grgCmdRun
 	GRGName    string
+	GRGVer     string
 	RtPriority string
 }
 
@@ -123,7 +137,7 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
 
-	conn, err := gd.setupgrg(msg.GRGName+"."+version, msg.RtPriority)
+	conn, err := gd.setupgrg(msg.GRGName, msg.GRGVer, msg.RtPriority)
 	if err != nil {
 		return err
 	}

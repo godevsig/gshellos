@@ -107,6 +107,7 @@ var updateInterval = "600"
 func addDeamonCmd() {
 	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "Start local gshell daemon"), flag.ExitOnError)
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
+	invisible := cmd.Bool("invisible", false, "make gshell daemon invisible in gshell service network")
 	registryAddr := cmd.String("registry", "", "root registry address")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
 	codeRepo := cmd.String("repo", "", "code repo https address in format site/org/proj/branch, require -root")
@@ -166,7 +167,7 @@ func addDeamonCmd() {
 		if len(*lanBroadcastPort) != 0 {
 			s.SetBroadcastPort(*lanBroadcastPort)
 		}
-		if scope&as.ScopeWAN == as.ScopeWAN || scope&as.ScopeLAN == as.ScopeLAN {
+		if !*invisible && scope&as.ScopeNetwork != 0 {
 			s.EnableAutoReverseProxy()
 		}
 		if *rootRegistry {
@@ -278,7 +279,11 @@ func addDeamonCmd() {
 		gd := &daemon{
 			lg: lg,
 		}
-		if err := s.Publish("gshellDaemon",
+		visibleScope := scope
+		if *invisible {
+			visibleScope = as.ScopeProcess | as.ScopeOS
+		}
+		if err := s.PublishIn(visibleScope, "gshellDaemon",
 			daemonKnownMsgs,
 			as.OnNewStreamFunc(gd.onNewStream),
 		); err != nil {
@@ -308,10 +313,7 @@ func addListCmd() {
 			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
 		}
-		selfID, err := getSelfID(opts)
-		if err != nil {
-			return err
-		}
+		selfID, _ := getSelfID(opts)
 
 		c := as.NewClient(opts...)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
@@ -493,6 +495,7 @@ func addRepoCmd() {
 func addKillCmd() {
 	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named GRG(s) on local/remote system"), flag.ExitOnError)
 	force := cmd.Bool("f", false, "force terminate even if there are still running GREs")
+	grgVer := cmd.String("ver", "", "specify the running GRG version, default to target daemon version")
 
 	action := func() error {
 		args := cmd.Args()
@@ -509,6 +512,7 @@ func addKillCmd() {
 
 		cmd := cmdKill{
 			GRGNames: args,
+			GRGVer:   *grgVer,
 			Force:    *force,
 		}
 		var reply string
@@ -537,6 +541,7 @@ func addRunCmd() {
 		"run it in a new GRE in specified GRG on local/remote system"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "<random>", "create new or use existing GRG")
+	grgVer := cmd.String("ver", "", "specify the running GRG version, default to target daemon version")
 	rtPriority := cmd.String("rt", "", `Set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
 Caution: gshell daemon must be started as root to set realtime attributes`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
@@ -592,6 +597,7 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 				ByteCode:    rmShebang(byteCode),
 			},
 			GRGName:    grg,
+			GRGVer:     *grgVer,
 			RtPriority: *rtPriority,
 		}
 
@@ -642,11 +648,15 @@ func addPsCmd() {
 			return err
 		}
 
+		groupName := func(nameVersion string) string {
+			return strings.Replace(nameVersion, ".", " ", 1)
+		}
+
 		if len(msg.IDPattern) != 0 { // info
 			for _, ggi := range ggis {
 				for _, grei := range ggi.GREInfos {
 					fmt.Println("GRE ID    :", grei.ID)
-					fmt.Println("IN GROUP  :", ggi.Name)
+					fmt.Println("IN GROUP  :", groupName(ggi.Name))
 					fmt.Println("NAME      :", grei.Name)
 					fmt.Println("ARGS      :", grei.Args)
 					fmt.Println("STATUS    :", grei.Stat)
@@ -689,7 +699,7 @@ func addPsCmd() {
 					d := grei.EndTime.Sub(grei.StartTime)
 					stat = fmt.Sprintf("%-10s %v", stat, d)
 
-					fmt.Printf("%s  %-18s  %-18s  %s  %s\n", grei.ID, trimName(ggi.Name), trimName(grei.Name), created, stat)
+					fmt.Printf("%s  %-18s  %-18s  %s  %s\n", grei.ID, trimName(groupName(ggi.Name)), trimName(grei.Name), created, stat)
 				}
 			}
 		}
