@@ -30,6 +30,7 @@ func init() {
 		"RegisterType":           reflect.ValueOf(adaptiveservice.RegisterType),
 		"ScopeAll":               reflect.ValueOf(adaptiveservice.ScopeAll),
 		"ScopeLAN":               reflect.ValueOf(adaptiveservice.ScopeLAN),
+		"ScopeNetwork":           reflect.ValueOf(adaptiveservice.ScopeNetwork),
 		"ScopeOS":                reflect.ValueOf(adaptiveservice.ScopeOS),
 		"ScopeProcess":           reflect.ValueOf(adaptiveservice.ScopeProcess),
 		"ScopeWAN":               reflect.ValueOf(adaptiveservice.ScopeWAN),
