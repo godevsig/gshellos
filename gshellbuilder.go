@@ -50,9 +50,8 @@ func init() {
 	}
 }
 
-func getSelfID(opts []as.Option) (selfID string, err error) {
-	opts = append(opts, as.WithScope(as.ScopeProcess|as.ScopeOS))
-	c := as.NewClient(opts...).SetDiscoverTimeout(0)
+func getSelfID() (selfID string, err error) {
+	c := as.NewClient(as.WithScope(as.ScopeProcess | as.ScopeOS)).SetDiscoverTimeout(0)
 	conn := <-c.Discover(as.BuiltinPublisher, as.SrvProviderInfo)
 	if conn == nil {
 		err = as.ErrServiceNotFound(as.BuiltinPublisher, as.SrvProviderInfo)
@@ -313,7 +312,7 @@ func addListCmd() {
 			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
 		}
-		selfID, _ := getSelfID(opts)
+		selfID, _ := getSelfID()
 
 		c := as.NewClient(opts...)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
@@ -384,10 +383,7 @@ func addIDCmd() {
 	cmd := flag.NewFlagSet(newCmd("id", "", "Print self provider ID"), flag.ExitOnError)
 
 	action := func() error {
-		opts := []as.Option{
-			as.WithLogger(newLogger(log.DefaultStream, "main")),
-		}
-		selfID, err := getSelfID(opts)
+		selfID, err := getSelfID()
 		if err != nil {
 			selfID = "NA"
 		}
