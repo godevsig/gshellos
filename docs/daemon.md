@@ -112,7 +112,7 @@ bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -b
 - update addr: automatically update gshell binary from the address, which should contain:
   `gshell.386 gshell.amd64 gshell.arm64 gshell.mips64 gshell.ppc gshell.ppc64 md5sum rev`
 
-## Example: deploy coordinated daemons
+## Example: deploy coordinated gshell daemons
 
 Follow the same steps of the root registry, except `gshell daemon` command:
 
@@ -127,8 +127,31 @@ bin/gshell -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 &
 bin/gshell info || bin/gshell -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 &
 ```
 
-- registry: specify the root registry IP address
-- bcast: LAN broadcast port
+- registry: specify the root registry IP address, enables scope WAN
+- bcast: LAN broadcast port, enables scope LAN
+
+## Example: deploy standalone gshell daemon
+If you decide to deploy gshell daemon on your Linux PC or inside a VM or a docker container only
+in standalone mode, use below commands:
+```
+# in gshell work dir
+cd /path/to/gshell
+
+# start daemon without either registry address or LAN broadcast port will
+# put the daemon in scope Process and OS only
+bin/gshell daemon &
+```
+
+## Example: deploy gshell daemon in scope LAN
+Adding `-bcast port` on starting gshell daemon then makes this daemon and all the services under
+it scope LAN visible to the other gshell systems that also started with the same broadcast port:
+```
+# in gshell work dir
+cd /path/to/gshell
+
+# start daemon also in scope LAN
+bin/gshell daemon -bcast 9923 &
+```
 
 ## Auto update gshell binary
 
