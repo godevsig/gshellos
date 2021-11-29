@@ -157,8 +157,10 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	client := as.NewStreamIO(stream)
 	grg := as.NewStreamIO(conn)
 	gd.lg.Debugln("enter interactive io")
-	go io.Copy(grg, client)
-	io.Copy(client, grg)
+	done := make(chan struct{}, 1)
+	go func() { io.Copy(grg, client); done <- struct{}{} }()
+	go func() { io.Copy(client, grg); done <- struct{}{} }()
+	<-done
 	gd.lg.Debugln("exit interactive io")
 
 	return io.EOF
