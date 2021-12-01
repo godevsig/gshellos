@@ -53,6 +53,12 @@ func (grg *grg) rmGRE(gc *greCtl) {
 	grg.Unlock()
 	os.Remove(gc.outputFile)
 	grg.lg.Debugln("gre " + gc.ID + " removed")
+
+	grg.Lock()
+	if len(grg.greids) == 0 {
+		grg.server.Close()
+	}
+	grg.Unlock()
 }
 
 const (
@@ -280,10 +286,6 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 				ids = append(ids, gc.ID)
 			}
 		}
-	}
-
-	if msg.Cmd == "rm" && len(grg.greids) == 0 {
-		grg.server.Close()
 	}
 
 	return ids
