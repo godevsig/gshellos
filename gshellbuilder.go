@@ -537,8 +537,9 @@ func addRunCmd() {
 		"run it in a new GRE in specified GRG on local/remote system"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "<random>", "create new or use existing GRG")
+	maxprocs := cmd.Int("maxprocs", -1, "set GOMAXPROCS variable")
 	grgVer := cmd.String("ver", "", "specify the running GRG version, default to target daemon version")
-	rtPriority := cmd.String("rt", "", `Set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
+	rtPriority := cmd.String("rt", "", `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
 Caution: gshell daemon must be started as root to set realtime attributes`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
 	autoRemove := cmd.Bool("rm", false, "automatically remove the GRE when it exits")
@@ -595,6 +596,7 @@ Caution: gshell daemon must be started as root to set realtime attributes`)
 			GRGName:    grg,
 			GRGVer:     *grgVer,
 			RtPriority: *rtPriority,
+			Maxprocs:   *maxprocs,
 		}
 
 		conn := connectDaemon(lg)

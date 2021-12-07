@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -24,10 +25,16 @@ func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string) (as.Connection, error) {
+func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as.Connection, error) {
 	if len(grgVer) == 0 {
 		grgVer = version
 	}
+
+	daemonMaxprocs := runtime.GOMAXPROCS(-1)
+	if maxprocs <= 0 || maxprocs > daemonMaxprocs {
+		maxprocs = daemonMaxprocs
+	}
+
 	name := grgName + "." + grgVer
 	opts := []as.Option{
 		as.WithLogger(gd.lg),
@@ -52,6 +59,7 @@ func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string) (as.Connection, e
 		exe = "chrt"
 	}
 	cmd := exec.Command(exe, strings.Split(args, " ")...)
+	cmd.Env = append(os.Environ(), fmt.Sprintf("GOMAXPROCS=%d", maxprocs))
 	buf := &bytes.Buffer{}
 	cmd.Stdout = buf
 	cmd.Stderr = buf
@@ -131,13 +139,14 @@ type cmdRun struct {
 	GRGName    string
 	GRGVer     string
 	RtPriority string
+	Maxprocs   int
 }
 
 func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
 
-	conn, err := gd.setupgrg(msg.GRGName, msg.GRGVer, msg.RtPriority)
+	conn, err := gd.setupgrg(msg.GRGName, msg.GRGVer, msg.RtPriority, msg.Maxprocs)
 	if err != nil {
 		return err
 	}
