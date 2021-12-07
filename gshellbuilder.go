@@ -259,7 +259,7 @@ func addDeamonCmd() {
 				}
 
 				updateChan = make(chan struct{})
-				s.Close()
+				s.CloseWait()
 				cmd := cmdArgs[0]
 				args := cmdArgs[1:]
 				if cmdArgs[0] == "gshell.tester" {
