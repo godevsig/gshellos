@@ -369,19 +369,19 @@ func TestCmdStopRm(t *testing.T) {
 	}
 }
 
-func TestCmdRestart(t *testing.T) {
+func TestCmdStart(t *testing.T) {
 	out, err := gshellRunCmd("run testdata/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out)
-	out, err = gshellRunCmd("restart " + id)
+	out, err = gshellRunCmd("start " + id)
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "restarted") {
+	if !strings.Contains(out, "started") {
 		t.Fatal("unexpected output")
 	}
 }

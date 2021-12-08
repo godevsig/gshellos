@@ -314,7 +314,7 @@ func addListCmd() {
 		}
 		selfID, _ := getSelfID()
 
-		c := as.NewClient(opts...)
+		c := as.NewClient(opts...).SetDiscoverTimeout(0)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
 		if conn == nil {
 			return as.ErrServiceNotFound(as.BuiltinPublisher, as.SrvServiceLister)
@@ -710,7 +710,7 @@ func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
 		{"stop", "[options] [GRE IDs ...|names ...]", "Call `func Stop()` to stop one or more GREs on local/remote system"},
 		{"rm", "[options] [GRE IDs ...|names ...]", "Remove one or more stopped GREs on local/remote system"},
-		{"restart", "[options] [GRE IDs ...|names ...]", "Restart one or more stopped GREs on local/remote system"},
+		{"start", "[options] [GRE IDs ...|names ...]", "Start one or more stopped GREs on local/remote system"},
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
@@ -736,8 +736,8 @@ func addPatternCmds() {
 				info = "stopped"
 			case "rm":
 				info = "removed"
-			case "restart":
-				info = "restarted"
+			case "start":
+				info = "started"
 			}
 			var sb strings.Builder
 			for _, ggi := range greids {

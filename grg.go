@@ -268,7 +268,7 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 				grg.rmGRE(gc)
 				ids = append(ids, gc.ID)
 			}
-		case "restart":
+		case "start":
 			if gc.stat == greStatExited {
 				gc.stdin = null{}
 				logFile, err := os.Create(gc.outputFile)
