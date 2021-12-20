@@ -4,7 +4,7 @@ PKG_ALL = $(shell go list ./...)
 GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
 COMMIT_REV = $(shell git rev-parse HEAD)
 STDTAGS := stdbase,stdcommon,stdruntime
-EXTTAGS := adaptiveservice,shell,log
+EXTTAGS := adaptiveservice,shell,log,pidinfo,asbench
 
 all: format lint vet test build
 
@@ -49,9 +49,10 @@ build: dep
 	@go build -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
 lite: LDFLAGS += -s -w
+lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build lite release binary to bin dir
 
-full: EXTTAGS := debug,$(EXTTAGS)
+full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
 full: STDTAGS := $(STDTAGS),stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
 full: build ## Build full release binary to bin dir

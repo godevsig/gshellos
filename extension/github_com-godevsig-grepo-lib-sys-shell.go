@@ -12,6 +12,11 @@ import (
 func init() {
 	Symbols["github.com/godevsig/grepo/lib/sys/shell/shell"] = map[string]reflect.Value{
 		// function, constant and variable definitions
-		"Run": reflect.ValueOf(shell.Run),
+		"New":     reflect.ValueOf(shell.New),
+		"Run":     reflect.ValueOf(shell.Run),
+		"RunWith": reflect.ValueOf(shell.RunWith),
+
+		// type definitions
+		"Shell": reflect.ValueOf((*shell.Shell)(nil)),
 	}
 }
