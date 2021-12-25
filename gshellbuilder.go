@@ -864,7 +864,7 @@ func ShellMain() error {
   gshellos is a simple pure golang service framework for linux devices.
   One gshell daemon must have been started in the system to join the
 service network with an unique provider ID.
-  Each app/service is run in one dedicated GRE(Gshell Runtime Environment)
+  Each app/service runs in one dedicated GRE(Gshell Runtime Environment)
 which by default runs in a random GRG(Gshell Runtime Group). GREs can be
 grouped into one named GRG for better performance.
   gshell enters interactive mode if no options and no commands provided.

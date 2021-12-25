@@ -164,7 +164,7 @@ and a http file service should be running, this is done by starting a gshell app
 
 ```shell
 cd /path/to/gshell
-bin/gshell run app-http/fileserver/fileserver.go -dir /path/to/gshell/release
+bin/gshell run util/fileserver/cmd/fileserver.go -dir /path/contains/gshell/release
 ```
 
 ### Disable auto update
