@@ -5,10 +5,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
+
+	as "github.com/godevsig/adaptiveservice"
 )
 
 var (
@@ -105,4 +110,13 @@ func RunShCmd(cmd string) string {
 	}
 	output, _ := exec.Command("sh", fields...).CombinedOutput()
 	return string(output)
+}
+
+func init() {
+	as.RegisterType((*net.OpError)(nil))
+	as.RegisterType((*net.TCPAddr)(nil))
+	as.RegisterType((*os.SyscallError)(nil))
+	as.RegisterType(syscall.Errno(0))
+	as.RegisterType((*url.Error)(nil))
+	as.RegisterType((*exec.ExitError)(nil))
 }

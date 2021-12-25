@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -419,8 +418,6 @@ func init() {
 	as.RegisterType(cmdInfo{})
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType(getFileContent{})
-	as.RegisterType((*url.Error)(nil))
-	as.RegisterType((*exec.ExitError)(nil))
 	as.RegisterType(tryUpdate{})
 	as.RegisterType((*gshellBin)(nil))
 }
