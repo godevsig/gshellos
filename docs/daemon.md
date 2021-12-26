@@ -53,6 +53,14 @@ $ mkdir -p gshell/bin
 # copy gshell binary to gshell/bin
 ```
 
+Or use the official github gshell binary:
+
+```shell
+$ mkdir -p gshell/bin
+$ wget https://github.com/godevsig/gshellos/releases/latest/download/gshell.amd64 -O bin/gshell
+$ chmod +x bin/gshell
+```
+
 See help first:
 
 ```shell
@@ -131,8 +139,10 @@ bin/gshell info || bin/gshell -loglevel info daemon -registry 10.10.10.10:11985 
 - bcast: LAN broadcast port, enables scope LAN
 
 ## Example: deploy standalone gshell daemon
+
 If you decide to deploy gshell daemon on your Linux PC or inside a VM or a docker container only
 in standalone mode, use below commands:
+
 ```
 # in gshell work dir
 cd /path/to/gshell
@@ -143,8 +153,10 @@ bin/gshell daemon &
 ```
 
 ## Example: deploy gshell daemon in scope LAN
+
 Adding `-bcast port` on starting gshell daemon then makes this daemon and all the services under
 it scope LAN visible to the other gshell systems that also started with the same broadcast port:
+
 ```
 # in gshell work dir
 cd /path/to/gshell
@@ -162,9 +174,42 @@ gshell daemon will be still running in background.
 To be able to get auto update working, gshell root regitstry should be started with `-update` option,
 and a http file service should be running, this is done by starting a gshell app:
 
+For example, to autoupdate gshell binary from official github repo, here we don't need to start our own http file server,
+we just use github download page:
+
+```
+bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update https://github.com/godevsig/gshellos/releases/latest/download/%s &
+```
+
+Another example is autoupdating from private http file server:
+
 ```shell
 cd /path/to/gshell
+# start root gshell daemon
+bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/%s &
+# start file server on the same node(10.10.10.10) of root gshell daemon
 bin/gshell run util/fileserver/cmd/fileserver.go -dir /path/contains/gshell/release
+```
+
+The file server should contain:
+
+```
+$ ls
+gshell.386  gshell.aarch64  gshell.amd64  gshell.arm64  gshell.i386  gshell.mips64  gshell.ppc  gshell.ppc64  gshell.x86_64  md5sum  rev
+
+$ cat md5sum
+94530ecb0cc832039cb47011469038fc  bin/gshell.386
+f8923dfb13a049c7747161e54768bddf  bin/gshell.aarch64
+13209e10228da7c65d0c1bd93543624a  bin/gshell.amd64
+f8923dfb13a049c7747161e54768bddf  bin/gshell.arm64
+94530ecb0cc832039cb47011469038fc  bin/gshell.i386
+e8e7693e741c3388d9ae437627c82eb4  bin/gshell.mips64
+7f2645fe507859e1e3a35d603b3691d2  bin/gshell.ppc
+895ed26b51b98c1b2ef2df32df6aa7b1  bin/gshell.ppc64
+13209e10228da7c65d0c1bd93543624a  bin/gshell.x86_64
+
+$ cat rev
+957ca365d0ecd26846d15733203d3e3bfc4e9645
 ```
 
 ### Disable auto update
