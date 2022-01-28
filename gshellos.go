@@ -113,6 +113,7 @@ func RunShCmd(cmd string) string {
 }
 
 func init() {
+	as.RegisterType((*net.DNSError)(nil))
 	as.RegisterType((*net.OpError)(nil))
 	as.RegisterType((*net.TCPAddr)(nil))
 	as.RegisterType((*os.SyscallError)(nil))
