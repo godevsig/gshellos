@@ -188,6 +188,7 @@ func (msg *cmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 	connChan := c.Discover(godevsigPublisher, "grg-"+msg.GRGName)
 	for conn := range connChan {
 		var ggi *grgGREInfo
+		conn.SetRecvTimeout(time.Second)
 		if err := conn.SendRecv(&grgCmdQuery{msg.IDPattern}, &ggi); err != nil {
 			gd.lg.Warnf("cmdQuery: send recv error: %v", err)
 		}
