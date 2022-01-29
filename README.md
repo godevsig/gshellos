@@ -45,26 +45,20 @@ gshellos is a simple pure golang service framework for linux devices that provid
   - zero config, self discovered and managed network
   - auto reverse proxy for service behind NAT
 
-# Interpreted mode VS compiled mode
+# Architecture
 
-See [here](docs/interpreter.md)
+![gshell architecture](docs/gshellos_architecture.PNG)
 
-# Deploy gshell daemon
+# Docs
 
-See [here](docs/daemon.md)
+- [Interpreted mode VS compiled mode](docs/interpreter.md)
+- [Deploy gshell daemon](docs/daemon.md)
+- [Run go apps/services in GRE and GRG](docs/gregrg.md)
+- [Service and message](docs/adaptiveservice.md)
+- [Command line guide](docs/userguide.md)
+- [Debugging using interactive shell](docs/debugging.md)
 
-# Run go apps/services in GRE and GRG
+# See also
 
-See [here](docs/gregrg.md)
-
-# Service and message
-
-See [here](docs/adaptiveservice.md)
-
-# Command line guide
-
-See [here](docs/userguide.md)
-
-# Debugging using interactive shell
-
-See [here](docs/debugging.md)
+- [adaptiveservice](https://github.com/godevsig/adaptiveservice)
+- [grepo](https://github.com/godevsig/grepo)
