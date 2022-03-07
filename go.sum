@@ -4,8 +4,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/godevsig/adaptiveservice v0.9.16/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
-github.com/godevsig/adaptiveservice v0.9.17 h1:UY7rx6aDIYWDv4/krFn4jvaT7GBVuE+AdkKn2tfGZOc=
-github.com/godevsig/adaptiveservice v0.9.17/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
+github.com/godevsig/adaptiveservice v0.9.18 h1:3MomE8T6VRg5y+zA3h1fJfugzOaw+FfCQ1qyVnb7Qkw=
+github.com/godevsig/adaptiveservice v0.9.18/go.mod h1:t/MOA1DVvomK8ltOny8pbb8k1ZBYub6GvnTOs/M6Qkk=
 github.com/godevsig/go-echarts/v2 v2.0.0-20211101104447-e8e4a51bc4fd h1:NXoy9fdgrEi4dREtTBQMRl5naGeHpYldnqjh5rmZgJk=
 github.com/godevsig/go-echarts/v2 v2.0.0-20211101104447-e8e4a51bc4fd/go.mod h1:6TOomEztzGDVDkOSCFBq3ed7xOYfbOqhaBzD0YV771A=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177 h1:Ga+4dO0xF4ejuZfKnHfEA/bqlNUc2XKNjpopVDhMjLM=
