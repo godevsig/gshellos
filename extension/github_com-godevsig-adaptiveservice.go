@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"net"
 	"reflect"
+	"time"
 )
 
 func init() {
@@ -17,6 +18,7 @@ func init() {
 		// function, constant and variable definitions
 		"BuiltinPublisher":       reflect.ValueOf(constant.MakeFromLiteral("\"builtin\"", token.STRING, 0)),
 		"ErrConnReset":           reflect.ValueOf(&adaptiveservice.ErrConnReset).Elem(),
+		"ErrRecvTimeout":         reflect.ValueOf(&adaptiveservice.ErrRecvTimeout).Elem(),
 		"ErrServerClosed":        reflect.ValueOf(&adaptiveservice.ErrServerClosed).Elem(),
 		"ErrServiceNotFound":     reflect.ValueOf(adaptiveservice.ErrServiceNotFound),
 		"ErrServiceNotReachable": reflect.ValueOf(&adaptiveservice.ErrServiceNotReachable).Elem(),
@@ -83,13 +85,14 @@ func init() {
 
 // _github_com_godevsig_adaptiveservice_Connection is an interface wrapper for Connection type
 type _github_com_godevsig_adaptiveservice_Connection struct {
-	IValue      interface{}
-	WClose      func()
-	WGetNetconn func() adaptiveservice.Netconn
-	WNewStream  func() adaptiveservice.Stream
-	WRecv       func(msgPtr interface{}) error
-	WSend       func(msg interface{}) error
-	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) error
+	IValue          interface{}
+	WClose          func()
+	WGetNetconn     func() adaptiveservice.Netconn
+	WNewStream      func() adaptiveservice.Stream
+	WRecv           func(msgPtr interface{}) error
+	WSend           func(msg interface{}) error
+	WSendRecv       func(msgSnd interface{}, msgRcvPtr interface{}) error
+	WSetRecvTimeout func(d time.Duration)
 }
 
 func (W _github_com_godevsig_adaptiveservice_Connection) Close() {
@@ -109,6 +112,9 @@ func (W _github_com_godevsig_adaptiveservice_Connection) Send(msg interface{}) e
 }
 func (W _github_com_godevsig_adaptiveservice_Connection) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) error {
 	return W.WSendRecv(msgSnd, msgRcvPtr)
+}
+func (W _github_com_godevsig_adaptiveservice_Connection) SetRecvTimeout(d time.Duration) {
+	W.WSetRecvTimeout(d)
 }
 
 // _github_com_godevsig_adaptiveservice_Context is an interface wrapper for Context type
@@ -135,15 +141,16 @@ func (W _github_com_godevsig_adaptiveservice_Context) SetContext(v interface{}) 
 
 // _github_com_godevsig_adaptiveservice_ContextStream is an interface wrapper for ContextStream type
 type _github_com_godevsig_adaptiveservice_ContextStream struct {
-	IValue      interface{}
-	WGetContext func() interface{}
-	WGetNetconn func() adaptiveservice.Netconn
-	WGetVar     func(v interface{})
-	WPutVar     func(v interface{})
-	WRecv       func(msgPtr interface{}) error
-	WSend       func(msg interface{}) error
-	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) error
-	WSetContext func(v interface{})
+	IValue          interface{}
+	WGetContext     func() interface{}
+	WGetNetconn     func() adaptiveservice.Netconn
+	WGetVar         func(v interface{})
+	WPutVar         func(v interface{})
+	WRecv           func(msgPtr interface{}) error
+	WSend           func(msg interface{}) error
+	WSendRecv       func(msgSnd interface{}, msgRcvPtr interface{}) error
+	WSetContext     func(v interface{})
+	WSetRecvTimeout func(d time.Duration)
 }
 
 func (W _github_com_godevsig_adaptiveservice_ContextStream) GetContext() interface{} {
@@ -169,6 +176,9 @@ func (W _github_com_godevsig_adaptiveservice_ContextStream) SendRecv(msgSnd inte
 }
 func (W _github_com_godevsig_adaptiveservice_ContextStream) SetContext(v interface{}) {
 	W.WSetContext(v)
+}
+func (W _github_com_godevsig_adaptiveservice_ContextStream) SetRecvTimeout(d time.Duration) {
+	W.WSetRecvTimeout(d)
 }
 
 // _github_com_godevsig_adaptiveservice_HighPriorityMessage is an interface wrapper for HighPriorityMessage type
@@ -251,11 +261,12 @@ func (W _github_com_godevsig_adaptiveservice_Netconn) RemoteAddr() net.Addr {
 
 // _github_com_godevsig_adaptiveservice_Stream is an interface wrapper for Stream type
 type _github_com_godevsig_adaptiveservice_Stream struct {
-	IValue      interface{}
-	WGetNetconn func() adaptiveservice.Netconn
-	WRecv       func(msgPtr interface{}) error
-	WSend       func(msg interface{}) error
-	WSendRecv   func(msgSnd interface{}, msgRcvPtr interface{}) error
+	IValue          interface{}
+	WGetNetconn     func() adaptiveservice.Netconn
+	WRecv           func(msgPtr interface{}) error
+	WSend           func(msg interface{}) error
+	WSendRecv       func(msgSnd interface{}, msgRcvPtr interface{}) error
+	WSetRecvTimeout func(d time.Duration)
 }
 
 func (W _github_com_godevsig_adaptiveservice_Stream) GetNetconn() adaptiveservice.Netconn {
@@ -269,4 +280,7 @@ func (W _github_com_godevsig_adaptiveservice_Stream) Send(msg interface{}) error
 }
 func (W _github_com_godevsig_adaptiveservice_Stream) SendRecv(msgSnd interface{}, msgRcvPtr interface{}) error {
 	return W.WSendRecv(msgSnd, msgRcvPtr)
+}
+func (W _github_com_godevsig_adaptiveservice_Stream) SetRecvTimeout(d time.Duration) {
+	W.WSetRecvTimeout(d)
 }
