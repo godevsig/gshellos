@@ -111,6 +111,7 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 		connChan := c.Discover(godevsigPublisher, "grg-"+grg+"."+grgVer)
 		for conn := range connChan {
 			var pInfo processInfo
+			conn.SetRecvTimeout(time.Second)
 			if err := conn.SendRecv(getProcessInfo{}, &pInfo); err != nil {
 				gd.lg.Warnf("get info for %s failed: %v", grg, err)
 			}
@@ -225,6 +226,7 @@ func (msg *cmdPatternAction) Handle(stream as.ContextStream) (reply interface{})
 	connChan := c.Discover(godevsigPublisher, "grg-"+msg.GRGName)
 	for conn := range connChan {
 		var greids []string
+		conn.SetRecvTimeout(time.Second)
 		if err := conn.SendRecv(&grgCmdPatternAction{msg.IDPattern, msg.Cmd}, &greids); err != nil {
 			gd.lg.Warnf("cmdPatternAction: send recv error: %v", err)
 		}
