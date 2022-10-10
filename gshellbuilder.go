@@ -160,7 +160,7 @@ func addDeamonCmd() {
 		}
 		s := as.NewServer(opts...).
 			SetPublisher(godevsigPublisher).
-			SetScaleFactors(4, 32).
+			SetScaleFactors(4, 0, 0).
 			EnableServiceLister()
 		defer s.Close()
 
