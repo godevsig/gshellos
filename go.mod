@@ -3,8 +3,8 @@ module github.com/godevsig/gshellos
 go 1.16
 
 require (
-	github.com/godevsig/adaptiveservice v0.9.24-0.20221009024351-f0cc63096d9e
-	github.com/godevsig/grepo v0.2.2-0.20221010150444-df1f983f673e
+	github.com/godevsig/adaptiveservice v0.9.24-0.20230329141516-d104c403854d
+	github.com/godevsig/grepo v0.2.2-0.20230329153956-e42313fb6947
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/traefik/yaegi v0.13.0
 )
