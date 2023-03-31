@@ -274,10 +274,14 @@ func TestCmdRun(t *testing.T) {
 }
 
 func TestCmdRunRT(t *testing.T) {
-	out, _ := gshellRunCmd("run -group testrt -rt 50 testdata/hello.go")
+	out, err := gshellRunCmd("run -group testrt -rt 50 testdata/hello.go")
 	t.Logf("\n%s", out)
-
-	if !strings.Contains(out, "Operation not permitted") {
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := strings.TrimSpace(out)
+	out, _ = gshellRunCmdTimeout("log "+id, 1)
+	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")
 	}
 }

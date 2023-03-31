@@ -48,46 +48,58 @@ func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as
 		return nil, fmt.Errorf("running GRG version %s not found", grgVer)
 	}
 
+	runGrg := func(exe, args string) error {
+		cmd := exec.Command(exe, strings.Split(args, " ")...)
+		cmd.Env = append(os.Environ(), fmt.Sprintf("GOMAXPROCS=%d", maxprocs))
+		buf := &bytes.Buffer{}
+		cmd.Stdout = buf
+		cmd.Stderr = buf
+		gd.lg.Debugln("starting grg:", cmd.String())
+
+		err := cmd.Start()
+		if err != nil {
+			gd.lg.Errorf("start cmd %s failed: %w", cmd.String(), err)
+			return err
+		}
+		errorChan := make(chan error, 1)
+		time.AfterFunc(time.Millisecond*500, func() { errorChan <- nil })
+		go func() {
+			cmderr := cmd.Wait()
+			if cmderr != nil {
+				errorChan <- errors.New(buf.String())
+				gd.lg.Warnf("cmd: %s exited with error: %v, output: %v", cmd.String(), cmderr, buf.String())
+			} else {
+				gd.lg.Infof("cmd: %s exited, output: %v", cmd.String(), buf.String())
+			}
+		}()
+		// wait a while to see if cmd returns error
+		return <-errorChan
+	}
+
 	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + name
 	if os.Args[0] == "gshell.tester" {
 		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + name + genID(3) + ".cov -- " + args
 	}
 	exe := os.Args[0]
-	if len(rtPriority) != 0 {
-		args = rtPriority + " " + exe + " " + args
-		exe = "chrt"
-	}
-	cmd := exec.Command(exe, strings.Split(args, " ")...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("GOMAXPROCS=%d", maxprocs))
-	buf := &bytes.Buffer{}
-	cmd.Stdout = buf
-	cmd.Stderr = buf
-	gd.lg.Debugln("starting grg:", cmd.String())
 
-	err := cmd.Start()
-	if err != nil {
-		gd.lg.Errorf("start cmd %s failed: %w", cmd.String(), err)
-		return nil, err
-	}
-	go func() {
-		cmderr := cmd.Wait()
-		if cmderr != nil {
-			err = errors.New(buf.String())
-			gd.lg.Errorf("cmd: %s exited with error: %v, output: %v", cmd.String(), cmderr, buf.String())
-		} else {
-			gd.lg.Infof("cmd: %s exited, output: %v", cmd.String(), buf.String())
+	if len(rtPriority) != 0 {
+		if err := runGrg("chrt", rtPriority+" "+exe+" "+args); err != nil {
+			if err := runGrg(exe, args); err != nil {
+				return nil, err
+			}
 		}
-	}()
+	} else {
+		if err := runGrg(exe, args); err != nil {
+			return nil, err
+		}
+	}
 
 	c.SetDiscoverTimeout(3)
 	conn = <-c.Discover(godevsigPublisher, "grg-"+name)
 	if conn != nil {
 		return conn, nil
 	}
-	if err == nil {
-		err = ErrBrokenGRG
-	}
-	return nil, err
+	return nil, ErrBrokenGRG
 }
 
 type cmdKill struct {

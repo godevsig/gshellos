@@ -541,7 +541,7 @@ func addRunCmd() {
 	maxprocs := cmd.Int("maxprocs", -1, "set GOMAXPROCS variable")
 	grgVer := cmd.String("ver", "", "specify the running GRG version, default to target daemon version")
 	rtPriority := cmd.String("rt", "", `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
-Caution: gshell daemon must be started as root to set realtime attributes`)
+silently ignore errors if real-time priority can not be set`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
 	autoRemove := cmd.Bool("rm", false, "automatically remove the GRE when it exits")
 
