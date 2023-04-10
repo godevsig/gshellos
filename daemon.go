@@ -7,7 +7,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -20,13 +22,56 @@ type daemon struct {
 	lg *log.Logger
 }
 
+// some grg processes were killed by oom or unexpected operations,
+// grgRestarter restarts those killed grg.
+func (gd *daemon) grgRestarter() {
+	for {
+		time.Sleep(time.Second)
+		files, err := filepath.Glob(workDir + "/status" + "/grg-*")
+		if err != nil {
+			gd.lg.Warnln(err)
+			continue
+		}
+		for _, file := range files {
+			func() {
+				f, err := os.Open(file)
+				if err != nil {
+					gd.lg.Warnln(err)
+					return
+				}
+				defer f.Close()
+				err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+				if err != nil {
+					gd.lg.Debugf("grg status file %s locked, grg running", file)
+					return
+				}
+				gd.lg.Infof("grg status file %s unlocked, grg died abnormally", file)
+				syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+				strs := strings.Split(filepath.Base(file), "-")
+				if len(strs) != 3 {
+					gd.lg.Warnf("grg file name format incompatible: %v", strs)
+					return
+				}
+				grgName := strs[1]
+				maxprocs, _ := strconv.Atoi(strs[2])
+				conn, err := gd.setupgrg(grgName, "", maxprocs)
+				if err != nil {
+					gd.lg.Errorf("restart grg %s failed with error: %v", grgName, err)
+					return
+				}
+				conn.Close()
+			}()
+		}
+	}
+}
+
 func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as.Connection, error) {
-	if len(grgVer) == 0 {
-		grgVer = version
+func (gd *daemon) setupgrg(grgName, rtPriority string, maxprocs int) (as.Connection, error) {
+	if !strings.Contains(grgName, "-") {
+		grgName = grgName + "-" + version
 	}
 
 	daemonMaxprocs := runtime.GOMAXPROCS(-1)
@@ -34,17 +79,17 @@ func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as
 		maxprocs = daemonMaxprocs
 	}
 
-	name := grgName + "." + grgVer
 	opts := []as.Option{
 		as.WithLogger(gd.lg),
 		as.WithScope(as.ScopeOS),
 	}
 	c := as.NewClient(opts...).SetDiscoverTimeout(0)
-	conn := <-c.Discover(godevsigPublisher, "grg-"+name)
+	conn := <-c.Discover(godevsigPublisher, "grg-"+grgName)
 	if conn != nil {
 		return conn, nil
 	}
-	if grgVer != version {
+
+	if grgVer := strings.Split(grgName, "-")[1]; grgVer != version {
 		return nil, fmt.Errorf("running GRG version %s not found", grgVer)
 	}
 
@@ -76,9 +121,9 @@ func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as
 		return <-errorChan
 	}
 
-	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + name
+	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + grgName
 	if os.Args[0] == "gshell.tester" {
-		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + name + genID(3) + ".cov -- " + args
+		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + grgName + genID(3) + ".cov -- " + args
 	}
 	exe := os.Args[0]
 
@@ -95,7 +140,7 @@ func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as
 	}
 
 	c.SetDiscoverTimeout(3)
-	conn = <-c.Discover(godevsigPublisher, "grg-"+name)
+	conn = <-c.Discover(godevsigPublisher, "grg-"+grgName)
 	if conn != nil {
 		return conn, nil
 	}
@@ -104,7 +149,6 @@ func (gd *daemon) setupgrg(grgName, grgVer, rtPriority string, maxprocs int) (as
 
 type cmdKill struct {
 	GRGNames []string
-	GRGVer   string
 	Force    bool
 }
 
@@ -112,31 +156,32 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdKill: %v", msg)
 
-	grgVer := msg.GRGVer
-	if len(grgVer) == 0 {
-		grgVer = version
-	}
-
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var b strings.Builder
 	for _, grg := range msg.GRGNames {
-		connChan := c.Discover(godevsigPublisher, "grg-"+grg+"."+grgVer)
+		connChan := c.Discover(godevsigPublisher, "grg-"+grg)
 		for conn := range connChan {
-			var pInfo processInfo
-			conn.SetRecvTimeout(time.Second)
-			if err := conn.SendRecv(getProcessInfo{}, &pInfo); err != nil {
-				gd.lg.Warnf("get info for %s failed: %v", grg, err)
-			}
-			if pInfo.pid != 0 && (pInfo.runningCnt == 0 || msg.Force) {
-				if process, err := os.FindProcess(pInfo.pid); err != nil {
-					gd.lg.Warnf("pid of %s not found: %v", pInfo.grgName, err)
-				} else if err := process.Signal(syscall.SIGINT); err != nil {
-					gd.lg.Warnf("kill %s failed: %v", pInfo.grgName, err)
-				} else {
-					fmt.Fprintf(&b, "%s ", pInfo.grgName)
+			func() {
+				defer conn.Close()
+				conn.SetRecvTimeout(time.Second)
+				var pInfo processInfo
+				if err := conn.SendRecv(grgCmdKill{}, &pInfo); err != nil {
+					gd.lg.Warnf("grgCmdKill for %s failed: %v", grg, err)
+					return
 				}
-			}
-			conn.Close()
+				if !pInfo.killed && msg.Force && pInfo.pid != 0 {
+					process, err := os.FindProcess(pInfo.pid)
+					if err != nil {
+						gd.lg.Warnf("pid of %s not found: %v", pInfo.grgName, err)
+						return
+					}
+					if err := process.Signal(syscall.SIGTERM); err != nil {
+						gd.lg.Warnf("kill %s failed: %v", pInfo.grgName, err)
+						return
+					}
+				}
+				fmt.Fprintf(&b, "%s ", pInfo.grgName)
+			}()
 		}
 	}
 	if len(b.String()) == 0 {
@@ -149,7 +194,6 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 type cmdRun struct {
 	grgCmdRun
 	GRGName    string
-	GRGVer     string
 	RtPriority string
 	Maxprocs   int
 }
@@ -158,7 +202,7 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
 
-	conn, err := gd.setupgrg(msg.GRGName, msg.GRGVer, msg.RtPriority, msg.Maxprocs)
+	conn, err := gd.setupgrg(msg.GRGName, msg.RtPriority, msg.Maxprocs)
 	if err != nil {
 		return err
 	}

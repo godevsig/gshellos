@@ -293,6 +293,7 @@ func addDeamonCmd() {
 			go debugService(lg)
 		}
 
+		go gd.grgRestarter()
 		err := s.Serve()
 		if updateChan != nil {
 			<-updateChan
@@ -422,24 +423,53 @@ func addStartCmd() {
 		if len(*grgName) == 0 {
 			return errors.New("no GRG name, see --help")
 		}
+		grgNameVer := *grgName
+		grgName := strings.Split(grgNameVer, "-")[0]
 
 		logStream := log.NewStream("grg")
 		logStream.SetOutput("file:" + workDir + "/logs/grg.log")
-		lg := newLogger(logStream, "grg-"+*grgName)
+		lg := newLogger(logStream, "grg-"+grgNameVer)
 		opts := []as.Option{
 			as.WithScope(as.ScopeOS),
 			as.WithLogger(lg),
 		}
 
+		var serverErr error
+
+		grgStatFile := workDir + "/status/grg-" + grgName + "-" + os.Getenv("GOMAXPROCS")
+		defer func() {
+			// remove the file only if no errors
+			if serverErr == nil {
+				os.Remove(grgStatFile)
+			}
+		}()
+		f, err := os.OpenFile(grgStatFile, os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+			return err
+		}
+		lg.Debugf("status file %s locked", grgStatFile)
+		defer func() {
+			syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+			lg.Debugf("status file %s unlocked", grgStatFile)
+		}()
+
 		s := as.NewServer(opts...).SetPublisher(godevsigPublisher)
 		grg := &grg{
-			server: s,
-			name:   *grgName,
-			lg:     lg,
-			gres:   make(map[string]*greCtl),
+			server:     s,
+			name:       grgNameVer,
+			lg:         lg,
+			statusFile: f,
+			gres:       make(map[string]*greCtl),
+		}
+		if err := grg.loadGREs(); err != nil {
+			return err
 		}
 
-		if err := s.Publish("grg-"+*grgName,
+		if err := s.Publish("grg-"+grgNameVer,
 			grgKnownMsgs,
 			as.OnNewStreamFunc(grg.onNewStream),
 		); err != nil {
@@ -448,7 +478,9 @@ func addStartCmd() {
 		if debugService != nil {
 			go debugService(lg)
 		}
-		return s.Serve()
+
+		serverErr = s.Serve()
+		return serverErr
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }
@@ -490,9 +522,12 @@ func addRepoCmd() {
 }
 
 func addKillCmd() {
-	cmd := flag.NewFlagSet(newCmd("kill", "[options] names ...", "Terminate the named GRG(s) on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("kill",
+		"[options] names ...",
+		"Terminate the named GRG(s) on local/remote system",
+		"wildcard(*) is supported"),
+		flag.ExitOnError)
 	force := cmd.Bool("f", false, "force terminate even if there are still running GREs")
-	grgVer := cmd.String("ver", "", "specify the running GRG version, default to target daemon version")
 
 	action := func() error {
 		args := cmd.Args()
@@ -509,7 +544,6 @@ func addKillCmd() {
 
 		cmd := cmdKill{
 			GRGNames: args,
-			GRGVer:   *grgVer,
 			Force:    *force,
 		}
 		var reply string
@@ -534,16 +568,19 @@ func randStringRunes(n int) string {
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <file.go> [args...]",
-		"Look for file.go in local file system or else in `gshell repo`,",
+		"Look for file.go in local file system or else in `gshell repo`",
 		"run it in a new GRE in specified GRG on local/remote system"),
 		flag.ExitOnError)
-	grgName := cmd.String("group", "<random>", "create new or use existing GRG")
+	grgName := cmd.String("group", "", `name of the GRG in the form name-version
+random group name will be used if no name specified
+target daemon version will be used if no version specified`)
 	maxprocs := cmd.Int("maxprocs", -1, "set GOMAXPROCS variable")
-	grgVer := cmd.String("ver", "", "specify the running GRG version, default to target daemon version")
 	rtPriority := cmd.String("rt", "", `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
 silently ignore errors if real-time priority can not be set`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
-	autoRemove := cmd.Bool("rm", false, "automatically remove the GRE when it exits")
+	autoRemove := cmd.Bool("rm", false, "auto-remove the GRE when it exits")
+	autoRestart := cmd.Uint("restart", 0, `auto-restart the GRE on failure for at most specified times
+only applicable for non-interactive mode`)
 
 	action := func() error {
 		args := cmd.Args()
@@ -551,11 +588,16 @@ silently ignore errors if real-time priority can not be set`)
 			return errors.New("no file provided, see --help")
 		}
 		grg := *grgName
-		if strings.Contains(grg, "*") {
-			return errors.New("wrong use of wildcard(*), see --help")
-		}
-		if len(grg) == 0 || grg == "<random>" {
+
+		if len(grg) == 0 {
 			grg = randStringRunes(6)
+		} else {
+			if strings.Contains(grg, "*") {
+				return errors.New("wrong use of wildcard(*), see --help")
+			}
+			if strings.Count(grg, "-") > 1 {
+				return errors.New("wrong group format, see --help")
+			}
 		}
 		if len(*rtPriority) != 0 {
 			pri, err := strconv.Atoi(*rtPriority)
@@ -586,16 +628,20 @@ silently ignore errors if real-time priority can not be set`)
 			}
 		}
 
+		if *interactive {
+			*autoRestart = 0
+		}
+
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
-				File:        file,
-				Args:        args,
-				Interactive: *interactive,
-				AutoRemove:  *autoRemove,
-				ByteCode:    rmShebang(byteCode),
+				File:           file,
+				Args:           args,
+				Interactive:    *interactive,
+				AutoRemove:     *autoRemove,
+				ByteCode:       rmShebang(byteCode),
+				AutoRestartMax: *autoRestart,
 			},
 			GRGName:    grg,
-			GRGVer:     *grgVer,
 			RtPriority: *rtPriority,
 			Maxprocs:   *maxprocs,
 		}
@@ -647,21 +693,15 @@ func addPsCmd() {
 			return err
 		}
 
-		groupName := func(nameVersion string) string {
-			return strings.Replace(nameVersion, ".", " ", 1)
-		}
-
 		if len(msg.IDPattern) != 0 { // info
 			for _, ggi := range ggis {
 				for _, grei := range ggi.GREInfos {
 					fmt.Println("GRE ID    :", grei.ID)
-					fmt.Println("IN GROUP  :", groupName(ggi.Name))
+					fmt.Println("IN GROUP  :", ggi.Name)
 					fmt.Println("NAME      :", grei.Name)
 					fmt.Println("ARGS      :", grei.Args)
 					fmt.Println("STATUS    :", grei.Stat)
-					if grei.RestartedNum != 0 {
-						fmt.Println("RESTARTED :", grei.RestartedNum)
-					}
+					fmt.Println("RESTARTED :", grei.RestartedNum)
 					startTime := ""
 					if !grei.StartTime.IsZero() {
 						startTime = fmt.Sprint(grei.StartTime)
@@ -698,7 +738,7 @@ func addPsCmd() {
 					d := grei.EndTime.Sub(grei.StartTime)
 					stat = fmt.Sprintf("%-10s %v", stat, d)
 
-					fmt.Printf("%s  %-18s  %-18s  %s  %s\n", grei.ID, trimName(groupName(ggi.Name)), trimName(grei.Name), created, stat)
+					fmt.Printf("%s  %-18s  %-18s  %s  %s\n", grei.ID, trimName(ggi.Name), trimName(grei.Name), created, stat)
 				}
 			}
 		}
@@ -882,6 +922,9 @@ grouped into one named GRG for better performance.
 	default:
 		flag.Parse()
 		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
+			panic(err)
+		}
+		if err := os.MkdirAll(workDir+"/status", 0755); err != nil {
 			panic(err)
 		}
 		args := flag.Args()

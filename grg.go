@@ -2,7 +2,7 @@ package gshellos
 
 import (
 	"context"
-	"errors"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"os"
@@ -19,11 +19,12 @@ import (
 
 type grg struct {
 	sync.RWMutex
-	server *as.Server
-	name   string
-	lg     *log.Logger
-	greids []string // keep the order
-	gres   map[string]*greCtl
+	server     *as.Server
+	name       string
+	lg         *log.Logger
+	statusFile *os.File
+	greids     []string // keep the order
+	gres       map[string]*greCtl
 }
 
 func (grg *grg) onNewStream(ctx as.Context) {
@@ -32,11 +33,77 @@ func (grg *grg) onNewStream(ctx as.Context) {
 
 const greIDWidth = 6
 
+func (grg *grg) loadGREs() error {
+	buf, err := io.ReadAll(grg.statusFile)
+	if err != nil {
+		return err
+	}
+	greidsStr := string(buf)
+	greidsStr = strings.TrimPrefix(greidsStr, "[")
+	greidsStr = strings.TrimSuffix(greidsStr, "]")
+	greids := strings.Split(greidsStr, " ")
+
+	for _, greid := range greids {
+		func() {
+			if len(greid) == 0 {
+				return
+			}
+			statDir := workDir + "/status/" + greid
+			fgi, err := os.Open(statDir + "/greInfo")
+			if err != nil {
+				grg.lg.Warnln(err)
+				return
+			}
+			defer fgi.Close()
+			gi := &greInfo{}
+			if err := gob.NewDecoder(fgi).Decode(gi); err != nil {
+				grg.lg.Warnf("decode greInfo for %s failed", greid)
+				return
+			}
+			frm, err := os.Open(statDir + "/runMsg")
+			if err != nil {
+				grg.lg.Warnln(err)
+				return
+			}
+			defer frm.Close()
+			runMsg := &grgCmdRun{}
+			if err := gob.NewDecoder(frm).Decode(runMsg); err != nil {
+				grg.lg.Warnf("decode runMsg for %s failed", greid)
+				return
+			}
+			gc, err := grg.newGRE(gi, runMsg)
+			if err != nil {
+				grg.lg.Errorln(err)
+				return
+			}
+			grg.addGRE(gc)
+
+			switch gi.Stat {
+			case "starting", "running":
+				go grg.runGRE(gc)
+				grg.lg.Infof("gre %s restarted", greid)
+			case "aborting", "exited":
+				fallthrough
+			default:
+				grg.lg.Infof("gre %s not restarted with status %s", greid, gi.Stat)
+			}
+		}()
+	}
+	return nil
+}
+
+func (grg *grg) updateStatFile() {
+	grg.statusFile.Truncate(0)
+	grg.statusFile.Seek(0, 0)
+	fmt.Fprint(grg.statusFile, grg.greids)
+}
+
 func (grg *grg) addGRE(gc *greCtl) {
 	grg.Lock()
 	grg.greids = append(grg.greids, gc.ID)
 	grg.gres[gc.ID] = gc
 	grg.Unlock()
+	grg.updateStatFile()
 	grg.lg.Debugln("gre " + gc.ID + " added")
 }
 
@@ -52,6 +119,8 @@ func (grg *grg) rmGRE(gc *greCtl) {
 	grg.greids = greids
 	grg.Unlock()
 	os.Remove(gc.outputFile)
+	os.RemoveAll(gc.statDir)
+	grg.updateStatFile()
 	grg.lg.Debugln("gre " + gc.ID + " removed")
 
 	grg.Lock()
@@ -76,19 +145,21 @@ var greStatString = []string{
 }
 
 type greInfo struct {
-	GREErr       string
-	Name         string
-	ID           string
-	Args         []string
-	Stat         string // starting running exited
-	StartTime    time.Time
-	EndTime      time.Time
-	RestartedNum int
+	GREErr             string
+	Name               string
+	ID                 string
+	Args               []string
+	Stat               string // starting running exited
+	StartTime          time.Time
+	EndTime            time.Time
+	RestartedNum       int
+	AutoRestartBalance uint // the remaining number of auto restart
 }
 
 type greCtl struct {
-	greInfo
+	*greInfo
 	cancel     context.CancelFunc
+	log        *os.File
 	stdin      io.Reader
 	stdout     io.Writer
 	stderr     strings.Builder
@@ -97,7 +168,105 @@ type greCtl struct {
 	greErr     error // returned error when GRE exits
 	runMsg     *grgCmdRun
 	outputFile string
+	statDir    string
 	sh         *shell
+}
+
+// gi is not nil when loading from file
+func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
+	gc := &greCtl{args: runMsg.Args, runMsg: runMsg}
+	gc.greInfo = gi
+	if gi == nil {
+		gc.greInfo = &greInfo{}
+		name := filepath.Base(runMsg.File)
+		gc.Name = strings.TrimSuffix(name, filepath.Ext(name))
+		gc.ID = genID(greIDWidth)
+		gc.greInfo.Args = runMsg.Args
+		gc.RestartedNum = -1
+		gc.AutoRestartBalance = runMsg.AutoRestartMax
+	}
+	gc.outputFile = workDir + "/logs/" + gc.ID
+	gc.statDir = workDir + "/status/" + gc.ID
+
+	if gi == nil {
+		if err := os.MkdirAll(gc.statDir, 0755); err != nil {
+			return nil, err
+		}
+		if err := gc.reset(); err != nil {
+			return nil, err
+		}
+		if err := gc.runMsgToFile(); err != nil {
+			return nil, err
+		}
+	}
+
+	return gc, nil
+}
+
+func (grg *grg) runGRE(gc *greCtl) {
+	for {
+		gc.runGRE()
+		if gc.AutoRestartBalance == 0 {
+			break
+		}
+		if err := gc.reset(); err != nil {
+			break
+		}
+	}
+	if gc.runMsg.AutoRemove {
+		grg.rmGRE(gc)
+	}
+}
+
+func (gc *greCtl) runMsgToFile() error {
+	f, err := os.Create(gc.statDir + "/runMsg")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(f)
+	if err := enc.Encode(gc.runMsg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (gc *greCtl) greInfoToFile() error {
+	f, err := os.Create(gc.statDir + "/greInfo")
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	enc := gob.NewEncoder(f)
+	if err := enc.Encode(gc.greInfo); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (gc *greCtl) changeStat(newStat int32) {
+	atomic.StoreInt32(&gc.stat, newStat)
+	gc.Stat = greStatString[gc.stat]
+}
+
+func (gc *greCtl) changeStatIf(oldStat, newStat int32) {
+	if atomic.CompareAndSwapInt32(&gc.stat, oldStat, newStat) {
+		gc.Stat = greStatString[gc.stat]
+	}
+}
+
+func (gc *greCtl) reset() error {
+	gc.changeStat(greStatStarting)
+	output, err := os.OpenFile(gc.outputFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return fmt.Errorf("GRE output file not created: %v", err)
+	}
+	gc.log = output
+	gc.stdin = nullIO{}
+	gc.stdout = output
+	return nil
 }
 
 func (gc *greCtl) newShell() error {
@@ -120,11 +289,13 @@ func (gc *greCtl) runGRE() {
 	defer cancel()
 	gc.cancel = cancel
 
-	atomic.StoreInt32(&gc.stat, greStatRunning)
 	gc.StartTime = time.Now()
 	gc.greErr = nil
 	gc.GREErr = ""
 	gc.EndTime = time.Time{}
+
+	gc.changeStat(greStatRunning)
+	gc.greInfoToFile()
 
 	if err := gc.newShell(); err != nil {
 		fmt.Fprintln(&gc.stderr, err)
@@ -138,11 +309,21 @@ func (gc *greCtl) runGRE() {
 	}
 
 	gc.EndTime = time.Now()
-	if len(gc.stderr.String()) != 0 {
-		gc.greErr = fmt.Errorf("%s", gc.stderr.String())
-		gc.GREErr = gc.stderr.String()
+	stderrStr := gc.stderr.String()
+	if len(stderrStr) != 0 {
+		gc.greErr = fmt.Errorf("%s", stderrStr)
+		gc.GREErr = stderrStr
 	}
-	atomic.StoreInt32(&gc.stat, greStatExited)
+	gc.log.Close()
+	gc.RestartedNum++
+	if gc.greErr == nil {
+		gc.AutoRestartBalance = 0
+	}
+	if gc.AutoRestartBalance > 0 {
+		gc.AutoRestartBalance--
+	}
+	gc.changeStat(greStatExited)
+	gc.greInfoToFile()
 }
 
 type grgGREInfo struct {
@@ -151,57 +332,39 @@ type grgGREInfo struct {
 }
 
 type grgCmdRun struct {
-	File        string
-	Args        []string
-	Interactive bool
-	AutoRemove  bool
-	ByteCode    []byte
+	File           string
+	Args           []string
+	Interactive    bool
+	AutoRemove     bool
+	ByteCode       []byte
+	AutoRestartMax uint // user defined max auto restart count
 }
 
 func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	grg := stream.GetContext().(*grg)
 	grg.lg.Debugf("grgCmdRun: file: %v, args: %v, interactive: %v\n", msg.File, msg.Args, msg.Interactive)
 
-	name := filepath.Base(msg.File)
-	gc := &greCtl{args: msg.Args, runMsg: msg}
-	gc.Name = strings.TrimSuffix(name, filepath.Ext(name))
-	gc.ID = genID(greIDWidth)
-	gc.greInfo.Args = msg.Args
-	atomic.StoreInt32(&gc.stat, greStatStarting)
-
-	gc.outputFile = workDir + "/logs/" + gc.ID
-	output, err := os.Create(gc.outputFile)
+	gc, err := grg.newGRE(nil, msg)
 	if err != nil {
-		grg.lg.Errorln("grgCmdRun: create output file error:", err)
-		return errors.New("output file not created")
+		grg.lg.Errorln(err)
+		return err
 	}
 	grg.addGRE(gc)
 
 	if msg.Interactive {
 		grg.lg.Debugln("grgCmdRun: interactive")
-		defer output.Close()
 		clientIO := as.NewStreamIO(stream)
+		defer clientIO.Close()
 		gc.stdin = clientIO
-		gc.stdout = multiWriter(clientIO, output)
+		gc.stdout = multiWriter(clientIO, gc.log)
 		gc.runGRE()
 		if msg.AutoRemove {
 			grg.rmGRE(gc)
 		}
-		clientIO.Close()
 		return nil
 	}
 
-	go func() {
-		grg.lg.Debugln("grgCmdRun: non-interactive")
-		defer output.Close()
-		gc.stdin = null{}
-		gc.stdout = output
-		gc.runGRE()
-		if msg.AutoRemove {
-			grg.rmGRE(gc)
-		}
-	}()
-
+	go grg.runGRE(gc)
 	return gc.ID
 }
 
@@ -226,8 +389,7 @@ func (msg *grgCmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 		if len(pattenStr) == 0 || // match all
 			strings.Contains(pattenStr, "^"+greid+"$") || // match greid
 			strings.Contains(pattenStr, "^"+gc.Name+"$") { // match name
-			gc.Stat = greStatString[gc.stat]
-			ggi.GREInfos = append(ggi.GREInfos, &gc.greInfo)
+			ggi.GREInfos = append(ggi.GREInfos, gc.greInfo)
 		}
 	}
 	grg.RUnlock()
@@ -260,7 +422,7 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 				if _, err := gc.sh.Eval("Stop()"); err != nil { // try to call Stop() if there is one
 					gc.cancel()
 				}
-				atomic.CompareAndSwapInt32(&gc.stat, greStatRunning, greStatAborting)
+				gc.changeStatIf(greStatRunning, greStatAborting)
 				ids = append(ids, gc.ID)
 			}
 		case "rm":
@@ -270,19 +432,12 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 			}
 		case "start":
 			if gc.stat == greStatExited {
-				gc.stdin = null{}
-				logFile, err := os.Create(gc.outputFile)
-				if err != nil {
-					grg.lg.Errorf("output file not created: %v", err)
+				if err := gc.reset(); err != nil {
+					grg.lg.Errorln(err)
 					break
 				}
-				gc.stdout = logFile
 				gc := gc
-				go func() {
-					defer logFile.Close()
-					gc.RestartedNum++
-					gc.runGRE()
-				}()
+				go gc.runGRE()
 				ids = append(ids, gc.ID)
 			}
 		}
@@ -292,33 +447,48 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 }
 
 type processInfo struct {
-	grgName    string
-	pid        int
-	runningCnt int
+	grgName string
+	pid     int
+	killed  bool
 }
 
-// reply with processInfo
-type getProcessInfo struct{}
+// reply with &processInfo
+type grgCmdKill struct{}
 
-func (msg getProcessInfo) Handle(stream as.ContextStream) (reply interface{}) {
+func (msg grgCmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 	grg := stream.GetContext().(*grg)
-	pid := os.Getpid()
-	runningCnt := 0
-	grg.RLock()
-	for _, gc := range grg.gres {
-		if gc.stat == greStatRunning {
-			runningCnt++
+
+	allExited := func() bool {
+		allExited := true
+		grg.RLock()
+		defer grg.RUnlock()
+		for _, gc := range grg.gres {
+			if gc.stat != greStatExited {
+				allExited = false
+				continue
+			}
+			grg.RUnlock()
+			grg.rmGRE(gc)
+			grg.RLock()
 		}
+		return allExited
 	}
-	grg.RUnlock()
-	return processInfo{grg.name, pid, runningCnt}
+
+	pi := &processInfo{grg.name, os.Getpid(), false}
+	if allExited() {
+		// Is below needed? Closing before sending reply seems possible?
+		// time.AfterFunc(time.Second*3, func() { grg.server.Close() })
+		grg.server.Close()
+		pi.killed = true
+	}
+	return pi
 }
 
 var grgKnownMsgs = []as.KnownMessage{
 	(*grgCmdRun)(nil),
 	(*grgCmdQuery)(nil),
 	(*grgCmdPatternAction)(nil),
-	getProcessInfo{},
+	grgCmdKill{},
 }
 
 func init() {
@@ -326,6 +496,6 @@ func init() {
 	as.RegisterType((*grgCmdQuery)(nil))
 	as.RegisterType((*grgGREInfo)(nil))
 	as.RegisterType((*grgCmdPatternAction)(nil))
-	as.RegisterType(getProcessInfo{})
-	as.RegisterType(processInfo{})
+	as.RegisterType(grgCmdKill{})
+	as.RegisterType((*processInfo)(nil))
 }

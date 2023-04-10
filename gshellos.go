@@ -80,11 +80,11 @@ func multiWriter(writers ...io.Writer) io.Writer {
 	return mw
 }
 
-type null struct{}
+type nullIO struct{}
 
-func (null) Close() error                  { return nil }
-func (null) Write(buf []byte) (int, error) { return len(buf), nil }
-func (null) Read(buf []byte) (int, error)  { return 0, io.EOF }
+func (nullIO) Close() error                  { return nil }
+func (nullIO) Write(buf []byte) (int, error) { return len(buf), nil }
+func (nullIO) Read(buf []byte) (int, error)  { return 0, io.EOF }
 
 // RunShCmd runs a command and returns its output.
 // The command will be running in background and output is discarded
