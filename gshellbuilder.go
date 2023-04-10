@@ -419,6 +419,23 @@ func addStartCmd() {
 	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "Start named GRG"), flag.ExitOnError)
 	grgName := cmd.String("group", "", "GRG name")
 
+	getRealtimePriority := func(pid int) int {
+		statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+		if err != nil {
+			return 0
+		}
+		fields := strings.Fields(string(statData))
+		if len(fields) < 40 {
+			return 0
+		}
+		priorityStr := fields[39]
+		priority, err := strconv.Atoi(priorityStr)
+		if err != nil {
+			return 0
+		}
+		return priority
+	}
+
 	action := func() error {
 		if len(*grgName) == 0 {
 			return errors.New("no GRG name, see --help")
@@ -435,8 +452,8 @@ func addStartCmd() {
 		}
 
 		var serverErr error
-
-		grgStatFile := workDir + "/status/grg-" + grgName + "-" + os.Getenv("GOMAXPROCS")
+		rtprio := getRealtimePriority(os.Getpid())
+		grgStatFile := fmt.Sprintf("%s/status/grg-%s-%d-%s", workDir, grgName, rtprio, os.Getenv("GOMAXPROCS"))
 		defer func() {
 			// remove the file only if no errors
 			if serverErr == nil {

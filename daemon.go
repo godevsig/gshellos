@@ -48,13 +48,14 @@ func (gd *daemon) grgRestarter() {
 				gd.lg.Infof("grg status file %s unlocked, grg died abnormally", file)
 				syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 				strs := strings.Split(filepath.Base(file), "-")
-				if len(strs) != 3 {
+				if len(strs) != 4 {
 					gd.lg.Warnf("grg file name format incompatible: %v", strs)
 					return
 				}
 				grgName := strs[1]
-				maxprocs, _ := strconv.Atoi(strs[2])
-				conn, err := gd.setupgrg(grgName, "", maxprocs)
+				rtprio := strs[2]
+				maxprocs, _ := strconv.Atoi(strs[3])
+				conn, err := gd.setupgrg(grgName, rtprio, maxprocs)
 				if err != nil {
 					gd.lg.Errorf("restart grg %s failed with error: %v", grgName, err)
 					return
@@ -101,24 +102,21 @@ func (gd *daemon) setupgrg(grgName, rtPriority string, maxprocs int) (as.Connect
 		cmd.Stderr = buf
 		gd.lg.Debugln("starting grg:", cmd.String())
 
-		err := cmd.Start()
-		if err != nil {
+		if err := cmd.Start(); err != nil {
 			gd.lg.Errorf("start cmd %s failed: %w", cmd.String(), err)
 			return err
 		}
-		errorChan := make(chan error, 1)
-		time.AfterFunc(time.Millisecond*500, func() { errorChan <- nil })
+
 		go func() {
 			cmderr := cmd.Wait()
 			if cmderr != nil {
-				errorChan <- errors.New(buf.String())
 				gd.lg.Warnf("cmd: %s exited with error: %v, output: %v", cmd.String(), cmderr, buf.String())
 			} else {
 				gd.lg.Infof("cmd: %s exited, output: %v", cmd.String(), buf.String())
 			}
 		}()
-		// wait a while to see if cmd returns error
-		return <-errorChan
+
+		return nil
 	}
 
 	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + grgName
@@ -127,16 +125,19 @@ func (gd *daemon) setupgrg(grgName, rtPriority string, maxprocs int) (as.Connect
 	}
 	exe := os.Args[0]
 
-	if len(rtPriority) != 0 {
-		if err := runGrg("chrt", rtPriority+" "+exe+" "+args); err != nil {
-			if err := runGrg(exe, args); err != nil {
-				return nil, err
-			}
+	testChrt := func() bool {
+		if err := exec.Command("chrt", rtPriority, "true").Run(); err != nil {
+			gd.lg.Infof("chrt with priority %s not working", rtPriority)
+			return false
 		}
-	} else {
-		if err := runGrg(exe, args); err != nil {
-			return nil, err
-		}
+		return true
+	}
+	if len(rtPriority) != 0 && rtPriority != "0" && testChrt() {
+		args = rtPriority + " " + exe + " " + args
+		exe = "chrt"
+	}
+	if err := runGrg(exe, args); err != nil {
+		return nil, err
 	}
 
 	c.SetDiscoverTimeout(3)

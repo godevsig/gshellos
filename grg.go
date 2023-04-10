@@ -182,7 +182,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		gc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 		gc.ID = genID(greIDWidth)
 		gc.greInfo.Args = runMsg.Args
-		gc.RestartedNum = -1
+		gc.RestartedNum = 0
 		gc.AutoRestartBalance = runMsg.AutoRestartMax
 	}
 	gc.outputFile = workDir + "/logs/" + gc.ID
@@ -212,6 +212,7 @@ func (grg *grg) runGRE(gc *greCtl) {
 		if err := gc.reset(); err != nil {
 			break
 		}
+		gc.RestartedNum++
 	}
 	if gc.runMsg.AutoRemove {
 		grg.rmGRE(gc)
@@ -315,7 +316,6 @@ func (gc *greCtl) runGRE() {
 		gc.GREErr = stderrStr
 	}
 	gc.log.Close()
-	gc.RestartedNum++
 	if gc.greErr == nil {
 		gc.AutoRestartBalance = 0
 	}
