@@ -86,6 +86,11 @@ func isFile(path string) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Mode().IsDir()
+}
+
 func (sh *shell) runFile(path string) error {
 	if isFile(path) {
 		b, err := os.ReadFile(path)
@@ -97,6 +102,10 @@ func (sh *shell) runFile(path string) error {
 		return err
 	}
 
-	_, err := sh.EvalPath(path)
-	return err
+	if isDir(path) {
+		_, err := sh.EvalPath(path)
+		return err
+	}
+
+	return fmt.Errorf("%s not found", path)
 }

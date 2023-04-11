@@ -206,6 +206,50 @@ func gshellRunCmdTimeout(cmdstr string, nSec int) (string, error) {
 	return out.String(), err
 }
 
+func TestCmdAutoRestart(t *testing.T) {
+	out, err := gshellRunCmd("run -group autorestart testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("run -group autorestart testdata/sleep.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Second)
+	pidOld := gs.RunShCmd("ps -eo pid,cmd | grep autorestart | grep -v grep | awk '{print $1}'")
+	t.Logf("\n%s", pidOld)
+	gs.RunShCmd(fmt.Sprintf("kill -9 %s", pidOld))
+	time.Sleep(time.Second)
+
+	pidNew := gs.RunShCmd("ps -eo pid,cmd | grep autorestart | grep -v grep | awk '{print $1}'")
+	t.Logf("\n%s", pidNew)
+
+	if pidOld == pidNew {
+		t.Fatal("restart grg error")
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out, "running") ||
+		!strings.Contains(out, "exited:OK") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestCmdRunWrongGRGVer(t *testing.T) {
 	out, err := gshellRunCmd("run -group testgrg testdata/hello.go")
 	t.Logf("\n%s", out)
@@ -213,9 +257,9 @@ func TestCmdRunWrongGRGVer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -group testgrg -ver 111 testdata/hello.go")
+	out, err = gshellRunCmd("run -group testgrg-v0.0.0 testdata/hello.go")
 	t.Logf("\n%s", out)
-	if err == nil {
+	if !strings.Contains(out, "running GRG version v0.0.0 not found") {
 		t.Fatal("expected version not found error")
 	}
 
@@ -260,6 +304,9 @@ func TestCmdExec(t *testing.T) {
 
 	out, err = gshellRunCmd("exec testdata/nofile.go")
 	t.Logf("\n%s", out)
+	if !strings.Contains(out, "testdata/nofile.go not found") {
+		t.Fatal("unexpected output")
+	}
 }
 
 func TestCmdRun(t *testing.T) {
@@ -299,14 +346,44 @@ func TestCmdKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("kill -f test* test1")
+	out, err = gshellRunCmd("kill test1 test2")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if !(strings.Contains(out, "test") && strings.Contains(out, "test2")) {
+	if !strings.Contains(out, "none killed") {
 		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("-v")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	version := strings.TrimSuffix(out, "\n")
+
+	out, err = gshellRunCmd("kill test2*")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "test2-"+version+" killed") {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("kill -f test-" + version)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "test-"+version+" killed") {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("kill test*")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	out, err = gshellRunCmd("ps -group test*")

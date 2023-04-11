@@ -40,8 +40,8 @@ func (gd *daemon) grgRestarter() {
 					return
 				}
 				defer f.Close()
-				err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
-				if err != nil {
+
+				if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 					gd.lg.Debugf("grg status file %s locked, grg running", file)
 					return
 				}
