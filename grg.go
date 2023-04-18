@@ -21,6 +21,9 @@ type grg struct {
 	sync.RWMutex
 	server     *as.Server
 	name       string
+	rtPriority int
+	maxProcs   string
+	statFile   string
 	lg         *log.Logger
 	statusFile *os.File
 	greids     []string // keep the order
@@ -83,7 +86,7 @@ func (grg *grg) loadGREs() error {
 				go grg.runGRE(gc)
 				grg.lg.Infof("gre %s restarted", greid)
 			case "aborting", "exited":
-				fallthrough
+				gc.changeStat(greStatExited)
 			default:
 				grg.lg.Infof("gre %s not restarted with status %s", greid, gi.Stat)
 			}
@@ -146,6 +149,7 @@ var greStatString = []string{
 
 type greInfo struct {
 	GREErr             string
+	File               string
 	Name               string
 	ID                 string
 	Args               []string
@@ -178,6 +182,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 	gc.greInfo = gi
 	if gi == nil {
 		gc.greInfo = &greInfo{}
+		gc.File = runMsg.File
 		name := filepath.Base(runMsg.File)
 		gc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 		gc.ID = genID(greIDWidth)
@@ -331,13 +336,18 @@ type grgGREInfo struct {
 	GREInfos []*greInfo
 }
 
-type grgCmdRun struct {
+// JobInfo is the job in grgCmdRun
+type JobInfo struct {
 	File           string
 	Args           []string
-	Interactive    bool
 	AutoRemove     bool
-	ByteCode       []byte
 	AutoRestartMax uint // user defined max auto restart count
+	ByteCode       []byte
+}
+
+type grgCmdRun struct {
+	JobInfo
+	Interactive bool
 }
 
 func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
@@ -396,6 +406,35 @@ func (msg *grgCmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 	return ggi
 }
 
+type grgJoblist struct {
+	Name       string
+	RtPriority int
+	Maxprocs   string
+	Jobs       []JobInfo
+}
+
+// reply grgJoblist{}
+type grgCmdJoblist struct{}
+
+func (msg grgCmdJoblist) Handle(stream as.ContextStream) (reply interface{}) {
+	grg := stream.GetContext().(*grg)
+
+	grgjl := &grgJoblist{
+		Name:       grg.name,
+		RtPriority: grg.rtPriority,
+		Maxprocs:   grg.maxProcs,
+	}
+
+	grg.RLock()
+	for _, gc := range grg.gres {
+		job := gc.runMsg.JobInfo
+		grgjl.Jobs = append(grgjl.Jobs, job)
+	}
+	grg.RUnlock()
+
+	return grgjl
+}
+
 type grgCmdPatternAction struct {
 	IDPattern []string
 	Cmd       string
@@ -447,9 +486,12 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 }
 
 type processInfo struct {
-	grgName string
-	pid     int
-	killed  bool
+	grgName    string
+	pid        int
+	rtPriority int
+	maxProcs   string
+	statFile   string
+	killed     bool
 }
 
 // reply with &processInfo
@@ -474,8 +516,9 @@ func (msg grgCmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 		return allExited
 	}
 
-	pi := &processInfo{grg.name, os.Getpid(), false}
+	pi := &processInfo{grg.name, os.Getpid(), grg.rtPriority, grg.maxProcs, grg.statFile, false}
 	if allExited() {
+		grg.lg.Infoln("command kill received and all jobs done, closing")
 		// Is below needed? Closing before sending reply seems possible?
 		// time.AfterFunc(time.Second*3, func() { grg.server.Close() })
 		grg.server.Close()
@@ -487,6 +530,7 @@ func (msg grgCmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 var grgKnownMsgs = []as.KnownMessage{
 	(*grgCmdRun)(nil),
 	(*grgCmdQuery)(nil),
+	grgCmdJoblist{},
 	(*grgCmdPatternAction)(nil),
 	grgCmdKill{},
 }
@@ -495,6 +539,8 @@ func init() {
 	as.RegisterType((*grgCmdRun)(nil))
 	as.RegisterType((*grgCmdQuery)(nil))
 	as.RegisterType((*grgGREInfo)(nil))
+	as.RegisterType(grgCmdJoblist{})
+	as.RegisterType((*grgJoblist)(nil))
 	as.RegisterType((*grgCmdPatternAction)(nil))
 	as.RegisterType(grgCmdKill{})
 	as.RegisterType((*processInfo)(nil))

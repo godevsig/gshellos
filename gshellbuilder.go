@@ -3,6 +3,7 @@ package gshellos
 import (
 	"crypto/md5"
 	_ "embed" // go embed
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strconv"
@@ -478,6 +480,9 @@ func addStartCmd() {
 		grg := &grg{
 			server:     s,
 			name:       grgNameVer,
+			rtPriority: rtprio,
+			maxProcs:   os.Getenv("GOMAXPROCS"),
+			statFile:   grgStatFile,
 			lg:         lg,
 			statusFile: f,
 			gres:       make(map[string]*greCtl),
@@ -541,7 +546,7 @@ func addRepoCmd() {
 func addKillCmd() {
 	cmd := flag.NewFlagSet(newCmd("kill",
 		"[options] names ...",
-		"Terminate the named GRG(s) on local/remote system",
+		"Terminate the named GRG(s) on local/remote node",
 		"wildcard(*) is supported"),
 		flag.ExitOnError)
 	force := cmd.Bool("f", false, "force terminate even if there are still running GREs")
@@ -585,8 +590,9 @@ func randStringRunes(n int) string {
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <file.go> [args...]",
-		"Look for file.go in local file system or else in `gshell repo`",
-		"run it in a new GRE in specified GRG on local/remote system"),
+		"run a gshell job",
+		"look for file.go in local file system or else in `gshell repo`",
+		"run it in a new GRE in specified GRG on local/remote node"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "", `name of the GRG in the form name-version
 random group name will be used if no name specified
@@ -651,12 +657,14 @@ only applicable for non-interactive mode`)
 
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
-				File:           file,
-				Args:           args,
-				Interactive:    *interactive,
-				AutoRemove:     *autoRemove,
-				ByteCode:       rmShebang(byteCode),
-				AutoRestartMax: *autoRestart,
+				JobInfo: JobInfo{
+					File:           file,
+					Args:           args,
+					AutoRemove:     *autoRemove,
+					AutoRestartMax: *autoRestart,
+					ByteCode:       rmShebang(byteCode),
+				},
+				Interactive: *interactive,
 			},
 			GRGName:    grg,
 			RtPriority: *rtPriority,
@@ -692,8 +700,88 @@ only applicable for non-interactive mode`)
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
+/*
+GRGs:
+- name: test1 # without version
+  rt-priority: 0
+  max-procs: 4
+  Jobs:
+  - file: xxx.go
+    args: -option1
+    auto-remove: False
+    auto-restart-max: 0
+*/
+
+func addJoblistCmd() {
+	cmd := flag.NewFlagSet(newCmd("joblist",
+		"[options] <save|load>",
+		"Save all current jobs to file or load them to run"),
+		flag.ExitOnError)
+	file := cmd.String("file", "default.joblist.json", "the file save to or load from")
+
+	action := func() error {
+		args := cmd.Args()
+		if len(args) == 0 {
+			return errors.New("no subcommand provided, see --help")
+		}
+		action := args[0]
+
+		file, err := filepath.Abs(*file)
+		if err != nil {
+			return err
+		}
+
+		lg := newLogger(log.DefaultStream, "main")
+		conn := connectDaemon(lg)
+		if conn == nil {
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
+		}
+		defer conn.Close()
+
+		switch action {
+		case "save":
+			var jlist joblist
+			if err := conn.SendRecv(cmdJoblistSave{}, &jlist); err != nil {
+				return err
+			}
+			f, err := os.Create(file)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			enc := json.NewEncoder(f)
+			if err := enc.Encode(jlist); err != nil {
+				return err
+			}
+			fmt.Println(file, "saved")
+		case "load":
+			f, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			var jlist joblist
+			dec := json.NewDecoder(f)
+			if err := dec.Decode(&jlist); err != nil {
+				return err
+			}
+
+			if err := conn.SendRecv(&cmdJoblistLoad{jlist}, nil); err != nil {
+				return err
+			}
+		default:
+			return errors.New("wrong subcommand, see --help")
+		}
+
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
 func addPsCmd() {
-	cmd := flag.NewFlagSet(newCmd("ps", "[options] [GRE IDs ...|names ...]", "Show GRE instances by GRE ID or name on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("ps", "[options] [GRE IDs ...|names ...]", "Show jobs by GRE ID or name on local/remote node"), flag.ExitOnError)
 	grgName := cmd.String("group", "*", "in which GRG")
 
 	action := func() error {
@@ -716,6 +804,7 @@ func addPsCmd() {
 					fmt.Println("GRE ID    :", grei.ID)
 					fmt.Println("IN GROUP  :", ggi.Name)
 					fmt.Println("NAME      :", grei.Name)
+					fmt.Println("FILE      :", grei.File)
 					fmt.Println("ARGS      :", grei.Args)
 					fmt.Println("STATUS    :", grei.Stat)
 					fmt.Println("RESTARTED :", grei.RestartedNum)
@@ -766,9 +855,9 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"stop", "[options] [GRE IDs ...|names ...]", "Call `func Stop()` to stop one or more GREs on local/remote system"},
-		{"rm", "[options] [GRE IDs ...|names ...]", "Remove one or more stopped GREs on local/remote system"},
-		{"start", "[options] [GRE IDs ...|names ...]", "Start one or more stopped GREs on local/remote system"},
+		{"stop", "[options] [GRE IDs ...|names ...]", "Call `func Stop()` to stop one or more jobs on local/remote node"},
+		{"rm", "[options] [GRE IDs ...|names ...]", "Remove one or more stopped jobs on local/remote node"},
+		{"start", "[options] [GRE IDs ...|names ...]", "Start one or more stopped jobs on local/remote node"},
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
@@ -815,7 +904,7 @@ func addPatternCmds() {
 }
 
 func addInfoCmd() {
-	cmd := flag.NewFlagSet(newCmd("info", "", "Show gshell info on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("info", "", "Show gshell info on local/remote node"), flag.ExitOnError)
 
 	action := func() error {
 		lg := newLogger(log.DefaultStream, "main")
@@ -837,7 +926,7 @@ func addInfoCmd() {
 }
 
 func addLogCmd() {
-	cmd := flag.NewFlagSet(newCmd("log", "[options] <daemon|grg|GRE ID>", "Print target log on local/remote system"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("log", "[options] <daemon|grg|GRE ID>", "Print target log on local/remote node"), flag.ExitOnError)
 	follow := cmd.Bool("f", false, "follow and output appended data as the log grows")
 
 	action := func() error {
@@ -901,6 +990,7 @@ func ShellMain() error {
 	addRepoCmd()
 	addKillCmd()
 	addRunCmd()
+	addJoblistCmd()
 	addPsCmd()
 	addPatternCmds()
 	addInfoCmd()
@@ -920,9 +1010,9 @@ func ShellMain() error {
 	case "-h", "--help":
 		help := `  gshell is gshellos based service management tool.
   gshellos is a simple pure golang service framework for linux devices.
-  One gshell daemon must have been started in the system to join the
-service network with an unique provider ID.
-  Each app/service runs in one dedicated GRE(Gshell Runtime Environment)
+  A system with one gshell daemon running is a node in the
+service network, each node has an unique provider ID.
+  Each job runs in one dedicated GRE(Gshell Runtime Environment)
 which by default runs in a random GRG(Gshell Runtime Group). GREs can be
 grouped into one named GRG for better performance.
   gshell enters interactive mode if no options and no commands provided.

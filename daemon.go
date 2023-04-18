@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -27,7 +28,7 @@ type daemon struct {
 func (gd *daemon) grgRestarter() {
 	for {
 		time.Sleep(time.Second)
-		files, err := filepath.Glob(workDir + "/status" + "/grg-*")
+		files, err := filepath.Glob(workDir + "/status/grg-*")
 		if err != nil {
 			gd.lg.Warnln(err)
 			continue
@@ -60,6 +61,7 @@ func (gd *daemon) grgRestarter() {
 					gd.lg.Errorf("restart grg %s failed with error: %v", grgName, err)
 					return
 				}
+				gd.lg.Infof("grg %s restarted", grgName)
 				conn.Close()
 			}()
 		}
@@ -153,10 +155,7 @@ type cmdKill struct {
 	Force    bool
 }
 
-func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
-	gd := stream.GetContext().(*daemon)
-	gd.lg.Debugf("handle cmdKill: %v", msg)
-
+func (gd *daemon) doKill(msg *cmdKill) string {
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var b strings.Builder
 	for _, grg := range msg.GRGNames {
@@ -176,12 +175,17 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 						gd.lg.Warnf("pid of %s not found: %v", pInfo.grgName, err)
 						return
 					}
-					if err := process.Signal(syscall.SIGTERM); err != nil {
+					// prevent grgRestarter keeps restarting the grg
+					os.Remove(pInfo.statFile)
+					if err := process.Signal(syscall.SIGKILL); err != nil {
 						gd.lg.Warnf("kill %s failed: %v", pInfo.grgName, err)
 						return
 					}
+					pInfo.killed = true
 				}
-				fmt.Fprintf(&b, "%s ", pInfo.grgName)
+				if pInfo.killed {
+					fmt.Fprintf(&b, "%s ", pInfo.grgName)
+				}
 			}()
 		}
 	}
@@ -190,6 +194,13 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 	}
 	fmt.Fprintf(&b, "killed")
 	return b.String()
+}
+
+func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
+	gd.lg.Debugf("handle cmdKill: %v", msg)
+
+	return gd.doKill(msg)
 }
 
 type cmdRun struct {
@@ -347,6 +358,109 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	return b.String()
 }
 
+type joblist struct {
+	GRGs []grgJoblist
+}
+
+// reply joblist{}
+type cmdJoblistSave struct{}
+
+func (msg cmdJoblistSave) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
+	gd.lg.Debugf("handle cmdJoblistSave: %v", msg)
+
+	jlist := &joblist{}
+	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
+	connChan := c.Discover(godevsigPublisher, "grg-*")
+	for conn := range connChan {
+		var grgjl grgJoblist
+		conn.SetRecvTimeout(time.Second)
+		if err := conn.SendRecv(grgCmdJoblist{}, &grgjl); err != nil {
+			gd.lg.Warnf("cmdJoblistSave: send recv error: %v", err)
+		} else {
+			grgjl.Name = strings.Split(grgjl.Name, "-")[0]
+			jlist.GRGs = append(jlist.GRGs, grgjl)
+		}
+		conn.Close()
+	}
+	return jlist
+}
+
+// reply OK or error
+type cmdJoblistLoad struct {
+	joblist
+}
+
+func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
+	gd.lg.Debugf("handle cmdJoblistLoad: %v", msg)
+
+	out := gd.doKill(&cmdKill{GRGNames: []string{"*"}, Force: true})
+	gd.lg.Infoln("kill all GRGs:", out)
+
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(msg.GRGs))
+	for _, grgjl := range msg.GRGs {
+		grgjl := grgjl
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			grgName := grgjl.Name
+			rtpriority := strconv.Itoa(grgjl.RtPriority)
+			maxprocs := 0
+			if i, err := strconv.Atoi(grgjl.Maxprocs); err == nil {
+				maxprocs = i
+			}
+
+			grgconn, err := gd.setupgrg(grgName, rtpriority, maxprocs)
+			if err != nil {
+				gd.lg.Errorf("load grg %s failed with error: %v", grgName, err)
+				errChan <- err
+				return
+			}
+			defer grgconn.Close()
+
+			c := as.NewClient(as.WithLogger(gd.lg)).SetDiscoverTimeout(0)
+			codeconn := <-c.Discover(godevsigPublisher, "codeRepo")
+			if codeconn != nil {
+				defer codeconn.Close()
+			}
+
+			for _, job := range grgjl.Jobs {
+				if codeconn != nil {
+					var byteCode []byte
+					if err := codeconn.SendRecv(getFileContent{job.File}, &byteCode); err == nil {
+						job.ByteCode = rmShebang(byteCode)
+					}
+				}
+
+				runMsg := &grgCmdRun{
+					JobInfo:     job,
+					Interactive: false,
+				}
+
+				if err := grgconn.SendRecv(runMsg, nil); err != nil {
+					gd.lg.Errorln(err)
+					errChan <- err
+					return
+				}
+			}
+			gd.lg.Infof("grg %s loaded", grgName)
+		}()
+	}
+
+	wg.Wait()
+	if len(errChan) == 0 {
+		return as.OK
+	}
+	close(errChan)
+	err := errors.New("load joblist error")
+	for e := range errChan {
+		err = fmt.Errorf("%v, %v", err, e)
+	}
+	return err
+}
+
 var daemonKnownMsgs = []as.KnownMessage{
 	(*cmdKill)(nil),
 	(*cmdRun)(nil),
@@ -354,6 +468,8 @@ var daemonKnownMsgs = []as.KnownMessage{
 	(*cmdPatternAction)(nil),
 	(*cmdLog)(nil),
 	cmdInfo{},
+	cmdJoblistSave{},
+	(*cmdJoblistLoad)(nil),
 }
 
 var httpGet func(url string) ([]byte, error)
@@ -476,7 +592,10 @@ func init() {
 	as.RegisterType([]*grgGREIDs(nil))
 	as.RegisterType((*cmdLog)(nil))
 	as.RegisterType(cmdInfo{})
+	as.RegisterType(cmdJoblistSave{})
+	as.RegisterType((*joblist)(nil))
 	as.RegisterType(codeRepoAddr{})
+	as.RegisterType((*cmdJoblistLoad)(nil))
 	as.RegisterType(getFileContent{})
 	as.RegisterType(tryUpdate{})
 	as.RegisterType((*gshellBin)(nil))
