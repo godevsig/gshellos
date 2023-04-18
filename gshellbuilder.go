@@ -115,6 +115,12 @@ func addDeamonCmd() {
 	updateURL := cmd.String("update", "", "url of artifacts to update gshell, require -root")
 
 	action := func() error {
+		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
+			panic(err)
+		}
+		if err := os.MkdirAll(workDir+"/status", 0755); err != nil {
+			panic(err)
+		}
 		cmdArgs := os.Args
 		scope := as.ScopeAll
 		if len(*registryAddr) == 0 {
@@ -455,14 +461,18 @@ func addStartCmd() {
 
 		var serverErr error
 		rtprio := getRealtimePriority(os.Getpid())
-		grgStatFile := fmt.Sprintf("%s/status/grg-%s-%d-%s", workDir, grgName, rtprio, os.Getenv("GOMAXPROCS"))
+		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%s", workDir, grgName, rtprio, os.Getenv("GOMAXPROCS"))
+		if err := os.MkdirAll(grgStatDir, 0755); err != nil {
+			return err
+		}
 		defer func() {
 			// remove the file only if no errors
 			if serverErr == nil {
-				os.Remove(grgStatFile)
+				os.RemoveAll(grgStatDir)
 			}
 		}()
-		f, err := os.OpenFile(grgStatFile, os.O_RDWR|os.O_CREATE, 0644)
+		grgLockFile := filepath.Join(grgStatDir, ".lock")
+		f, err := os.OpenFile(grgLockFile, os.O_RDWR|os.O_CREATE, 0644)
 		if err != nil {
 			return err
 		}
@@ -470,22 +480,24 @@ func addStartCmd() {
 		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
 			return err
 		}
-		lg.Debugf("status file %s locked", grgStatFile)
+		lg.Debugf("status %s locked", grgStatDir)
 		defer func() {
 			syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-			lg.Debugf("status file %s unlocked", grgStatFile)
+			lg.Debugf("status %s unlocked", grgStatDir)
 		}()
 
 		s := as.NewServer(opts...).SetPublisher(godevsigPublisher)
 		grg := &grg{
-			server:     s,
-			name:       grgNameVer,
-			rtPriority: rtprio,
-			maxProcs:   os.Getenv("GOMAXPROCS"),
-			statFile:   grgStatFile,
-			lg:         lg,
-			statusFile: f,
-			gres:       make(map[string]*greCtl),
+			processInfo: processInfo{
+				name:       grgNameVer,
+				rtPriority: rtprio,
+				maxProcs:   os.Getenv("GOMAXPROCS"),
+				statDir:    grgStatDir,
+				pid:        os.Getpid(),
+			},
+			server: s,
+			lg:     lg,
+			gres:   make(map[string]*greCtl),
 		}
 		if err := grg.loadGREs(); err != nil {
 			return err
@@ -1028,12 +1040,6 @@ grouped into one named GRG for better performance.
 		return nil
 	default:
 		flag.Parse()
-		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
-			panic(err)
-		}
-		if err := os.MkdirAll(workDir+"/status", 0755); err != nil {
-			panic(err)
-		}
 		args := flag.Args()
 		if len(args) == 0 {
 			return errors.New("no command provided, see --help")

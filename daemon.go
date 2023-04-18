@@ -28,14 +28,15 @@ type daemon struct {
 func (gd *daemon) grgRestarter() {
 	for {
 		time.Sleep(time.Second)
-		files, err := filepath.Glob(workDir + "/status/grg-*")
+		grgs, err := filepath.Glob(workDir + "/status/grg-*")
 		if err != nil {
 			gd.lg.Warnln(err)
 			continue
 		}
-		for _, file := range files {
+		for _, grgStatDir := range grgs {
 			func() {
-				f, err := os.Open(file)
+				lockFile := filepath.Join(grgStatDir, ".lock")
+				f, err := os.Open(lockFile)
 				if err != nil {
 					gd.lg.Warnln(err)
 					return
@@ -43,14 +44,14 @@ func (gd *daemon) grgRestarter() {
 				defer f.Close()
 
 				if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-					gd.lg.Debugf("grg status file %s locked, grg running", file)
+					gd.lg.Debugf("grg status %s locked, grg running", grgStatDir)
 					return
 				}
-				gd.lg.Infof("grg status file %s unlocked, grg died abnormally", file)
+				gd.lg.Infof("grg status %s unlocked, grg died abnormally", grgStatDir)
 				syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
-				strs := strings.Split(filepath.Base(file), "-")
+				strs := strings.Split(filepath.Base(grgStatDir), "-")
 				if len(strs) != 4 {
-					gd.lg.Warnf("grg file name format incompatible: %v", strs)
+					gd.lg.Warnf("grg dir name format incompatible: %v", strs)
 					return
 				}
 				grgName := strs[1]
@@ -172,19 +173,19 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 				if !pInfo.killed && msg.Force && pInfo.pid != 0 {
 					process, err := os.FindProcess(pInfo.pid)
 					if err != nil {
-						gd.lg.Warnf("pid of %s not found: %v", pInfo.grgName, err)
+						gd.lg.Warnf("pid of %s not found: %v", pInfo.name, err)
 						return
 					}
 					// prevent grgRestarter keeps restarting the grg
-					os.Remove(pInfo.statFile)
+					os.RemoveAll(pInfo.statDir)
 					if err := process.Signal(syscall.SIGKILL); err != nil {
-						gd.lg.Warnf("kill %s failed: %v", pInfo.grgName, err)
+						gd.lg.Warnf("kill %s failed: %v", pInfo.name, err)
 						return
 					}
 					pInfo.killed = true
 				}
 				if pInfo.killed {
-					fmt.Fprintf(&b, "%s ", pInfo.grgName)
+					fmt.Fprintf(&b, "%s ", pInfo.name)
 				}
 			}()
 		}

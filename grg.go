@@ -17,17 +17,22 @@ import (
 	"github.com/traefik/yaegi/interp"
 )
 
-type grg struct {
-	sync.RWMutex
-	server     *as.Server
+type processInfo struct {
 	name       string
 	rtPriority int
 	maxProcs   string
-	statFile   string
-	lg         *log.Logger
-	statusFile *os.File
-	greids     []string // keep the order
-	gres       map[string]*greCtl
+	statDir    string
+	pid        int
+	killed     bool
+}
+
+type grg struct {
+	sync.RWMutex
+	processInfo
+	server *as.Server
+	lg     *log.Logger
+	greids []string // keep the order
+	gres   map[string]*greCtl
 }
 
 func (grg *grg) onNewStream(ctx as.Context) {
@@ -37,22 +42,18 @@ func (grg *grg) onNewStream(ctx as.Context) {
 const greIDWidth = 6
 
 func (grg *grg) loadGREs() error {
-	buf, err := io.ReadAll(grg.statusFile)
+	gres, err := filepath.Glob(grg.statDir + "/*")
 	if err != nil {
 		return err
 	}
-	greidsStr := string(buf)
-	greidsStr = strings.TrimPrefix(greidsStr, "[")
-	greidsStr = strings.TrimSuffix(greidsStr, "]")
-	greids := strings.Split(greidsStr, " ")
 
-	for _, greid := range greids {
+	for _, greStatDir := range gres {
 		func() {
-			if len(greid) == 0 {
+			greid := filepath.Base(greStatDir)
+			if len(greid) == 0 || greid == ".lock" {
 				return
 			}
-			statDir := workDir + "/status/" + greid
-			fgi, err := os.Open(statDir + "/greInfo")
+			fgi, err := os.Open(greStatDir + "/greInfo")
 			if err != nil {
 				grg.lg.Warnln(err)
 				return
@@ -63,7 +64,7 @@ func (grg *grg) loadGREs() error {
 				grg.lg.Warnf("decode greInfo for %s failed", greid)
 				return
 			}
-			frm, err := os.Open(statDir + "/runMsg")
+			frm, err := os.Open(greStatDir + "/runMsg")
 			if err != nil {
 				grg.lg.Warnln(err)
 				return
@@ -95,18 +96,11 @@ func (grg *grg) loadGREs() error {
 	return nil
 }
 
-func (grg *grg) updateStatFile() {
-	grg.statusFile.Truncate(0)
-	grg.statusFile.Seek(0, 0)
-	fmt.Fprint(grg.statusFile, grg.greids)
-}
-
 func (grg *grg) addGRE(gc *greCtl) {
 	grg.Lock()
 	grg.greids = append(grg.greids, gc.ID)
 	grg.gres[gc.ID] = gc
 	grg.Unlock()
-	grg.updateStatFile()
 	grg.lg.Debugln("gre " + gc.ID + " added")
 }
 
@@ -123,7 +117,6 @@ func (grg *grg) rmGRE(gc *greCtl) {
 	grg.Unlock()
 	os.Remove(gc.outputFile)
 	os.RemoveAll(gc.statDir)
-	grg.updateStatFile()
 	grg.lg.Debugln("gre " + gc.ID + " removed")
 
 	grg.Lock()
@@ -190,8 +183,8 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		gc.RestartedNum = 0
 		gc.AutoRestartBalance = runMsg.AutoRestartMax
 	}
-	gc.outputFile = workDir + "/logs/" + gc.ID
-	gc.statDir = workDir + "/status/" + gc.ID
+	gc.outputFile = filepath.Join(workDir, "logs", gc.ID)
+	gc.statDir = filepath.Join(grg.statDir, gc.ID)
 
 	if gi == nil {
 		if err := os.MkdirAll(gc.statDir, 0755); err != nil {
@@ -485,15 +478,6 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 	return ids
 }
 
-type processInfo struct {
-	grgName    string
-	pid        int
-	rtPriority int
-	maxProcs   string
-	statFile   string
-	killed     bool
-}
-
 // reply with &processInfo
 type grgCmdKill struct{}
 
@@ -516,15 +500,14 @@ func (msg grgCmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 		return allExited
 	}
 
-	pi := &processInfo{grg.name, os.Getpid(), grg.rtPriority, grg.maxProcs, grg.statFile, false}
 	if allExited() {
 		grg.lg.Infoln("command kill received and all jobs done, closing")
 		// Is below needed? Closing before sending reply seems possible?
 		// time.AfterFunc(time.Second*3, func() { grg.server.Close() })
 		grg.server.Close()
-		pi.killed = true
+		grg.killed = true
 	}
-	return pi
+	return &grg.processInfo
 }
 
 var grgKnownMsgs = []as.KnownMessage{
