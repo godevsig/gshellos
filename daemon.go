@@ -159,6 +159,7 @@ type cmdKill struct {
 func (gd *daemon) doKill(msg *cmdKill) string {
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var b strings.Builder
+	var killingList []*processInfo
 	for _, grg := range msg.GRGNames {
 		connChan := c.Discover(godevsigPublisher, "grg-"+grg)
 		for conn := range connChan {
@@ -170,7 +171,7 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 					gd.lg.Warnf("grgCmdKill for %s failed: %v", grg, err)
 					return
 				}
-				if !pInfo.killed && msg.Force && pInfo.pid != 0 {
+				if !pInfo.killing && msg.Force && pInfo.pid != 0 {
 					process, err := os.FindProcess(pInfo.pid)
 					if err != nil {
 						gd.lg.Warnf("pid of %s not found: %v", pInfo.name, err)
@@ -182,10 +183,10 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 						gd.lg.Warnf("kill %s failed: %v", pInfo.name, err)
 						return
 					}
-					pInfo.killed = true
+					pInfo.killing = true
 				}
-				if pInfo.killed {
-					fmt.Fprintf(&b, "%s ", pInfo.name)
+				if pInfo.killing {
+					killingList = append(killingList, &pInfo)
 				}
 			}()
 		}
@@ -193,6 +194,58 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 	if len(b.String()) == 0 {
 		fmt.Fprintf(&b, "none ")
 	}
+
+	processExists := func(pid int) bool {
+		process, err := os.FindProcess(pid)
+		if err != nil {
+			return false
+		}
+		if err := process.Signal(syscall.Signal(0)); err != nil {
+			return false
+		}
+		return true
+	}
+
+	checkDone := func() bool {
+		for i, pInfo := range killingList {
+			if pInfo == nil {
+				continue
+			}
+			if !processExists(pInfo.pid) {
+				killingList[i] = nil // the pid exited
+				fmt.Fprintf(&b, "%s ", pInfo.name)
+			}
+		}
+		for _, pInfo := range killingList {
+			if pInfo != nil {
+				return false
+			}
+		}
+		return true
+	}
+	forceKill := func() {
+		for _, pInfo := range killingList {
+			if pInfo == nil {
+				continue
+			}
+			if process, err := os.FindProcess(pInfo.pid); err == nil {
+				process.Signal(syscall.SIGKILL)
+			}
+		}
+	}
+
+	timeout := false
+	time.AfterFunc(3*time.Second, func() { timeout = true })
+	for {
+		if timeout {
+			forceKill()
+		}
+		if checkDone() {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	fmt.Fprintf(&b, "killed")
 	return b.String()
 }

@@ -213,7 +213,7 @@ func TestCmdAutoRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -group autorestart testdata/sleep.go")
+	out, err = gshellRunCmd("run -group autorestart testdata/sleep.go 300")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -404,6 +404,48 @@ func TestCmdPs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "GRE ID        IN GROUP            NAME                START AT             STATUS") {
+		t.Fatal("unexpected output")
+	}
+}
+
+func TestCmdJoblist(t *testing.T) {
+	out, err := gshellRunCmd("run -group testjoblist testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("joblist save")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("run -group aftersave testdata/sleep.go 300")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("joblist load")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Contains(out, "aftersave") {
 		t.Fatal("unexpected output")
 	}
 }

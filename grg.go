@@ -23,7 +23,7 @@ type processInfo struct {
 	maxProcs   string
 	statDir    string
 	pid        int
-	killed     bool
+	killing    bool
 }
 
 type grg struct {
@@ -505,7 +505,7 @@ func (msg grgCmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 		// Is below needed? Closing before sending reply seems possible?
 		// time.AfterFunc(time.Second*3, func() { grg.server.Close() })
 		grg.server.Close()
-		grg.killed = true
+		grg.killing = true
 	}
 	return &grg.processInfo
 }

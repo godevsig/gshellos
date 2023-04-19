@@ -712,18 +712,6 @@ only applicable for non-interactive mode`)
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-/*
-GRGs:
-- name: test1 # without version
-  rt-priority: 0
-  max-procs: 4
-  Jobs:
-  - file: xxx.go
-    args: -option1
-    auto-remove: False
-    auto-restart-max: 0
-*/
-
 func addJoblistCmd() {
 	cmd := flag.NewFlagSet(newCmd("joblist",
 		"[options] <save|load>",
