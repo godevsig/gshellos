@@ -719,6 +719,7 @@ func addJoblistCmd() {
 		"Save all current jobs to file or load them to run"),
 		flag.ExitOnError)
 	file := cmd.String("file", "default.joblist.yaml", "the file save to or load from")
+	tiny := cmd.Bool("tiny", false, "discard bytecode")
 
 	action := func() error {
 		args := cmd.Args()
@@ -739,6 +740,7 @@ func addJoblistCmd() {
 		}
 		defer conn.Close()
 
+		tiny := *tiny
 		switch action {
 		case "save":
 			var jlist joblist
@@ -748,7 +750,9 @@ func addJoblistCmd() {
 			// turn bytecode to string
 			for _, grg := range jlist.GRGs {
 				for _, job := range grg.Jobs {
-					job.ByteCodeBase64 = base64.StdEncoding.EncodeToString(job.ByteCode)
+					if !tiny {
+						job.ByteCodeBase64 = base64.StdEncoding.EncodeToString(job.ByteCode)
+					}
 					job.ByteCode = nil
 				}
 			}
@@ -787,12 +791,14 @@ func addJoblistCmd() {
 				}
 				grgMap[grg.Name] = struct{}{}
 				for _, job := range grg.Jobs {
-					data, err := base64.StdEncoding.DecodeString(job.ByteCodeBase64)
-					if err != nil {
-						return fmt.Errorf("parse joblist %s with error: %v", file, err)
+					if len(job.ByteCodeBase64) != 0 {
+						data, err := base64.StdEncoding.DecodeString(job.ByteCodeBase64)
+						if err != nil {
+							return fmt.Errorf("parse joblist %s with error: %v", file, err)
+						}
+						job.ByteCodeBase64 = ""
+						job.ByteCode = data
 					}
-					job.ByteCodeBase64 = ""
-					job.ByteCode = data
 				}
 			}
 

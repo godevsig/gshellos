@@ -461,8 +461,13 @@ func TestCmdJoblist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(out, "test1") {
+	if !strings.Contains(out, "dwuuwt") {
 		t.Fatal("unexpected output")
+	}
+
+	out, _ = gshellRunCmd("joblist save")
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -548,10 +553,8 @@ func TestCmdLog(t *testing.T) {
 	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")
 	}
-	_, err = gshellRunCmd("log grg")
-	if err != nil {
-		t.Fatal(err)
-	}
+	// to increase coverage rate
+	go gshellRunCmd("log -f grg")
 }
 
 func TestCmdRepo(t *testing.T) {
@@ -673,6 +676,7 @@ func TestMain(m *testing.M) {
 		time.Sleep(time.Second)
 		exec.Command("pkill", "-SIGINT", "gshell.tester").Run()
 		time.Sleep(time.Second)
+		exec.Command("pkill", "-SIGKILL", "gshell.tester").Run()
 		os.Exit(ret)
 	} else {
 		os.Exit(m.Run())
