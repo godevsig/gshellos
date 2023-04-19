@@ -142,7 +142,6 @@ var greStatString = []string{
 
 type greInfo struct {
 	GREErr             string
-	File               string
 	Name               string
 	ID                 string
 	Args               []string
@@ -175,8 +174,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 	gc.greInfo = gi
 	if gi == nil {
 		gc.greInfo = &greInfo{}
-		gc.File = runMsg.File
-		name := filepath.Base(runMsg.File)
+		name := filepath.Base(runMsg.Args[0])
 		gc.Name = strings.TrimSuffix(name, filepath.Ext(name))
 		gc.ID = genID(greIDWidth)
 		gc.greInfo.Args = runMsg.Args
@@ -331,11 +329,11 @@ type grgGREInfo struct {
 
 // JobInfo is the job in grgCmdRun
 type JobInfo struct {
-	File           string
 	Args           []string
-	AutoRemove     bool
-	AutoRestartMax uint // user defined max auto restart count
-	ByteCode       []byte
+	AutoRemove     bool   `yaml:"auto-remove,omitempty"`
+	AutoRestartMax uint   `yaml:"auto-restart-max,omitempty"` // user defined max auto restart count
+	ByteCode       []byte `yaml:"bytecode,omitempty"`
+	ByteCodeBase64 string `yaml:"bytecode-base64,omitempty"`
 }
 
 type grgCmdRun struct {
@@ -345,7 +343,7 @@ type grgCmdRun struct {
 
 func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	grg := stream.GetContext().(*grg)
-	grg.lg.Debugf("grgCmdRun: file: %v, args: %v, interactive: %v\n", msg.File, msg.Args, msg.Interactive)
+	grg.lg.Debugf("grgCmdRun: args: %v, interactive: %v\n", msg.Args, msg.Interactive)
 
 	gc, err := grg.newGRE(nil, msg)
 	if err != nil {
@@ -401,9 +399,9 @@ func (msg *grgCmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 
 type grgJoblist struct {
 	Name       string
-	RtPriority int
-	Maxprocs   string
-	Jobs       []JobInfo
+	RtPriority int    `yaml:"rt-priority,omitempty"`
+	Maxprocs   string `yaml:"max-procs,omitempty"`
+	Jobs       []*JobInfo
 }
 
 // reply grgJoblist{}
@@ -420,8 +418,7 @@ func (msg grgCmdJoblist) Handle(stream as.ContextStream) (reply interface{}) {
 
 	grg.RLock()
 	for _, gc := range grg.gres {
-		job := gc.runMsg.JobInfo
-		grgjl.Jobs = append(grgjl.Jobs, job)
+		grgjl.Jobs = append(grgjl.Jobs, &gc.runMsg.JobInfo)
 	}
 	grg.RUnlock()
 

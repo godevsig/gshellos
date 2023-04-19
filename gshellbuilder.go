@@ -3,7 +3,7 @@ package gshellos
 import (
 	"crypto/md5"
 	_ "embed" // go embed
-	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -20,6 +20,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/grepo/lib/sys/log"
@@ -670,7 +672,6 @@ only applicable for non-interactive mode`)
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
 				JobInfo: JobInfo{
-					File:           file,
 					Args:           args,
 					AutoRemove:     *autoRemove,
 					AutoRestartMax: *autoRestart,
@@ -717,7 +718,7 @@ func addJoblistCmd() {
 		"[options] <save|load>",
 		"Save all current jobs to file or load them to run"),
 		flag.ExitOnError)
-	file := cmd.String("file", "default.joblist.json", "the file save to or load from")
+	file := cmd.String("file", "default.joblist.yaml", "the file save to or load from")
 
 	action := func() error {
 		args := cmd.Args()
@@ -744,13 +745,20 @@ func addJoblistCmd() {
 			if err := conn.SendRecv(cmdJoblistSave{}, &jlist); err != nil {
 				return err
 			}
+			// turn bytecode to string
+			for _, grg := range jlist.GRGs {
+				for _, job := range grg.Jobs {
+					job.ByteCodeBase64 = base64.StdEncoding.EncodeToString(job.ByteCode)
+					job.ByteCode = nil
+				}
+			}
 			f, err := os.Create(file)
 			if err != nil {
 				return err
 			}
 			defer f.Close()
 
-			enc := json.NewEncoder(f)
+			enc := yaml.NewEncoder(f)
 			if err := enc.Encode(jlist); err != nil {
 				return err
 			}
@@ -763,9 +771,29 @@ func addJoblistCmd() {
 			defer f.Close()
 
 			var jlist joblist
-			dec := json.NewDecoder(f)
+			dec := yaml.NewDecoder(f)
 			if err := dec.Decode(&jlist); err != nil {
 				return err
+			}
+
+			grgMap := make(map[string]struct{})
+			// back to bytecode
+			for _, grg := range jlist.GRGs {
+				if len(grg.Name) == 0 {
+					return fmt.Errorf("empty grg name in joblist %s", file)
+				}
+				if _, has := grgMap[grg.Name]; has {
+					return fmt.Errorf("duplicated grg entry %s in joblist %s", grg.Name, file)
+				}
+				grgMap[grg.Name] = struct{}{}
+				for _, job := range grg.Jobs {
+					data, err := base64.StdEncoding.DecodeString(job.ByteCodeBase64)
+					if err != nil {
+						return fmt.Errorf("parse joblist %s with error: %v", file, err)
+					}
+					job.ByteCodeBase64 = ""
+					job.ByteCode = data
+				}
 			}
 
 			if err := conn.SendRecv(&cmdJoblistLoad{jlist}, nil); err != nil {
@@ -804,7 +832,6 @@ func addPsCmd() {
 					fmt.Println("GRE ID    :", grei.ID)
 					fmt.Println("IN GROUP  :", ggi.Name)
 					fmt.Println("NAME      :", grei.Name)
-					fmt.Println("FILE      :", grei.File)
 					fmt.Println("ARGS      :", grei.Args)
 					fmt.Println("STATUS    :", grei.Stat)
 					fmt.Println("RESTARTED :", grei.RestartedNum)

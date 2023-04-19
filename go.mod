@@ -7,6 +7,7 @@ require (
 	github.com/godevsig/grepo v0.2.2-0.20230329153956-e42313fb6947
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/traefik/yaegi v0.13.0
+	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
 )
 
 replace (

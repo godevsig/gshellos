@@ -448,6 +448,22 @@ func TestCmdJoblist(t *testing.T) {
 	if strings.Contains(out, "aftersave") {
 		t.Fatal("unexpected output")
 	}
+
+	out, err = gshellRunCmd("joblist -file testdata/default.joblist.yaml load")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out, "test1") {
+		t.Fatal("unexpected output")
+	}
 }
 
 func TestCmdPsID(t *testing.T) {
@@ -531,6 +547,10 @@ func TestCmdLog(t *testing.T) {
 	t.Logf("\n%s", out)
 	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")
+	}
+	_, err = gshellRunCmd("log grg")
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

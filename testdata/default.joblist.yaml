@@ -1,0 +1,16 @@
+grgs:
+  - name: test1
+    jobs:
+      - args:
+          - testdata/hello.go
+      - args:
+          - testdata/hellolog.go
+  - name: test2
+    rtpriority: 0
+    maxprocs: "4"
+    jobs:
+      - args:
+          - testdata/sleep.go
+          - "30000"
+        autoremove: false
+        autorestartmax: 3

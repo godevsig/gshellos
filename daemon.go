@@ -191,9 +191,6 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 			}()
 		}
 	}
-	if len(b.String()) == 0 {
-		fmt.Fprintf(&b, "none ")
-	}
 
 	processExists := func(pid int) bool {
 		process, err := os.FindProcess(pid)
@@ -246,6 +243,10 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 		time.Sleep(100 * time.Millisecond)
 	}
 
+	if len(b.String()) == 0 {
+		fmt.Fprintf(&b, "none ")
+	}
+
 	fmt.Fprintf(&b, "killed")
 	return b.String()
 }
@@ -266,7 +267,7 @@ type cmdRun struct {
 
 func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
-	gd.lg.Debugf("handle cmdRun: file %v, args %v, interactive %v", msg.File, msg.Args, msg.Interactive)
+	gd.lg.Debugf("handle cmdRun: args %v, interactive %v", msg.Args, msg.Interactive)
 
 	conn, err := gd.setupgrg(msg.GRGName, msg.RtPriority, msg.Maxprocs)
 	if err != nil {
@@ -481,15 +482,17 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 			}
 
 			for _, job := range grgjl.Jobs {
-				if codeconn != nil {
-					var byteCode []byte
-					if err := codeconn.SendRecv(getFileContent{job.File}, &byteCode); err == nil {
+				file := job.Args[0]
+				if byteCode, err := os.ReadFile(file); err == nil {
+					job.ByteCode = rmShebang(byteCode)
+				} else if codeconn != nil {
+					if err := codeconn.SendRecv(getFileContent{file}, &byteCode); err == nil {
 						job.ByteCode = rmShebang(byteCode)
 					}
 				}
 
 				runMsg := &grgCmdRun{
-					JobInfo:     job,
+					JobInfo:     *job,
 					Interactive: false,
 				}
 
