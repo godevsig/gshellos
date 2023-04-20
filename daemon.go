@@ -495,7 +495,7 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 				}
 
 				runMsg := &grgCmdRun{
-					JobInfo:     *job,
+					JobCmd:      job.JobCmd,
 					Interactive: false,
 				}
 

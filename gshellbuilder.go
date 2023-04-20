@@ -679,7 +679,7 @@ only applicable for non-interactive mode`)
 
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
-				JobInfo: JobInfo{
+				JobCmd: JobCmd{
 					Args:           args,
 					AutoRemove:     *autoRemove,
 					AutoRestartMax: *autoRestart,
@@ -762,6 +762,8 @@ func addJoblistCmd() {
 						job.ByteCodeBase64 = base64.StdEncoding.EncodeToString(job.ByteCode)
 					}
 					job.ByteCode = nil
+					job.Cmd = strings.Join(job.Args, " ")
+					job.Args = nil
 				}
 			}
 			f, err := os.Create(file)
@@ -807,6 +809,11 @@ func addJoblistCmd() {
 						job.ByteCodeBase64 = ""
 						job.ByteCode = data
 					}
+					job.Args = strings.Fields(job.Cmd)
+					if len(job.Args) == 0 {
+						return fmt.Errorf("parse joblist %s error: empty job", file)
+					}
+					job.Cmd = ""
 				}
 			}
 

@@ -327,17 +327,23 @@ type grgGREInfo struct {
 	GREInfos []*greInfo
 }
 
-// JobInfo is the job in grgCmdRun
+// JobCmd is the job in grgCmdRun
+type JobCmd struct {
+	Args           []string `yaml:",omitempty"`
+	AutoRemove     bool     `yaml:"auto-remove,omitempty"`
+	AutoRestartMax uint     `yaml:"auto-restart-max,omitempty"` // user defined max auto restart count
+	ByteCode       []byte   `yaml:"bytecode,omitempty"`
+}
+
+// JobInfo is the job in joblist
 type JobInfo struct {
-	Args           []string
-	AutoRemove     bool   `yaml:"auto-remove,omitempty"`
-	AutoRestartMax uint   `yaml:"auto-restart-max,omitempty"` // user defined max auto restart count
-	ByteCode       []byte `yaml:"bytecode,omitempty"`
+	Cmd            string
+	JobCmd         `yaml:",inline"`
 	ByteCodeBase64 string `yaml:"bytecode-base64,omitempty"`
 }
 
 type grgCmdRun struct {
-	JobInfo
+	JobCmd
 	Interactive bool
 }
 
@@ -418,7 +424,8 @@ func (msg grgCmdJoblist) Handle(stream as.ContextStream) (reply interface{}) {
 
 	grg.RLock()
 	for _, gc := range grg.gres {
-		grgjl.Jobs = append(grgjl.Jobs, &gc.runMsg.JobInfo)
+		ji := &JobInfo{JobCmd: gc.runMsg.JobCmd}
+		grgjl.Jobs = append(grgjl.Jobs, ji)
 	}
 	grg.RUnlock()
 

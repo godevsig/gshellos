@@ -1,19 +1,14 @@
 grgs:
   - name: test2
     jobs:
-      - args:
-          - testdata/hello.go
-      - args:
-          - testdata/hello.go
+      - cmd: testdata/hello.go
+      - cmd: testdata/sleep.go 300
   - name: szcrel
     jobs:
-      - args:
-          - testdata/sleep.go
-          - "30000"
+      - cmd: testdata/sleep.go 30000
         auto-restart-max: 3
   - name: dwuuwt
     rt-priority: 39
     max-procs: 4
     jobs:
-      - args:
-          - testdata/hellolog.go
+      - cmd: testdata/hellolog.go
