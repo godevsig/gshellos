@@ -463,7 +463,13 @@ func addStartCmd() {
 
 		var serverErr error
 		rtprio := getRealtimePriority(os.Getpid())
-		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%s", workDir, grgName, rtprio, os.Getenv("GOMAXPROCS"))
+		maxProcs := 0
+		if v, has := os.LookupEnv("GOMAXPROCS"); has {
+			if i, err := strconv.Atoi(v); err == nil {
+				maxProcs = i
+			}
+		}
+		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%d", workDir, grgName, rtprio, maxProcs)
 		if err := os.MkdirAll(grgStatDir, 0755); err != nil {
 			return err
 		}
@@ -493,7 +499,7 @@ func addStartCmd() {
 			processInfo: processInfo{
 				name:       grgNameVer,
 				rtPriority: rtprio,
-				maxProcs:   os.Getenv("GOMAXPROCS"),
+				maxProcs:   maxProcs,
 				statDir:    grgStatDir,
 				pid:        os.Getpid(),
 			},
@@ -611,8 +617,8 @@ func addRunCmd() {
 	grgName := cmd.String("group", "", `name of the GRG in the form name-version
 random group name will be used if no name specified
 target daemon version will be used if no version specified`)
-	maxprocs := cmd.Int("maxprocs", -1, "set GOMAXPROCS variable")
-	rtPriority := cmd.String("rt", "", `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
+	maxprocs := cmd.Int("maxprocs", 0, "set GOMAXPROCS variable")
+	rtPriority := cmd.Int("rt", 0, `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
 silently ignore errors if real-time priority can not be set`)
 	interactive := cmd.Bool("i", false, "enter interactive mode")
 	autoRemove := cmd.Bool("rm", false, "auto-remove the GRE when it exits")
@@ -636,11 +642,13 @@ only applicable for non-interactive mode`)
 				return errors.New("wrong group format, see --help")
 			}
 		}
-		if len(*rtPriority) != 0 {
-			pri, err := strconv.Atoi(*rtPriority)
-			if err != nil || pri < 1 || pri > 99 {
-				return errors.New("wrong SCHED_RR priority, see man chrt")
-			}
+		maxprocs := *maxprocs
+		if maxprocs < 0 {
+			maxprocs = 0
+		}
+		rtPriority := *rtPriority
+		if rtPriority < 0 || rtPriority > 99 {
+			return errors.New("wrong SCHED_RR priority, see man chrt")
 		}
 
 		lg := newLogger(log.DefaultStream, "main")
@@ -680,8 +688,8 @@ only applicable for non-interactive mode`)
 				Interactive: *interactive,
 			},
 			GRGName:    grg,
-			RtPriority: *rtPriority,
-			Maxprocs:   *maxprocs,
+			RtPriority: rtPriority,
+			Maxprocs:   maxprocs,
 		}
 
 		conn := connectDaemon(lg)

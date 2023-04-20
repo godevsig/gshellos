@@ -465,7 +465,7 @@ func TestCmdJoblist(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, _ = gshellRunCmd("joblist save")
+	_, err = gshellRunCmd("joblist -tiny save")
 	if err != nil {
 		t.Fatal(err)
 	}

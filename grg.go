@@ -20,7 +20,7 @@ import (
 type processInfo struct {
 	name       string
 	rtPriority int
-	maxProcs   string
+	maxProcs   int
 	statDir    string
 	pid        int
 	killing    bool
@@ -399,8 +399,8 @@ func (msg *grgCmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 
 type grgJoblist struct {
 	Name       string
-	RtPriority int    `yaml:"rt-priority,omitempty"`
-	Maxprocs   string `yaml:"max-procs,omitempty"`
+	RtPriority int `yaml:"rt-priority,omitempty"`
+	Maxprocs   int `yaml:"max-procs,omitempty"`
 	Jobs       []*JobInfo
 }
 

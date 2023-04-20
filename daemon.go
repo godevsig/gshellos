@@ -55,7 +55,7 @@ func (gd *daemon) grgRestarter() {
 					return
 				}
 				grgName := strs[1]
-				rtprio := strs[2]
+				rtprio, _ := strconv.Atoi(strs[2])
 				maxprocs, _ := strconv.Atoi(strs[3])
 				conn, err := gd.setupgrg(grgName, rtprio, maxprocs)
 				if err != nil {
@@ -73,13 +73,19 @@ func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgrg(grgName, rtPriority string, maxprocs int) (as.Connection, error) {
+func (gd *daemon) setupgrg(grgName string, rtPriority int, maxprocs int) (as.Connection, error) {
 	if !strings.Contains(grgName, "-") {
 		grgName = grgName + "-" + version
 	}
+	if rtPriority < 0 {
+		rtPriority = 0
+	}
+	if maxprocs < 0 {
+		maxprocs = 0
+	}
 
 	daemonMaxprocs := runtime.GOMAXPROCS(-1)
-	if maxprocs <= 0 || maxprocs > daemonMaxprocs {
+	if maxprocs > daemonMaxprocs {
 		maxprocs = daemonMaxprocs
 	}
 
@@ -99,7 +105,9 @@ func (gd *daemon) setupgrg(grgName, rtPriority string, maxprocs int) (as.Connect
 
 	runGrg := func(exe, args string) error {
 		cmd := exec.Command(exe, strings.Split(args, " ")...)
-		cmd.Env = append(os.Environ(), fmt.Sprintf("GOMAXPROCS=%d", maxprocs))
+		if maxprocs != 0 {
+			cmd.Env = append(os.Environ(), fmt.Sprintf("GOMAXPROCS=%d", maxprocs))
+		}
 		buf := &bytes.Buffer{}
 		cmd.Stdout = buf
 		cmd.Stderr = buf
@@ -129,14 +137,14 @@ func (gd *daemon) setupgrg(grgName, rtPriority string, maxprocs int) (as.Connect
 	exe := os.Args[0]
 
 	testChrt := func() bool {
-		if err := exec.Command("chrt", rtPriority, "true").Run(); err != nil {
+		if err := exec.Command("chrt", strconv.Itoa(rtPriority), "true").Run(); err != nil {
 			gd.lg.Infof("chrt with priority %s not working", rtPriority)
 			return false
 		}
 		return true
 	}
-	if len(rtPriority) != 0 && rtPriority != "0" && testChrt() {
-		args = rtPriority + " " + exe + " " + args
+	if rtPriority != 0 && testChrt() {
+		args = strconv.Itoa(rtPriority) + " " + exe + " " + args
 		exe = "chrt"
 	}
 	if err := runGrg(exe, args); err != nil {
@@ -225,6 +233,8 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 			if pInfo == nil {
 				continue
 			}
+			// prevent grgRestarter keeps restarting the grg
+			os.RemoveAll(pInfo.statDir)
 			if process, err := os.FindProcess(pInfo.pid); err == nil {
 				process.Signal(syscall.SIGKILL)
 			}
@@ -261,7 +271,7 @@ func (msg *cmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 type cmdRun struct {
 	grgCmdRun
 	GRGName    string
-	RtPriority string
+	RtPriority int
 	Maxprocs   int
 }
 
@@ -460,16 +470,9 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			grgName := grgjl.Name
-			rtpriority := strconv.Itoa(grgjl.RtPriority)
-			maxprocs := 0
-			if i, err := strconv.Atoi(grgjl.Maxprocs); err == nil {
-				maxprocs = i
-			}
-
-			grgconn, err := gd.setupgrg(grgName, rtpriority, maxprocs)
+			grgconn, err := gd.setupgrg(grgjl.Name, grgjl.RtPriority, grgjl.Maxprocs)
 			if err != nil {
-				gd.lg.Errorf("load grg %s failed with error: %v", grgName, err)
+				gd.lg.Errorf("load grg %s failed with error: %v", grgjl.Name, err)
 				errChan <- err
 				return
 			}
@@ -502,7 +505,7 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 					return
 				}
 			}
-			gd.lg.Infof("grg %s loaded", grgName)
+			gd.lg.Infof("grg %s loaded", grgjl.Name)
 		}()
 	}
 

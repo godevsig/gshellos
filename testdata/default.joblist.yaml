@@ -1,13 +1,11 @@
 grgs:
   - name: test2
-    max-procs: "24"
     jobs:
       - args:
           - testdata/hello.go
       - args:
           - testdata/hello.go
   - name: szcrel
-    max-procs: "24"
     jobs:
       - args:
           - testdata/sleep.go
@@ -15,7 +13,7 @@ grgs:
         auto-restart-max: 3
   - name: dwuuwt
     rt-priority: 39
-    max-procs: "4"
+    max-procs: 4
     jobs:
       - args:
           - testdata/hellolog.go
