@@ -1,3 +1,4 @@
+//go:build stdhttp
 // +build stdhttp
 
 package gshellos
