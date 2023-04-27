@@ -226,12 +226,12 @@ func TestCmdAutoRestart(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
-	pidOld := gs.RunShCmd("ps -eo pid,cmd | grep autorestart | grep -v grep | awk '{print $1}'")
+	pidOld := gs.RunShCmd("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", pidOld)
 	gs.RunShCmd(fmt.Sprintf("kill -9 %s", pidOld))
 	time.Sleep(time.Second)
 
-	pidNew := gs.RunShCmd("ps -eo pid,cmd | grep autorestart | grep -v grep | awk '{print $1}'")
+	pidNew := gs.RunShCmd("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", pidNew)
 
 	if pidOld == pidNew {

@@ -62,7 +62,7 @@ func extractCmd() error {
 		ext.Include = strings.Split(include, ",")
 	}
 
-	r := strings.NewReplacer("/", "-", ".", "_")
+	r := strings.NewReplacer("/", "-", ".", "_", "~", "_")
 
 	for _, pkgIdent := range args {
 		var buf bytes.Buffer
