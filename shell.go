@@ -91,7 +91,7 @@ func isDir(path string) bool {
 	return err == nil && fi.Mode().IsDir()
 }
 
-func (sh *shell) runFile(path string) error {
+func (sh *shell) run(path string) error {
 	if isFile(path) {
 		b, err := os.ReadFile(path)
 		if err != nil {

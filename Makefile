@@ -17,7 +17,7 @@ lint: dep ## Lint the files
 vet: dep ## Examine and report suspicious constructs
 	@go vet ${PKG_ALL}
 
-testbin: STDTAGS := $(STDTAGS),stdhttp
+testbin: STDTAGS := $(STDTAGS),stdhttp,stdlog
 testbin: LDFLAGS += -X 'github.com/godevsig/gshellos.updateInterval=5'
 testbin: dep ## Generate test version of main binary
 	@go test -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .

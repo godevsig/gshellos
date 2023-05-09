@@ -304,7 +304,27 @@ func TestCmdExec(t *testing.T) {
 
 	out, err = gshellRunCmd("exec testdata/nofile.go")
 	t.Logf("\n%s", out)
-	if !strings.Contains(out, "testdata/nofile.go not found") {
+	if !strings.Contains(out, "testdata/nofile.go: no such file or directory") {
+		t.Fatal("unexpected output")
+	}
+}
+
+func TestCmdExecDir(t *testing.T) {
+	should := `|_| |_____| |____/   \___|`
+	out, err := gshellRunCmd("exec testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, should) {
+		t.Fatal("unexpected output")
+	}
+	out, err = gshellRunCmd("exec testdata/figure")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, should) {
 		t.Fatal("unexpected output")
 	}
 }

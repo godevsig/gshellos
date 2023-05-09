@@ -406,17 +406,52 @@ func addIDCmd() {
 }
 
 func addExecCmd() {
-	cmd := flag.NewFlagSet(newCmd("exec", "<file.go> [args...]", "Run <file.go> in a local GRE"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("exec", "<path[/file.go]> [args...]", "Run go file(s) in a local GRE"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no file provided, see --help")
+			return errors.New("no path provided, see --help")
 		}
 
-		file := args[0]
-		sh := newShell(interp.Options{Args: args})
-		err := sh.runFile(file)
+		pathFile := filepath.Clean(args[0])
+		fi, err := os.Stat(pathFile)
+		if err != nil {
+			return err
+		}
+		path := pathFile
+		file := ""
+		if fi.Mode().IsRegular() {
+			path = filepath.Dir(pathFile)
+			file = filepath.Base(pathFile)
+			if !strings.HasSuffix(file, ".go") {
+				return errors.New("wrong file suffix, see --help")
+			}
+		}
+
+		tmpDir, err := os.MkdirTemp("", "gshell-exec-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tmpDir)
+		srcDir := filepath.Join(tmpDir, "src")
+		if fi.Mode().IsDir() {
+			srcDir = filepath.Join(srcDir, "vendor")
+		}
+		if err := os.MkdirAll(srcDir, 0755); err != nil {
+			return err
+		}
+		RunShCmd(fmt.Sprintf("cp -a %s/* -t %s", path, srcDir))
+
+		oldwd, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(oldwd)
+		sh := newShell(interp.Options{Args: args, GoPath: tmpDir})
+		pathFile = "."
+		if file != "" {
+			pathFile = filepath.Join("src", file)
+		}
+		err = sh.run(pathFile)
 		if p, ok := err.(interp.Panic); ok {
 			err = fmt.Errorf("%w\n%s", err, string(p.Stack))
 		}
