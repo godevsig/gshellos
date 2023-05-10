@@ -165,7 +165,7 @@ type greCtl struct {
 	runMsg     *grgCmdRun
 	outputFile string
 	statDir    string
-	sh         *shell
+	gsh        *gshell
 }
 
 // gi is not nil when loading from file
@@ -270,14 +270,14 @@ func (gc *greCtl) newShell() error {
 	src := string(gc.runMsg.ByteCode)
 	src = strings.Replace(src, "main(", "_main(", 1)
 
-	gc.sh = newShell(interp.Options{
+	gc.gsh = newShell(interp.Options{
 		Stdin:  gc.stdin,
 		Stdout: gc.stdout,
 		Stderr: &gc.stderr,
 		Args:   gc.args,
 	})
 
-	_, err := gc.sh.Eval(src)
+	_, err := gc.gsh.Eval(src)
 	return err
 }
 
@@ -297,7 +297,7 @@ func (gc *greCtl) runGRE() {
 	if err := gc.newShell(); err != nil {
 		fmt.Fprintln(&gc.stderr, err)
 	} else {
-		if _, err := gc.sh.EvalWithContext(ctx, "_main()"); err != nil {
+		if _, err := gc.gsh.EvalWithContext(ctx, "_main()"); err != nil {
 			fmt.Fprintln(&gc.stderr, err)
 			if p, ok := err.(interp.Panic); ok {
 				fmt.Fprintln(&gc.stderr, string(p.Stack))
@@ -455,7 +455,7 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "stop":
 			if gc.stat == greStatRunning { // no need to atomic
-				if _, err := gc.sh.Eval("Stop()"); err != nil { // try to call Stop() if there is one
+				if _, err := gc.gsh.Eval("Stop()"); err != nil { // try to call Stop() if there is one
 					gc.cancel()
 				}
 				gc.changeStatIf(greStatRunning, greStatAborting)

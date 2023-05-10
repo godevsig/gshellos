@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 
@@ -85,30 +84,6 @@ type nullIO struct{}
 func (nullIO) Close() error                  { return nil }
 func (nullIO) Write(buf []byte) (int, error) { return len(buf), nil }
 func (nullIO) Read(buf []byte) (int, error)  { return 0, io.EOF }
-
-// RunShCmd runs a command and returns its output.
-// The command will be running in background and output is discarded
-// if it ends with &.
-func RunShCmd(cmd string) string {
-	cmd = strings.TrimSpace(cmd)
-	if cmd == "" {
-		return ""
-	}
-	bg := false
-	if cmd[len(cmd)-1] == '&' {
-		bg = true
-		cmd = cmd[:len(cmd)-1]
-	}
-
-	if bg {
-		if err := exec.Command("sh", "-c", cmd).Start(); err != nil {
-			return err.Error()
-		}
-		return ""
-	}
-	output, _ := exec.Command("sh", "-c", cmd).CombinedOutput()
-	return string(output)
-}
 
 func init() {
 	as.RegisterType((*net.DNSError)(nil))

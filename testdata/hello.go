@@ -7,3 +7,6 @@ import (
 func main() {
 	fmt.Println("Hello, playground")
 }
+
+//output:
+//Hello, playground

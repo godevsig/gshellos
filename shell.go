@@ -14,11 +14,11 @@ import (
 	"github.com/traefik/yaegi/interp"
 )
 
-type shell struct {
+type gshell struct {
 	*interp.Interpreter
 }
 
-func newShell(opt interp.Options) *shell {
+func newShell(opt interp.Options) *gshell {
 	os.Setenv("YAEGI_SPECIAL_STDIO", "1")
 	i := interp.New(opt)
 	if err := i.Use(stdlib.Symbols); err != nil {
@@ -28,11 +28,11 @@ func newShell(opt interp.Options) *shell {
 		panic(err)
 	}
 	i.ImportUsed()
-	sh := &shell{Interpreter: i}
+	sh := &gshell{Interpreter: i}
 	return sh
 }
 
-func (sh *shell) runREPL() {
+func (gsh *gshell) runREPL() {
 	ctx, cancel := context.WithCancel(context.Background())
 	end := make(chan struct{}) // channel to terminate the REPL
 	defer close(end)
@@ -64,7 +64,7 @@ func (sh *shell) runREPL() {
 			break
 		}
 		if len(line) != 0 {
-			_, err := sh.EvalWithContext(ctx, line)
+			_, err := gsh.EvalWithContext(ctx, line)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -91,19 +91,19 @@ func isDir(path string) bool {
 	return err == nil && fi.Mode().IsDir()
 }
 
-func (sh *shell) run(path string) error {
+func (gsh *gshell) run(path string) error {
 	if isFile(path) {
 		b, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
 
-		_, err = sh.Eval(string(rmShebang(b)))
+		_, err = gsh.Eval(string(rmShebang(b)))
 		return err
 	}
 
 	if isDir(path) {
-		_, err := sh.EvalPath(path)
+		_, err := gsh.EvalPath(path)
 		return err
 	}
 

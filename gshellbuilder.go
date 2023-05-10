@@ -25,6 +25,7 @@ import (
 
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/grepo/lib/sys/log"
+	"github.com/godevsig/grepo/lib/sys/shell"
 	"github.com/traefik/yaegi/interp"
 )
 
@@ -253,18 +254,18 @@ func addDeamonCmd() {
 					continue
 				}
 
-				lg.Debugf(RunShCmd("ls -lh " + newFile))
+				lg.Debugf(shell.Run("ls -lh " + newFile))
 				lg.Infof("updating gshell version...")
 
 				if err := os.Rename(newFile, exe); err != nil {
 					lg.Infof("failed to rename new gshell to %s: %s", exe, err)
-					output := RunShCmd("mv -f " + newFile + " " + exe)
+					output := shell.Run("mv -f " + newFile + " " + exe)
 					if len(output) != 0 {
 						lg.Warnf("failed to mv new gshell to %s: %s", exe, output)
 						continue
 					}
 				}
-				if output := RunShCmd("chmod ugo+s " + exe); len(output) != 0 {
+				if output := shell.Run("chmod ugo+s " + exe); len(output) != 0 {
 					lg.Warnf("failed to set gshell bin permission : %s", output)
 					continue
 				}
@@ -441,7 +442,7 @@ func addExecCmd() {
 		if err := os.MkdirAll(srcDir, 0755); err != nil {
 			return err
 		}
-		RunShCmd(fmt.Sprintf("cp -a %s/* -t %s", path, srcDir))
+		shell.Run(fmt.Sprintf("cp -a %s/* -t %s", path, srcDir))
 
 		oldwd, _ := os.Getwd()
 		os.Chdir(tmpDir)
