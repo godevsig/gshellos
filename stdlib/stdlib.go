@@ -37,7 +37,7 @@ func init() {
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stddatabase database/sql database/sql/driver
 
-//go:generate ../cmd/extract/extract -name stdlib -tag stddebug debug/dwarf debug/elf debug/gosym debug/macho debug/pe debug/plan9obj
+//go:generate ../cmd/extract/extract -name stdlib -tag stddebug debug/buildinfo debug/dwarf debug/elf debug/gosym debug/macho debug/pe debug/plan9obj
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdencoding encoding encoding/ascii85 encoding/asn1 encoding/base32 encoding/base64
 //go:generate ../cmd/extract/extract -name stdlib -tag stdencoding encoding/csv encoding/pem encoding/xml
@@ -77,3 +77,6 @@ func init() {
 //go:generate ../cmd/extract/extract -name stdlib -tag stdunicode unicode unicode/utf16 unicode/utf8
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdother time/tzdata
+
+//go:generate ../cmd/extract/extract -name stdlib -tag stdunsafe unsafe
+//go:generate ../cmd/extract/extract -name stdlib -tag stdsyscall syscall
