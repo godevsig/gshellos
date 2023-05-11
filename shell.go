@@ -29,6 +29,7 @@ func newShell(opt interp.Options) *gshell {
 	}
 	i.ImportUsed()
 	sh := &gshell{Interpreter: i}
+	os.Args = opt.Args //reset os.Args for interpreter
 	return sh
 }
 

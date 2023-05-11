@@ -447,12 +447,12 @@ func addExecCmd() {
 		oldwd, _ := os.Getwd()
 		os.Chdir(tmpDir)
 		defer os.Chdir(oldwd)
-		sh := newShell(interp.Options{Args: args, GoPath: tmpDir})
+		gsh := newShell(interp.Options{Args: args, GoPath: tmpDir})
 		pathFile = "."
 		if file != "" {
 			pathFile = filepath.Join("src", file)
 		}
-		err = sh.run(pathFile)
+		err = gsh.run(pathFile)
 		if p, ok := err.(interp.Panic); ok {
 			err = fmt.Errorf("%w\n%s", err, string(p.Stack))
 		}

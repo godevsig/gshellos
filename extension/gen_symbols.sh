@@ -1,27 +1,28 @@
 #!/bin/bash
 
-pkg=$1
-shift
-
+test "$1" = "-tag" && tag=$2 && shift 2
+pkg=$1 && shift
 basepkg=`basename $pkg`
-../cmd/extract/extract -name extension -tag $basepkg $pkg
+: ${tag:=$basepkg}
+
+../cmd/extract/extract -name extension -tag $tag $pkg
 
 file=`echo $pkg | tr ./ _-`.go
 mv $file $file.raw
 while test $# != 0; do
         case $1 in
-                -fixlog)
+        -fixlog)
                 sed -i 's/logLogger/log.Logger/' $file.raw
                 shift
                 ;;
-                -extramsg)
+        -extramsg)
                 extrapkg=$pkg/$basepkg
                 extrafile=`echo $extrapkg | tr ./ _-`.go
-                ../cmd/extract/extract -name extension -tag ${basepkg}msg $extrapkg
+                ../cmd/extract/extract -name extension -tag ${tag}msg $extrapkg
                 sed -n '/func init/,$p' $extrafile >> $file.raw
                 shift
                 ;;
-                *)
+        *)
                 shift
         esac
 done
