@@ -444,13 +444,10 @@ func addExecCmd() {
 		}
 		shell.Run(fmt.Sprintf("cp -a %s/* -t %s", path, srcDir))
 
-		oldwd, _ := os.Getwd()
-		os.Chdir(tmpDir)
-		defer os.Chdir(oldwd)
 		gsh := newShell(interp.Options{Args: args, GoPath: tmpDir})
 		pathFile = "."
 		if file != "" {
-			pathFile = filepath.Join("src", file)
+			pathFile = filepath.Join(srcDir, file)
 		}
 		err = gsh.run(pathFile)
 		if p, ok := err.(interp.Panic); ok {
