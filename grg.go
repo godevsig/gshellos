@@ -29,10 +29,11 @@ type processInfo struct {
 type grg struct {
 	sync.RWMutex
 	processInfo
-	server *as.Server
-	lg     *log.Logger
-	greids []string // keep the order
-	gres   map[string]*greCtl
+	workDir string
+	server  *as.Server
+	lg      *log.Logger
+	greids  []string // keep the order
+	gres    map[string]*greCtl
 }
 
 func (grg *grg) onNewStream(ctx as.Context) {
@@ -115,8 +116,7 @@ func (grg *grg) rmGRE(gc *greCtl) {
 	}
 	grg.greids = greids
 	grg.Unlock()
-	os.Remove(gc.outputFile)
-	os.RemoveAll(gc.statDir)
+	gc.close()
 	grg.lg.Debugln("gre " + gc.ID + " removed")
 
 	grg.Lock()
@@ -166,6 +166,7 @@ type greCtl struct {
 	outputFile string
 	statDir    string
 	gsh        *gshell
+	codeDir    string
 }
 
 // gi is not nil when loading from file
@@ -181,7 +182,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		gc.RestartedNum = 0
 		gc.AutoRestartBalance = runMsg.AutoRestartMax
 	}
-	gc.outputFile = filepath.Join(workDir, "logs", gc.ID)
+	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
 	gc.statDir = filepath.Join(grg.statDir, gc.ID)
 
 	if gi == nil {
@@ -195,6 +196,17 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 			return nil, err
 		}
 	}
+
+	tmpDir, err := os.MkdirTemp("", "gshell-gre-code-")
+	if err != nil {
+		return nil, err
+	}
+	gc.codeDir = tmpDir
+
+	if err := unzipBufferToPath(runMsg.CodeZip, tmpDir); err != nil {
+		return nil, err
+	}
+	runMsg.CodeZip = nil // release the mem sooner
 
 	return gc, nil
 }
@@ -266,19 +278,21 @@ func (gc *greCtl) reset() error {
 	return nil
 }
 
-func (gc *greCtl) newShell() error {
-	src := string(gc.runMsg.ByteCode)
-	src = strings.Replace(src, "main(", "_main(", 1)
+func (gc *greCtl) close() {
+	gc.gsh.close()
+	os.Remove(gc.outputFile)
+	os.RemoveAll(gc.statDir)
+	os.RemoveAll(gc.codeDir)
+}
 
-	gc.gsh = newShell(interp.Options{
+func (gc *greCtl) newShell() (err error) {
+	gc.gsh, err = newShell(interp.Options{
 		Stdin:  gc.stdin,
 		Stdout: gc.stdout,
 		Stderr: &gc.stderr,
 		Args:   gc.args,
 	})
-
-	_, err := gc.gsh.Eval(src)
-	return err
+	return
 }
 
 func (gc *greCtl) runGRE() {
@@ -297,7 +311,7 @@ func (gc *greCtl) runGRE() {
 	if err := gc.newShell(); err != nil {
 		fmt.Fprintln(&gc.stderr, err)
 	} else {
-		if _, err := gc.gsh.EvalWithContext(ctx, "_main()"); err != nil {
+		if err := gc.gsh.evalPathWithContext(ctx, gc.codeDir); err != nil {
 			fmt.Fprintln(&gc.stderr, err)
 			if p, ok := err.(interp.Panic); ok {
 				fmt.Fprintln(&gc.stderr, string(p.Stack))
@@ -329,17 +343,17 @@ type grgGREInfo struct {
 
 // JobCmd is the job in grgCmdRun
 type JobCmd struct {
-	Args           []string `yaml:",omitempty"`
+	Args           []string `yaml:"args,omitempty"`
 	AutoRemove     bool     `yaml:"auto-remove,omitempty"`
 	AutoRestartMax uint     `yaml:"auto-restart-max,omitempty"` // user defined max auto restart count
-	ByteCode       []byte   `yaml:"bytecode,omitempty"`
+	CodeZip        []byte   `yaml:"code-zip,omitempty"`
 }
 
 // JobInfo is the job in joblist
 type JobInfo struct {
-	Cmd            string
-	JobCmd         `yaml:",inline"`
-	ByteCodeBase64 string `yaml:"bytecode-base64,omitempty"`
+	JobCmd        `yaml:",inline"`
+	Cmd           string `yaml:"cmd"`
+	CodeZipBase64 string `yaml:"code-zip-base64,omitempty"`
 }
 
 type grgCmdRun struct {
@@ -350,6 +364,22 @@ type grgCmdRun struct {
 func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	grg := stream.GetContext().(*grg)
 	grg.lg.Debugf("grgCmdRun: args: %v, interactive: %v\n", msg.Args, msg.Interactive)
+
+	if msg.CodeZip == nil {
+		filePath := msg.Args[0]
+		c := as.NewClient(as.WithLogger(grg.lg)).SetDiscoverTimeout(0)
+		conn := <-c.Discover(godevsigPublisher, "codeRepo")
+		if conn == nil {
+			return fmt.Errorf("%s_codeRepo service not running", godevsigPublisher)
+		}
+		defer conn.Close()
+
+		var zip []byte
+		if err := conn.SendRecv(getCode{filePath}, &zip); err != nil {
+			return err
+		}
+		msg.CodeZip = zip
+	}
 
 	gc, err := grg.newGRE(nil, msg)
 	if err != nil {
@@ -455,7 +485,7 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "stop":
 			if gc.stat == greStatRunning { // no need to atomic
-				if _, err := gc.gsh.Eval("Stop()"); err != nil { // try to call Stop() if there is one
+				if _, err := gc.gsh.interpreter.Eval("Stop()"); err != nil { // try to call Stop() if there is one
 					gc.cancel()
 				}
 				gc.changeStatIf(greStatRunning, greStatAborting)

@@ -20,7 +20,8 @@ import (
 )
 
 type daemon struct {
-	lg *log.Logger
+	lg      *log.Logger
+	workDir string
 }
 
 // some grg processes were killed by oom or unexpected operations,
@@ -28,7 +29,7 @@ type daemon struct {
 func (gd *daemon) grgRestarter() {
 	for {
 		time.Sleep(time.Second)
-		grgs, err := filepath.Glob(workDir + "/status/grg-*")
+		grgs, err := filepath.Glob(gd.workDir + "/status/grg-*")
 		if err != nil {
 			gd.lg.Warnln(err)
 			continue
@@ -130,7 +131,7 @@ func (gd *daemon) setupgrg(grgName string, rtPriority int, maxprocs int) (as.Con
 		return nil
 	}
 
-	args := "-wd " + workDir + " -loglevel " + loglevel + " __start " + "-group " + grgName
+	args := fmt.Sprintf("-loglevel %s __start -group %s -wd %s", loglevel, grgName, gd.workDir)
 	if os.Args[0] == "gshell.tester" {
 		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + grgName + genID(3) + ".cov -- " + args
 	}
@@ -381,11 +382,11 @@ func (msg *cmdLog) Handle(stream as.ContextStream) (reply interface{}) {
 	var file string
 	switch msg.Target {
 	case "daemon":
-		file = workDir + "/logs/daemon.log"
+		file = gd.workDir + "/logs/daemon.log"
 	case "grg":
-		file = workDir + "/logs/grg.log"
+		file = gd.workDir + "/logs/grg.log"
 	default:
-		file = workDir + "/logs/" + msg.Target
+		file = gd.workDir + "/logs/" + msg.Target
 	}
 
 	if msg.Follow {
@@ -478,22 +479,7 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 			}
 			defer grgconn.Close()
 
-			c := as.NewClient(as.WithLogger(gd.lg)).SetDiscoverTimeout(0)
-			codeconn := <-c.Discover(godevsigPublisher, "codeRepo")
-			if codeconn != nil {
-				defer codeconn.Close()
-			}
-
 			for _, job := range grgjl.Jobs {
-				file := job.Args[0]
-				if byteCode, err := os.ReadFile(file); err == nil {
-					job.ByteCode = rmShebang(byteCode)
-				} else if codeconn != nil {
-					if err := codeconn.SendRecv(getFileContent{file}, &byteCode); err == nil {
-						job.ByteCode = rmShebang(byteCode)
-					}
-				}
-
 				runMsg := &grgCmdRun{
 					JobCmd:      job.JobCmd,
 					Interactive: false,
@@ -532,8 +518,6 @@ var daemonKnownMsgs = []as.KnownMessage{
 	(*cmdJoblistLoad)(nil),
 }
 
-var httpGet func(url string) ([]byte, error)
-
 type updater struct {
 	urlFmt string
 	lg     *log.Logger
@@ -554,7 +538,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	updtr := stream.GetContext().(*updater)
 	updtr.lg.Debugf("tryUpdate: %v", msg)
 
-	rev, err := httpGet(fmt.Sprintf(updtr.urlFmt, "rev"))
+	rev, err := httpOp.readFile(fmt.Sprintf(updtr.urlFmt, "rev"))
 	if err != nil {
 		return err
 	}
@@ -570,7 +554,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 		return ErrNoUpdate
 	}
 
-	checksum, err := httpGet(fmt.Sprintf(updtr.urlFmt, "md5sum"))
+	checksum, err := httpOp.readFile(fmt.Sprintf(updtr.urlFmt, "md5sum"))
 	if err != nil {
 		return err
 	}
@@ -591,7 +575,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 		return fmt.Errorf("arch %s not supported", msg.arch)
 	}
 
-	bin, err := httpGet(fmt.Sprintf(updtr.urlFmt, "gshell."+msg.arch))
+	bin, err := httpOp.readFile(fmt.Sprintf(updtr.urlFmt, "gshell."+msg.arch))
 	if err != nil {
 		return err
 	}
@@ -604,43 +588,118 @@ var updaterKnownMsgs = []as.KnownMessage{
 }
 
 type codeRepoSvc struct {
-	repoInfo []string
+	localRepoPath string
+	httpRepoInfo  []string // site/org/proj/branch
 }
 
 type codeRepoAddr struct{}
 
 func (msg codeRepoAddr) Handle(stream as.ContextStream) (reply interface{}) {
 	crs := stream.GetContext().(*codeRepoSvc)
-	return strings.Join(crs.repoInfo[:3], "/") + " " + crs.repoInfo[3]
+	if crs.localRepoPath != "" {
+		return crs.localRepoPath
+	}
+	return strings.Join(crs.httpRepoInfo[:3], "/") + " " + crs.httpRepoInfo[3]
 }
 
-type getFileContent struct {
-	File string
+type getCode struct {
+	PathFile string
 }
 
-func (msg getFileContent) Handle(stream as.ContextStream) (reply interface{}) {
+func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {
 	crs := stream.GetContext().(*codeRepoSvc)
-	repoInfo := crs.repoInfo
+	// local dir
+	if crs.localRepoPath != "" {
+		zip, err := zipPathToBuffer(filepath.Join(crs.localRepoPath, msg.PathFile))
+		if err != nil {
+			return err
+		}
+		return zip
+	}
+	domain, owner, repo, branch := crs.httpRepoInfo[0], crs.httpRepoInfo[1], crs.httpRepoInfo[2], crs.httpRepoInfo[3]
 
 	var addr string
-	if repoInfo[0] == "github.com" {
-		addr = fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", repoInfo[1], repoInfo[2], repoInfo[3], msg.File)
-	} else if strings.Contains(repoInfo[0], "gitlab") {
-		addr = fmt.Sprintf("https://%s/%s/%s/-/raw/%s/%s", repoInfo[0], repoInfo[1], repoInfo[2], repoInfo[3], msg.File)
+	if strings.HasPrefix(msg.PathFile, "http://") || strings.HasPrefix(msg.PathFile, "https://") {
+		addr = msg.PathFile // raw URL
+	} else if strings.Contains(domain, "github") {
+		addr = fmt.Sprintf("https://%s/%s/%s/tree/%s/%s", domain, owner, repo, branch, msg.PathFile)
+	} else if strings.Contains(domain, "gitlab") {
+		addr = fmt.Sprintf("https://%s/%s/%s/-/tree/%s/%s", domain, owner, repo, branch, msg.PathFile)
 	} else {
-		return fmt.Errorf("%s not supported", repoInfo[0])
+		return fmt.Errorf("%s not supported", domain)
 	}
 
-	body, err := httpGet(addr)
+	zip, err := httpOp.getArchive(addr)
 	if err != nil {
 		return err
 	}
-	return body
+	return zip
+}
+
+// reply with []dirEntry
+type codeRepoList struct {
+	path string
+}
+
+type dirEntry struct {
+	name  string
+	isDir bool
+}
+
+func (msg codeRepoList) Handle(stream as.ContextStream) (reply interface{}) {
+	crs := stream.GetContext().(*codeRepoSvc)
+	var entries []dirEntry
+	// local dir
+	if crs.localRepoPath != "" {
+		path := filepath.Join(crs.localRepoPath, msg.path)
+		fi, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if fi.Mode().IsRegular() {
+			return []dirEntry{{filepath.Base(path), false}}
+		}
+		files, err := os.ReadDir(path)
+		if err != nil {
+			return err
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				entries = append(entries, dirEntry{file.Name(), true})
+			} else {
+				entries = append(entries, dirEntry{file.Name(), false})
+			}
+		}
+		return entries
+	}
+	domain, owner, repo, branch := crs.httpRepoInfo[0], crs.httpRepoInfo[1], crs.httpRepoInfo[2], crs.httpRepoInfo[3]
+
+	var addr string
+	if strings.HasPrefix(msg.path, "http://") || strings.HasPrefix(msg.path, "https://") {
+		addr = msg.path // raw URL
+	} else if strings.Contains(domain, "github") {
+		addr = fmt.Sprintf("https://%s/%s/%s/tree/%s/%s", domain, owner, repo, branch, msg.path)
+	} else if strings.Contains(domain, "gitlab") {
+		addr = fmt.Sprintf("https://%s/%s/%s/-/tree/%s/%s", domain, owner, repo, branch, msg.path)
+	} else {
+		return fmt.Errorf("%s not supported", domain)
+	}
+
+	hfis, err := httpOp.list(addr)
+	if err != nil {
+		return err
+	}
+	for _, hfi := range hfis {
+		entries = append(entries, dirEntry{hfi.name, hfi.isDir})
+	}
+	return entries
 }
 
 var codeRepoKnownMsgs = []as.KnownMessage{
 	codeRepoAddr{},
-	getFileContent{},
+	getCode{},
+	codeRepoList{},
 }
 
 func init() {
@@ -656,7 +715,9 @@ func init() {
 	as.RegisterType((*joblist)(nil))
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType((*cmdJoblistLoad)(nil))
-	as.RegisterType(getFileContent{})
+	as.RegisterType(getCode{})
+	as.RegisterType(codeRepoList{})
+	as.RegisterType([]dirEntry(nil))
 	as.RegisterType(tryUpdate{})
 	as.RegisterType((*gshellBin)(nil))
 }

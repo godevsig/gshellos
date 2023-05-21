@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 
 	"github.com/godevsig/grepo/lib/sys/lined"
 	"github.com/godevsig/gshellos/extension"
@@ -15,22 +17,83 @@ import (
 )
 
 type gshell struct {
-	*interp.Interpreter
+	codeDir     string
+	interpreter *interp.Interpreter
 }
 
-func newShell(opt interp.Options) *gshell {
+func newShell(opt interp.Options) (*gshell, error) {
+	gsh := &gshell{}
+	tmpDir, err := os.MkdirTemp("", "gshell-code-")
+	if err != nil {
+		return nil, err
+	}
+	gsh.codeDir = tmpDir
+	opt.GoPath = tmpDir
 	os.Setenv("YAEGI_SPECIAL_STDIO", "1")
 	i := interp.New(opt)
 	if err := i.Use(stdlib.Symbols); err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err := i.Use(extension.Symbols); err != nil {
-		panic(err)
+		return nil, err
 	}
 	i.ImportUsed()
-	sh := &gshell{Interpreter: i}
+	gsh.interpreter = i
 	os.Args = opt.Args //reset os.Args for interpreter
-	return sh
+
+	return gsh, nil
+}
+
+func (gsh *gshell) close() {
+	os.RemoveAll(gsh.codeDir)
+	gsh.interpreter = nil
+}
+
+func (gsh *gshell) evalPath(path string) error {
+	return gsh.evalPathWithContext(nil, path)
+}
+
+func (gsh *gshell) evalPathWithContext(ctx context.Context, path string) error {
+	var err error
+	path, err = filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	file := ""
+	if fi.Mode().IsRegular() {
+		file = filepath.Base(path)
+		if !strings.HasSuffix(file, ".go") {
+			return errors.New("wrong file suffix, .go expected")
+		}
+	}
+	dir := filepath.Join(gsh.codeDir, "src")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	src := "."
+	if file == "" {
+		if err := os.Symlink(path, filepath.Join(dir, "vendor")); err != nil {
+			return err
+		}
+	} else {
+		src = filepath.Join(dir, file)
+		if err := os.Symlink(path, src); err != nil {
+			return err
+		}
+	}
+
+	if ctx == nil {
+		_, err = gsh.interpreter.EvalPath(src)
+	} else {
+		_, err = gsh.interpreter.EvalPathWithContext(ctx, src)
+	}
+
+	return err
 }
 
 func (gsh *gshell) runREPL() {
@@ -65,7 +128,7 @@ func (gsh *gshell) runREPL() {
 			break
 		}
 		if len(line) != 0 {
-			_, err := gsh.EvalWithContext(ctx, line)
+			_, err := gsh.interpreter.EvalWithContext(ctx, line)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -80,33 +143,4 @@ func rmShebang(b []byte) []byte {
 		}
 	}
 	return b
-}
-
-func isFile(path string) bool {
-	fi, err := os.Stat(path)
-	return err == nil && fi.Mode().IsRegular()
-}
-
-func isDir(path string) bool {
-	fi, err := os.Stat(path)
-	return err == nil && fi.Mode().IsDir()
-}
-
-func (gsh *gshell) run(path string) error {
-	if isFile(path) {
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		_, err = gsh.Eval(string(rmShebang(b)))
-		return err
-	}
-
-	if isDir(path) {
-		_, err := gsh.EvalPath(path)
-		return err
-	}
-
-	return fmt.Errorf("%s not found", path)
 }

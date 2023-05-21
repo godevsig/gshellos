@@ -1,14 +1,19 @@
 package gshellos
 
 import (
+	"archive/zip"
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/fs"
 	"net"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -93,4 +98,147 @@ func init() {
 	as.RegisterType(syscall.Errno(0))
 	as.RegisterType((*url.Error)(nil))
 	as.RegisterType((*exec.ExitError)(nil))
+	as.RegisterType((*fs.PathError)(nil))
+}
+
+type httpFileInfo struct {
+	name        string
+	path        string
+	downloadURL string
+	isDir       bool
+}
+
+type httpOperation interface {
+	// list directory contents
+	list(url string) ([]httpFileInfo, error)
+	// download all contents recursively
+	download(url string, dstDir string) error
+	// read file content
+	readFile(url string) ([]byte, error)
+	// get .zip archive
+	getArchive(url string) ([]byte, error)
+}
+
+var httpOp httpOperation
+
+// save folder in .zip format
+func zipPathToBuffer(path string) ([]byte, error) {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	var data bytes.Buffer
+	zw := zip.NewWriter(&data)
+
+	if fi.Mode().IsRegular() {
+		fileName := filepath.Base(path)
+		zipEntry, err := zw.Create(fileName)
+		if err != nil {
+			return nil, err
+		}
+		// Open the source file
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close()
+
+		// Copy the file content to the ZIP entry
+		_, err = io.Copy(zipEntry, file)
+		if err != nil {
+			return nil, err
+		}
+
+		zw.Close()
+		return data.Bytes(), nil
+	}
+
+	srcDir := path
+
+	// Walk through the source directory
+	err = filepath.Walk(srcDir, func(filePath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Create a new file entry in the ZIP archive
+		relPath := strings.TrimPrefix(filePath, srcDir)
+		zipEntry, err := zw.Create(relPath)
+		if err != nil {
+			return err
+		}
+
+		// Open the source file
+		file, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		// Copy the file content to the ZIP entry
+		_, err = io.Copy(zipEntry, file)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	zw.Close()
+	return data.Bytes(), err
+}
+
+// unzip data to folder
+func unzipBufferToPath(data []byte, dstDir string) error {
+	r := bytes.NewReader(data)
+	zr, err := zip.NewReader(r, r.Size())
+	if err != nil {
+		return err
+	}
+
+	extractFile := func(file *zip.File, dstDir string) error {
+		filePath := filepath.Join(dstDir, file.Name)
+
+		if file.FileInfo().IsDir() {
+			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
+				return err
+			}
+		} else {
+			if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
+				return err
+			}
+
+			src, err := file.Open()
+			if err != nil {
+				return err
+			}
+			defer src.Close()
+
+			dst, err := os.Create(filePath)
+			if err != nil {
+				return err
+			}
+			defer dst.Close()
+
+			_, err = io.Copy(dst, src)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for _, file := range zr.File {
+		err := extractFile(file, dstDir)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
