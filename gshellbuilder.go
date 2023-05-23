@@ -40,12 +40,12 @@ var buildTags string
 
 const (
 	defaultWorkDir    = "/var/tmp/gshell"
-	defaultProviderID = "self"
 	godevsigPublisher = "godevsig"
 )
 
 var (
 	loglevel     = "error"
+	providerID   = "self"
 	debugService func(lg *log.Logger)
 )
 
@@ -122,6 +122,9 @@ func addDeamonCmd() {
 	updateURL := cmd.String("update", "", "url of artifacts to update gshell, require -root")
 
 	action := func() error {
+		if providerID != "self" {
+			return errors.New("command does not run on remote node")
+		}
 		workDir := *workDir
 		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
 			panic(err)
@@ -337,6 +340,9 @@ func addListCmd() {
 	service := cmd.String("s", "*", "service name, can be wildcard")
 
 	action := func() error {
+		if providerID != "self" {
+			return errors.New("command does not run on remote node")
+		}
 		opts := []as.Option{
 			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
@@ -412,6 +418,9 @@ func addIDCmd() {
 	cmd := flag.NewFlagSet(newCmd("id", "", "Print self provider ID"), flag.ExitOnError)
 
 	action := func() error {
+		if providerID != "self" {
+			return errors.New("command does not run on remote node")
+		}
 		selfID, err := getSelfID()
 		if err != nil {
 			selfID = "NA"
@@ -426,6 +435,9 @@ func addExecCmd() {
 	cmd := flag.NewFlagSet(newCmd("exec", "<path[/file.go]> [args...]", "Run go file(s) in a local GRE"), flag.ExitOnError)
 
 	action := func() error {
+		if providerID != "self" {
+			return errors.New("command does not run on remote node")
+		}
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no path provided, see --help")
@@ -465,6 +477,9 @@ func addStartCmd() {
 	}
 
 	action := func() error {
+		if providerID != "self" {
+			return errors.New("command does not run on remote node")
+		}
 		if len(*grgName) == 0 {
 			return errors.New("no GRG name, see --help")
 		}
@@ -547,20 +562,13 @@ func addStartCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
-	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
-	if providerID == "self" { // local
-		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
-	} else { // remote
-		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
-	}
-	return
-}
-
 func addRepoCmd() {
 	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "list contens of the central code repo"), flag.ExitOnError)
 
 	action := func() error {
+		if providerID != "self" {
+			return errors.New("command does not run on remote node")
+		}
 		args := cmd.Args()
 		lg := newLogger(log.DefaultStream, "main")
 		c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
@@ -608,13 +616,22 @@ func randStringRunes(n int) string {
 	return string(b)
 }
 
+func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
+	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+	if providerID == "self" { // local
+		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
+	} else { // remote
+		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
+	}
+	return
+}
+
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <path[/file.go]> [args...]",
 		"fetch code path[/file.go] from `gshell repo`",
 		"and run the go file(s) in a new GRE in specified GRG on local/remote node"),
 		flag.ExitOnError)
-	providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 	grgName := cmd.String("group", "", `name of the GRG in the form name-version
 random group name will be used if no name specified
 target daemon version will be used if no version specified`)
@@ -627,7 +644,6 @@ silently ignore errors if real-time priority can not be set`)
 only applicable for non-interactive mode`)
 
 	action := func() error {
-		providerID := *providerID
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see --help")
@@ -708,11 +724,9 @@ func addKillCmd() {
 		"Terminate the named GRG(s) on local/remote node",
 		"wildcard(*) is supported"),
 		flag.ExitOnError)
-	providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 	force := cmd.Bool("f", false, "force terminate even if there are still running GREs")
 
 	action := func() error {
-		providerID := *providerID
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no GRG specified, see --help")
@@ -744,12 +758,10 @@ func addJoblistCmd() {
 		"[options] <save|load>",
 		"Save all current jobs to file or load them to run on local/remote node"),
 		flag.ExitOnError)
-	providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 	file := cmd.String("file", "default.joblist.yaml", "the file save to or load from")
 	tiny := cmd.Bool("tiny", false, "discard bytecode")
 
 	action := func() error {
-		providerID := *providerID
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no subcommand provided, see --help")
@@ -851,11 +863,9 @@ func addJoblistCmd() {
 
 func addPsCmd() {
 	cmd := flag.NewFlagSet(newCmd("ps", "[options] [GRE IDs ...|names ...]", "Show jobs by GRE ID or name on local/remote node"), flag.ExitOnError)
-	providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 	grgName := cmd.String("group", "*", "in which GRG")
 
 	action := func() error {
-		providerID := *providerID
 		lg := newLogger(log.DefaultStream, "main")
 		conn := connectDaemon(providerID, lg)
 		if conn == nil {
@@ -931,11 +941,9 @@ func addPatternCmds() {
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
-		providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 		grgName := cmd.String("group", "*", "in which GRG")
 
 		action := func() error {
-			providerID := *providerID
 			lg := newLogger(log.DefaultStream, "main")
 			conn := connectDaemon(providerID, lg)
 			if conn == nil {
@@ -977,10 +985,8 @@ func addPatternCmds() {
 
 func addInfoCmd() {
 	cmd := flag.NewFlagSet(newCmd("info", "", "Show gshell info on local/remote node"), flag.ExitOnError)
-	providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 
 	action := func() error {
-		providerID := *providerID
 		lg := newLogger(log.DefaultStream, "main")
 		conn := connectDaemon(providerID, lg)
 		if conn == nil {
@@ -1001,11 +1007,9 @@ func addInfoCmd() {
 
 func addLogCmd() {
 	cmd := flag.NewFlagSet(newCmd("log", "[options] <daemon|grg|GRE ID>", "Print target log on local/remote node"), flag.ExitOnError)
-	providerID := cmd.String("p", defaultProviderID, "provider ID, run the command on the remote node with this ID")
 	follow := cmd.Bool("f", false, "follow and output appended data as the log grows")
 
 	action := func() error {
-		providerID := *providerID
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no target provided, see --help")
@@ -1059,20 +1063,21 @@ func ShellMain() error {
 	}
 
 	flag.StringVar(&loglevel, "loglevel", loglevel, "debug/info/warn/error")
+	flag.StringVar(&providerID, "provider", providerID, "provider ID, run following command on the remote node with this ID")
 
-	addDeamonCmd()
-	addListCmd()
 	addIDCmd()
 	addExecCmd()
+	addDeamonCmd()
+	addListCmd()
 	addStartCmd()
 	addRepoCmd()
-	addKillCmd()
 	addRunCmd()
-	addJoblistCmd()
+	addKillCmd()
 	addPsCmd()
 	addPatternCmds()
 	addInfoCmd()
 	addLogCmd()
+	addJoblistCmd()
 
 	usage := func() {
 		fmt.Println("COMMANDS:")
