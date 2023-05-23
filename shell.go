@@ -29,7 +29,6 @@ func newShell(opt interp.Options) (*gshell, error) {
 	}
 	gsh.codeDir = tmpDir
 	opt.GoPath = tmpDir
-	os.Setenv("YAEGI_SPECIAL_STDIO", "1")
 	i := interp.New(opt)
 	if err := i.Use(stdlib.Symbols); err != nil {
 		return nil, err
@@ -64,33 +63,36 @@ func (gsh *gshell) evalPathWithContext(ctx context.Context, path string) error {
 		return err
 	}
 
+	dir := path
 	file := ""
 	if fi.Mode().IsRegular() {
+		dir = filepath.Dir(path)
 		file = filepath.Base(path)
 		if !strings.HasSuffix(file, ".go") {
 			return errors.New("wrong file suffix, .go expected")
 		}
 	}
-	dir := filepath.Join(gsh.codeDir, "src")
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-	src := "."
-	if file == "" {
-		if err := os.Symlink(path, filepath.Join(dir, "vendor")); err != nil {
+
+	srcPath := filepath.Join(gsh.codeDir, "src")
+	if file != "" {
+		if err := os.Symlink(dir, srcPath); err != nil {
 			return err
 		}
+		srcPath = filepath.Join(srcPath, file)
 	} else {
-		src = filepath.Join(dir, file)
-		if err := os.Symlink(path, src); err != nil {
+		if err := os.MkdirAll(srcPath, 0755); err != nil {
 			return err
 		}
+		if err := os.Symlink(dir, filepath.Join(srcPath, "vendor")); err != nil {
+			return err
+		}
+		srcPath = "."
 	}
 
 	if ctx == nil {
-		_, err = gsh.interpreter.EvalPath(src)
+		_, err = gsh.interpreter.EvalPath(srcPath)
 	} else {
-		_, err = gsh.interpreter.EvalPathWithContext(ctx, src)
+		_, err = gsh.interpreter.EvalPathWithContext(ctx, srcPath)
 	}
 
 	return err
@@ -136,11 +138,6 @@ func (gsh *gshell) runREPL() {
 	}
 }
 
-func rmShebang(b []byte) []byte {
-	if len(b) >= 2 {
-		if string(b[:2]) == "#!" {
-			copy(b, "//")
-		}
-	}
-	return b
+func init() {
+	os.Setenv("YAEGI_SPECIAL_STDIO", "1")
 }

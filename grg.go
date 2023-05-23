@@ -279,7 +279,9 @@ func (gc *greCtl) reset() error {
 }
 
 func (gc *greCtl) close() {
-	gc.gsh.close()
+	if gc.gsh != nil {
+		gc.gsh.close()
+	}
 	os.Remove(gc.outputFile)
 	os.RemoveAll(gc.statDir)
 	os.RemoveAll(gc.codeDir)
@@ -324,6 +326,7 @@ func (gc *greCtl) runGRE() {
 	if len(stderrStr) != 0 {
 		gc.greErr = fmt.Errorf("%s", stderrStr)
 		gc.GREErr = stderrStr
+		fmt.Fprint(gc.stdout, stderrStr)
 	}
 	gc.log.Close()
 	if gc.greErr == nil {
@@ -485,9 +488,7 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "stop":
 			if gc.stat == greStatRunning { // no need to atomic
-				if _, err := gc.gsh.interpreter.Eval("Stop()"); err != nil { // try to call Stop() if there is one
-					gc.cancel()
-				}
+				gc.cancel()
 				gc.changeStatIf(greStatRunning, greStatAborting)
 				ids = append(ids, gc.ID)
 			}

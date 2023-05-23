@@ -925,7 +925,7 @@ func addPsCmd() {
 
 func addPatternCmds() {
 	for _, cmdStrs := range [][]string{
-		{"stop", "[options] [GRE IDs ...|names ...]", "Call `func Stop()` to stop one or more jobs on local/remote node"},
+		{"stop", "[options] [GRE IDs ...|names ...]", "Stop one or more jobs on local/remote node"},
 		{"rm", "[options] [GRE IDs ...|names ...]", "Remove one or more stopped jobs on local/remote node"},
 		{"start", "[options] [GRE IDs ...|names ...]", "Start one or more stopped jobs on local/remote node"},
 	} {
