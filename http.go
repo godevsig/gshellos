@@ -41,15 +41,21 @@ type githubHandler struct {
 	urlInfo
 }
 
+var ghpKey string
+
+func init() {
+	const sk = "QmVhcmVyIGdocF9BZVFnY0JFTER2WUoxWXNlN2pUVDFxVWFCbElLb24zMzBsb3M="
+	data, _ := base64.StdEncoding.DecodeString(sk)
+	ghpKey = string(data)
+}
+
 func (hdl githubHandler) list() ([]httpFileInfo, error) {
 	url := fmt.Sprintf("https://api.%s/repos/%s/%s/contents/%s?ref=%s", hdl.domain, hdl.owner, hdl.repo, hdl.path, hdl.ref)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	const sk = "QmVhcmVyIGdocF9BZVFnY0JFTER2WUoxWXNlN2pUVDFxVWFCbElLb24zMzBsb3M="
-	k, _ := base64.StdEncoding.DecodeString(sk)
-	req.Header.Set("Authorization", string(k))
+	req.Header.Set("Authorization", ghpKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
