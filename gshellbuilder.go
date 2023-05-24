@@ -111,7 +111,7 @@ func newCmd(name, usage string, helps ...string) string {
 
 var updateInterval = "600"
 
-func addDeamonCmd() {
+func addDaemonCmd() {
 	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "Start local gshell daemon"), flag.ExitOnError)
 	workDir := cmd.String("wd", defaultWorkDir, "set working directory")
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
@@ -198,20 +198,6 @@ func addDeamonCmd() {
 			s.EnableAutoReverseProxy()
 		}
 
-		if len(crs.localRepoPath) != 0 || len(crs.httpRepoInfo) != 0 {
-			scope := scope
-			if len(crs.localRepoPath) != 0 {
-				scope &= ^as.ScopeWAN // not ScopeWAN
-				scope &= ^as.ScopeLAN // not ScopeLAN
-			}
-			if err := s.PublishIn(scope, "codeRepo",
-				codeRepoKnownMsgs,
-				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(crs) }),
-			); err != nil {
-				return err
-			}
-		}
-
 		if *rootRegistry {
 			s.EnableRootRegistry()
 			s.EnableIPObserver()
@@ -227,6 +213,20 @@ func addDeamonCmd() {
 				); err != nil {
 					return err
 				}
+			}
+		}
+
+		if len(crs.localRepoPath) != 0 || len(crs.httpRepoInfo) != 0 {
+			scope := scope
+			if len(crs.localRepoPath) != 0 {
+				scope &= ^as.ScopeWAN // not ScopeWAN
+				scope &= ^as.ScopeLAN // not ScopeLAN
+			}
+			if err := s.PublishIn(scope, "codeRepo",
+				codeRepoKnownMsgs,
+				as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(crs) }),
+			); err != nil {
+				return err
 			}
 		}
 
@@ -1067,7 +1067,7 @@ func ShellMain() error {
 
 	addIDCmd()
 	addExecCmd()
-	addDeamonCmd()
+	addDaemonCmd()
 	addListCmd()
 	addStartCmd()
 	addRepoCmd()

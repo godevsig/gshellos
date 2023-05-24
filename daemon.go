@@ -608,6 +608,33 @@ type getCode struct {
 
 func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {
 	crs := stream.GetContext().(*codeRepoSvc)
+	HTTPAddr := ""
+	if strings.HasPrefix(msg.PathFile, "http://") || strings.HasPrefix(msg.PathFile, "https://") {
+		HTTPAddr = msg.PathFile // raw URL
+	}
+	if HTTPAddr != "" || len(crs.httpRepoInfo) != 0 {
+		if httpOp == nil {
+			return errors.New("No http functionality, check the build tags")
+		}
+
+		if HTTPAddr == "" {
+			domain, owner, repo, branch := crs.httpRepoInfo[0], crs.httpRepoInfo[1], crs.httpRepoInfo[2], crs.httpRepoInfo[3]
+			if strings.Contains(domain, "github") {
+				HTTPAddr = fmt.Sprintf("https://%s/%s/%s/tree/%s/%s", domain, owner, repo, branch, msg.PathFile)
+			} else if strings.Contains(domain, "gitlab") {
+				HTTPAddr = fmt.Sprintf("https://%s/%s/%s/-/tree/%s/%s", domain, owner, repo, branch, msg.PathFile)
+			} else {
+				return fmt.Errorf("%s not supported", domain)
+			}
+		}
+
+		zip, err := httpOp.getArchive(HTTPAddr)
+		if err != nil {
+			return err
+		}
+		return zip
+	}
+
 	// local dir
 	if crs.localRepoPath != "" {
 		zip, err := zipPathToBuffer(filepath.Join(crs.localRepoPath, msg.PathFile))
@@ -616,24 +643,8 @@ func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {
 		}
 		return zip
 	}
-	domain, owner, repo, branch := crs.httpRepoInfo[0], crs.httpRepoInfo[1], crs.httpRepoInfo[2], crs.httpRepoInfo[3]
 
-	var addr string
-	if strings.HasPrefix(msg.PathFile, "http://") || strings.HasPrefix(msg.PathFile, "https://") {
-		addr = msg.PathFile // raw URL
-	} else if strings.Contains(domain, "github") {
-		addr = fmt.Sprintf("https://%s/%s/%s/tree/%s/%s", domain, owner, repo, branch, msg.PathFile)
-	} else if strings.Contains(domain, "gitlab") {
-		addr = fmt.Sprintf("https://%s/%s/%s/-/tree/%s/%s", domain, owner, repo, branch, msg.PathFile)
-	} else {
-		return fmt.Errorf("%s not supported", domain)
-	}
-
-	zip, err := httpOp.getArchive(addr)
-	if err != nil {
-		return err
-	}
-	return zip
+	return errors.New("code repo not configured")
 }
 
 // reply with []dirEntry

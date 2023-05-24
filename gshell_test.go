@@ -269,13 +269,25 @@ func TestCmdRunWrongGRGVer(t *testing.T) {
 }
 
 func TestCmdList(t *testing.T) {
-	out, err := gshellRunCmd("list")
+	out, err := gshellRunCmd("list -h")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("list")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "godevsig                  gshellDaemon              self          1111") {
 		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("list -v -p godevsig")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -336,6 +348,21 @@ func TestCmdRunRT(t *testing.T) {
 	out, _ = gshellRunCmdTimeout("log "+id, 1)
 	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")
+	}
+}
+
+func TestCmdRunDir(t *testing.T) {
+	// single file without vendor dir will not compile
+	out, err := gshellRunCmd("run -i testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellTestCmd("run -i testdata/figure", "testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -570,7 +597,7 @@ func TestCmdRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if out != "github.com/godevsig/gshellos master\n" {
+	if !strings.Contains(out, "godevsig/gshellos") {
 		t.Fatal("unexpected output")
 	}
 
@@ -581,16 +608,61 @@ func TestCmdRepo(t *testing.T) {
 	}
 }
 
-func TestCmdRepoRun(t *testing.T) {
-	shell.Run("mv testdata/hello.go testdata/_hello.go")
-	defer shell.Run("mv testdata/_hello.go testdata/hello.go")
-	out, err := gshellRunCmd("run -i testdata/hello.go")
+func TestCmdRepoRunRaw(t *testing.T) {
+	out, err := gshellRunCmd("run -i https://github.com/godevsig/grepo/tree/master/example/hello")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != "Hello, playground\n" {
+	if out != "Hello, world!\n" {
 		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("run -i https://github.com/godevsig/grepo/tree/master/example/hello/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "Hello, world!\n" {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/grepo/-/tree/master/example/hello")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "Hello, world!\n" {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/grepo/-/tree/master/example/hello/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "Hello, world!\n" {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellTestCmd("run -i https://github.com/godevsig/gshellos/tree/master/testdata/figure", "testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellTestCmd("run -i https://gitlab.com/godevsig/gshellos/-/tree/master/testdata/figure", "testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCmdRepoList(t *testing.T) {
+	out, err := gshellRunCmd("repo ls")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -669,8 +741,8 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	if len(flag.Args()) == 0 {
 		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
-		cmdstr += "-wd .working -loglevel debug daemon -registry 127.0.0.1:11985 -bcast 9923 "
-		cmdstr += "-root -repo github.com/godevsig/gshellos/master "
+		cmdstr += "-loglevel debug daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
+		cmdstr += "-root -repo . "
 		cmdstr += "-update http://127.0.0.1:9001/%s"
 		go func() {
 			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).CombinedOutput()
