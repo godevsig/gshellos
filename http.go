@@ -46,7 +46,7 @@ func (hdl githubHandler) list() ([]httpFileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer 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")
+	req.Header.Set("Authorization", "Bearer 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")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

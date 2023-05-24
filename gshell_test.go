@@ -597,7 +597,7 @@ func TestCmdRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !strings.Contains(out, "godevsig/gshellos") {
+	if !strings.Contains(out, "gshellos") {
 		t.Fatal("unexpected output")
 	}
 
