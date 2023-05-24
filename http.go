@@ -101,7 +101,7 @@ func (hdl githubHandler) replacePath(path string) httpHandler {
 }
 
 func (hdl githubHandler) getArchive() ([]byte, error) {
-	tmpDir, err := os.MkdirTemp("", "gshell-http-")
+	tmpDir, err := os.MkdirTemp(gshellTempDir, "http-")
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (hdl gitlabHandler) getArchive() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	tmpDir, err := os.MkdirTemp("", "gshell-http-")
+	tmpDir, err := os.MkdirTemp(gshellTempDir, "http-")
 	if err != nil {
 		return nil, err
 	}

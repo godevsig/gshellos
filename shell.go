@@ -23,7 +23,7 @@ type gshell struct {
 
 func newShell(opt interp.Options) (*gshell, error) {
 	gsh := &gshell{}
-	tmpDir, err := os.MkdirTemp("", "gshell-code-")
+	tmpDir, err := os.MkdirTemp(gshellTempDir, "code-")
 	if err != nil {
 		return nil, err
 	}

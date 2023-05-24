@@ -127,10 +127,10 @@ func addDaemonCmd() {
 		}
 		workDir := *workDir
 		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
-			panic(err)
+			return err
 		}
 		if err := os.MkdirAll(workDir+"/status", 0755); err != nil {
-			panic(err)
+			return err
 		}
 		cmdArgs := os.Args
 		scope := as.ScopeAll

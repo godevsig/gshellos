@@ -197,7 +197,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		}
 	}
 
-	tmpDir, err := os.MkdirTemp("", "gshell-gre-code-")
+	tmpDir, err := os.MkdirTemp(gshellTempDir, "gre-code-")
 	if err != nil {
 		return nil, err
 	}

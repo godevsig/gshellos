@@ -90,7 +90,10 @@ func (nullIO) Close() error                  { return nil }
 func (nullIO) Write(buf []byte) (int, error) { return len(buf), nil }
 func (nullIO) Read(buf []byte) (int, error)  { return 0, io.EOF }
 
+var gshellTempDir = "/tmp/gshell"
+
 func init() {
+	os.MkdirAll(gshellTempDir, 0755)
 	as.RegisterType((*net.DNSError)(nil))
 	as.RegisterType((*net.OpError)(nil))
 	as.RegisterType((*net.TCPAddr)(nil))
