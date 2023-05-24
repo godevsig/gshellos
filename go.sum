@@ -10,8 +10,8 @@ github.com/godevsig/go-echarts/v2 v2.0.0-20211101104447-e8e4a51bc4fd h1:NXoy9fdg
 github.com/godevsig/go-echarts/v2 v2.0.0-20211101104447-e8e4a51bc4fd/go.mod h1:6TOomEztzGDVDkOSCFBq3ed7xOYfbOqhaBzD0YV771A=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177 h1:Ga+4dO0xF4ejuZfKnHfEA/bqlNUc2XKNjpopVDhMjLM=
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177/go.mod h1:QdEauSzqdF5tbLIVtGYO6sqOhUKVPSZGd5x7xK5oeS4=
-github.com/godevsig/grepo v0.2.2-0.20230329153956-e42313fb6947 h1:l4Ekq05QxBBsG+VBDDDhVZ+CVa+T+F597m5goVfpSuQ=
-github.com/godevsig/grepo v0.2.2-0.20230329153956-e42313fb6947/go.mod h1:56IdgpcCIYaCIdUlkUclEvwKLw76j1RK1tjc0bPgCtA=
+github.com/godevsig/grepo v0.2.2-0.20230524114720-e8ce18ed100f h1:SkAGecjb1Y2IjjiQVZMUeSE4m2evGso1kbKDbh3RzLU=
+github.com/godevsig/grepo v0.2.2-0.20230524114720-e8ce18ed100f/go.mod h1:56IdgpcCIYaCIdUlkUclEvwKLw76j1RK1tjc0bPgCtA=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
 github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=

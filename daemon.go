@@ -17,6 +17,7 @@ import (
 
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/grepo/lib/sys/log"
+	"github.com/godevsig/grepo/lib/sys/shell"
 )
 
 type daemon struct {
@@ -603,7 +604,38 @@ func (msg codeRepoAddr) Handle(stream as.ContextStream) (reply interface{}) {
 }
 
 type getCode struct {
-	PathFile string
+	PathFile   string
+	AutoImport bool
+}
+
+func goModVendor(zip []byte) ([]byte, error) {
+	tmpDir, err := os.MkdirTemp(gshellTempDir, "getcode-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+	if err := unzipBufferToPath(zip, tmpDir); err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "vendor")); err == nil {
+		return zip, nil // already included
+	}
+	if _, err := os.Stat(filepath.Join(tmpDir, "mod")); err != nil {
+		if out, err := shell.Run(fmt.Sprintf("cd %s; go mod init main", tmpDir)); err != nil {
+			return nil, fmt.Errorf("go mod init failed with %s", out)
+		}
+	}
+	if out, err := shell.Run(fmt.Sprintf("cd %s; go mod tidy", tmpDir)); err != nil {
+		return nil, fmt.Errorf("go mod tidy failed with %s", out)
+	}
+	if out, err := shell.Run(fmt.Sprintf("cd %s; go mod vendor", tmpDir)); err != nil {
+		return nil, fmt.Errorf("go mod vendor failed with %s", out)
+	}
+	zip, err = zipPathToBuffer(tmpDir)
+	if err != nil {
+		return nil, err
+	}
+	return zip, nil
 }
 
 func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {
@@ -612,6 +644,8 @@ func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {
 	if strings.HasPrefix(msg.PathFile, "http://") || strings.HasPrefix(msg.PathFile, "https://") {
 		HTTPAddr = msg.PathFile // raw URL
 	}
+	var zip []byte
+	var err error
 	if HTTPAddr != "" || len(crs.httpRepoInfo) != 0 {
 		if httpOp == nil {
 			return errors.New("No http functionality, check the build tags")
@@ -628,23 +662,25 @@ func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {
 			}
 		}
 
-		zip, err := httpOp.getArchive(HTTPAddr)
-		if err != nil {
-			return err
-		}
+		zip, err = httpOp.getArchive(HTTPAddr)
+	} else if crs.localRepoPath != "" { // local dir
+		zip, err = zipPathToBuffer(filepath.Join(crs.localRepoPath, msg.PathFile))
+	} else {
+		err = errors.New("code repo not configured")
+	}
+
+	if err != nil {
+		return err
+	}
+	if !msg.AutoImport {
 		return zip
 	}
 
-	// local dir
-	if crs.localRepoPath != "" {
-		zip, err := zipPathToBuffer(filepath.Join(crs.localRepoPath, msg.PathFile))
-		if err != nil {
-			return err
-		}
-		return zip
+	zip, err = goModVendor(zip)
+	if err != nil {
+		return err
 	}
-
-	return errors.New("code repo not configured")
+	return zip
 }
 
 // reply with []dirEntry

@@ -362,6 +362,7 @@ type JobInfo struct {
 type grgCmdRun struct {
 	JobCmd
 	Interactive bool
+	AutoImport  bool
 }
 
 func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
@@ -378,7 +379,7 @@ func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 		defer conn.Close()
 
 		var zip []byte
-		if err := conn.SendRecv(getCode{filePath}, &zip); err != nil {
+		if err := conn.SendRecv(getCode{filePath, msg.AutoImport}, &zip); err != nil {
 			return err
 		}
 		msg.CodeZip = zip

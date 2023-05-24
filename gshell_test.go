@@ -224,12 +224,12 @@ func TestCmdAutoRestart(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
-	pidOld := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
+	pidOld, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", pidOld)
 	shell.Run(fmt.Sprintf("kill -9 %s", pidOld))
 	time.Sleep(time.Second)
 
-	pidNew := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
+	pidNew, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", pidNew)
 
 	if pidOld == pidNew {
@@ -354,6 +354,13 @@ func TestCmdRunRT(t *testing.T) {
 func TestCmdRunDir(t *testing.T) {
 	// single file without vendor dir will not compile
 	out, err := gshellRunCmd("run -i testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// with -import single file can compile
+	out, err = gshellTestCmd("run -i -import testdata/figure/figure.go", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -645,13 +652,23 @@ func TestCmdRepoRunRaw(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellTestCmd("run -i https://github.com/godevsig/gshellos/tree/master/testdata/figure", "testdata/figure/figure.go")
+	out, err = gshellTestCmd("run -i -import https://github.com/godevsig/gshellos/tree/master/testdata/figure", "testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = gshellTestCmd("run -i -import https://github.com/godevsig/gshellos/tree/master/testdata/figure/figure.go", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err = gshellTestCmd("run -i https://gitlab.com/godevsig/gshellos/-/tree/master/testdata/figure", "testdata/figure/figure.go")
+	out, err = gshellTestCmd("run -i -import https://gitlab.com/godevsig/gshellos/-/tree/master/testdata/figure", "testdata/figure/figure.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = gshellTestCmd("run -i -import https://gitlab.com/godevsig/gshellos/-/tree/master/testdata/figure/figure.go", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -690,10 +707,11 @@ func TestCmdREPL(t *testing.T) {
 func TestAutoUpdate(t *testing.T) {
 	os.WriteFile("bin/rev", []byte("11111111111111111111111111111111\n"), 0644)
 	shell.Run("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
-	md5sum := shell.Run("md5sum bin/gshell." + runtime.GOARCH)
+	md5sum, _ := shell.Run("md5sum bin/gshell." + runtime.GOARCH)
 	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
-	t.Logf("\n%s", shell.Run("cat bin/rev bin/md5sum"))
-	oldpid := shell.Run("pidof gshell.tester")
+	out, _ := shell.Run("cat bin/rev bin/md5sum")
+	t.Logf("\n%s", out)
+	oldpid, _ := shell.Run("pidof gshell.tester")
 	t.Logf("\n%s", oldpid)
 
 	out, err := gshellRunCmd("run testdata/fileserver.go -dir bin -port 9001")
@@ -713,7 +731,7 @@ func TestAutoUpdate(t *testing.T) {
 	}()
 
 	time.Sleep(8 * time.Second)
-	pids := shell.Run("pidof gshell.tester")
+	pids, _ := shell.Run("pidof gshell.tester")
 	t.Logf("\n%s", pids)
 	if strings.Contains(pids, oldpid) {
 		t.Fatal("old pid still running")

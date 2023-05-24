@@ -277,13 +277,13 @@ func addDaemonCmd() {
 
 				if err := os.Rename(newFile, exe); err != nil {
 					lg.Infof("failed to rename new gshell to %s: %s", exe, err)
-					output := shell.Run("mv -f " + newFile + " " + exe)
+					output, _ := shell.Run("mv -f " + newFile + " " + exe)
 					if len(output) != 0 {
 						lg.Warnf("failed to mv new gshell to %s: %s", exe, output)
 						continue
 					}
 				}
-				if output := shell.Run("chmod ugo+s " + exe); len(output) != 0 {
+				if output, _ := shell.Run("chmod ugo+s " + exe); len(output) != 0 {
 					lg.Warnf("failed to set gshell bin permission : %s", output)
 					continue
 				}
@@ -642,6 +642,7 @@ silently ignore errors if real-time priority can not be set`)
 	autoRemove := cmd.Bool("rm", false, "auto-remove the GRE when it exits")
 	autoRestart := cmd.Uint("restart", 0, `auto-restart the GRE on failure for at most specified times
 only applicable for non-interactive mode`)
+	autoImport := cmd.Bool("import", false, "auto-import dependent packages")
 
 	action := func() error {
 		args := cmd.Args()
@@ -683,6 +684,7 @@ only applicable for non-interactive mode`)
 					AutoRestartMax: *autoRestart,
 				},
 				Interactive: *interactive,
+				AutoImport:  *autoImport,
 			},
 			GRGName:    grg,
 			RtPriority: rtPriority,

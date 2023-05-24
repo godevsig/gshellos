@@ -1,4 +1,4 @@
-module figure
+module main
 
 go 1.18
 
