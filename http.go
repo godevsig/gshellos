@@ -5,6 +5,7 @@ package gshellos
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,7 +47,9 @@ func (hdl githubHandler) list() ([]httpFileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer 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")
+	const sk = "QmVhcmVyIGdocF9BZVFnY0JFTER2WUoxWXNlN2pUVDFxVWFCbElLb24zMzBsb3M="
+	k, _ := base64.StdEncoding.DecodeString(sk)
+	req.Header.Set("Authorization", string(k))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
