@@ -1064,8 +1064,10 @@ func ShellMain() error {
 		return nil
 	}
 
-	flag.StringVar(&loglevel, "loglevel", loglevel, "debug/info/warn/error")
-	flag.StringVar(&providerID, "provider", providerID, "provider ID, run following command on the remote node with this ID")
+	flag.StringVar(&loglevel, "l", loglevel, "")
+	flag.StringVar(&loglevel, "loglevel", loglevel, "")
+	flag.StringVar(&providerID, "p", providerID, "")
+	flag.StringVar(&providerID, "provider", providerID, "")
 
 	addIDCmd()
 	addExecCmd()
@@ -1082,6 +1084,14 @@ func ShellMain() error {
 	addJoblistCmd()
 
 	usage := func() {
+		const opt = `Usage: [OPTIONS] COMMAND ...
+OPTIONS:
+  -l, --loglevel
+        loglevel, debug/info/warn/error (default "%s")
+  -p, --provider
+        provider ID, run following command on the remote node with this ID (default "%s")
+`
+		fmt.Printf(opt, loglevel, providerID)
 		fmt.Println("COMMANDS:")
 		for _, cmd := range cmds {
 			name := cmd.Name()
@@ -1090,6 +1100,7 @@ func ShellMain() error {
 			}
 		}
 	}
+	flag.Usage = usage
 
 	switch os.Args[1] {
 	case "-h", "--help":
@@ -1103,9 +1114,6 @@ grouped into one named GRG for better performance.
   gshell enters interactive mode if no options and no commands provided.
 `
 		fmt.Println(help)
-		fmt.Println("Usage: [OPTIONS] COMMAND ...")
-		fmt.Println("OPTIONS:")
-		flag.PrintDefaults()
 		usage()
 		return nil
 	case "-v", "--version":
