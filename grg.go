@@ -354,8 +354,8 @@ type JobCmd struct {
 
 // JobInfo is the job in joblist
 type JobInfo struct {
-	JobCmd        `yaml:",inline"`
 	Cmd           string `yaml:"cmd"`
+	JobCmd        `yaml:",inline"`
 	CodeZipBase64 string `yaml:"code-zip-base64,omitempty"`
 }
 
