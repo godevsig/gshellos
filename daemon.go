@@ -430,7 +430,9 @@ type joblist struct {
 }
 
 // reply joblist{}
-type cmdJoblistSave struct{}
+type cmdJoblistSave struct {
+	Tiny bool
+}
 
 func (msg cmdJoblistSave) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
@@ -442,7 +444,7 @@ func (msg cmdJoblistSave) Handle(stream as.ContextStream) (reply interface{}) {
 	for conn := range connChan {
 		var grgjl grgJoblist
 		conn.SetRecvTimeout(time.Second)
-		if err := conn.SendRecv(grgCmdJoblist{}, &grgjl); err != nil {
+		if err := conn.SendRecv(grgCmdJoblist{msg.Tiny}, &grgjl); err != nil {
 			gd.lg.Warnf("cmdJoblistSave: send recv error: %v", err)
 		} else {
 			grgjl.Name = strings.Split(grgjl.Name, "-")[0]

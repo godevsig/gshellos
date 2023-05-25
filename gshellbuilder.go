@@ -786,7 +786,7 @@ func addJoblistCmd() {
 		switch action {
 		case "save":
 			var jlist joblist
-			if err := conn.SendRecv(cmdJoblistSave{}, &jlist); err != nil {
+			if err := conn.SendRecv(cmdJoblistSave{tiny}, &jlist); err != nil {
 				return err
 			}
 			// turn bytecode to string

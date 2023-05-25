@@ -445,7 +445,9 @@ type grgJoblist struct {
 }
 
 // reply grgJoblist{}
-type grgCmdJoblist struct{}
+type grgCmdJoblist struct {
+	Tiny bool
+}
 
 func (msg grgCmdJoblist) Handle(stream as.ContextStream) (reply interface{}) {
 	grg := stream.GetContext().(*grg)
@@ -458,8 +460,24 @@ func (msg grgCmdJoblist) Handle(stream as.ContextStream) (reply interface{}) {
 
 	grg.RLock()
 	for _, gc := range grg.gres {
-		ji := &JobInfo{JobCmd: gc.runMsg.JobCmd}
-		grgjl.Jobs = append(grgjl.Jobs, ji)
+		func() {
+			ji := &JobInfo{JobCmd: gc.runMsg.JobCmd}
+			grgjl.Jobs = append(grgjl.Jobs, ji)
+			if msg.Tiny {
+				return
+			}
+
+			file, err := os.Open(filepath.Join(gc.statDir, "runMsg"))
+			if err != nil {
+				return
+			}
+			defer file.Close()
+			runMsg := grgCmdRun{}
+			if err := gob.NewDecoder(file).Decode(&runMsg); err != nil {
+				return
+			}
+			ji.CodeZip = runMsg.CodeZip
+		}()
 	}
 	grg.RUnlock()
 
