@@ -18,9 +18,9 @@ jobs:
 
     - name: Build
       run: |
-        GOARCH=amd64 make full && mv -f bin/gshell bin/gshell.amd64
-        GOARCH=mips64 make full && mv -f bin/gshell bin/gshell.mips64
-        GOARCH=arm64 make full && mv -f bin/gshell bin/gshell.arm64
+        CGO_ENABLED=0 GOARCH=amd64 make full && mv -f bin/gshell bin/gshell.amd64
+        CGO_ENABLED=0 GOARCH=mips64 make full && mv -f bin/gshell bin/gshell.mips64
+        CGO_ENABLED=0 GOARCH=arm64 make full && mv -f bin/gshell bin/gshell.arm64
         md5sum bin/gshell* > bin/md5sum
         rm -f bin/buildtag bin/gittag
 
