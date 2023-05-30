@@ -287,6 +287,10 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	}
 	defer conn.Close()
 
+	killgrg := func() {
+		conn.SendRecv(grgCmdKill{}, nil)
+	}
+
 	if err := conn.Send(&msg.grgCmdRun); err != nil {
 		return err
 	}
@@ -294,6 +298,7 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	if !msg.Interactive {
 		var greid string
 		if err := conn.Recv(&greid); err != nil {
+			killgrg()
 			return err
 		}
 		return greid
@@ -301,12 +306,20 @@ func (msg *cmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 	client := as.NewStreamIO(stream)
 	grg := as.NewStreamIO(conn)
 	gd.lg.Debugln("enter interactive io")
-	done := make(chan struct{}, 1)
-	go func() { io.Copy(grg, client); done <- struct{}{} }()
-	go func() { io.Copy(client, grg); done <- struct{}{} }()
-	<-done
+	done := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(client, grg)
+		if err != nil {
+			killgrg()
+		}
+		done <- err
+	}()
+	go func() { io.Copy(grg, client); done <- nil }()
+	err = <-done
 	gd.lg.Debugln("exit interactive io")
-
+	if err != nil {
+		return err
+	}
 	return io.EOF
 }
 
@@ -605,11 +618,6 @@ func (msg codeRepoAddr) Handle(stream as.ContextStream) (reply interface{}) {
 	return strings.Join(crs.httpRepoInfo[:3], "/") + " " + crs.httpRepoInfo[3]
 }
 
-type getCode struct {
-	PathFile   string
-	AutoImport bool
-}
-
 func goModVendor(zip []byte) ([]byte, error) {
 	tmpDir, err := os.MkdirTemp(gshellTempDir, "getcode-")
 	if err != nil {
@@ -638,6 +646,11 @@ func goModVendor(zip []byte) ([]byte, error) {
 		return nil, err
 	}
 	return zip, nil
+}
+
+type getCode struct {
+	PathFile   string
+	AutoImport bool
 }
 
 func (msg getCode) Handle(stream as.ContextStream) (reply interface{}) {

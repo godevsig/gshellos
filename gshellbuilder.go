@@ -617,7 +617,7 @@ func randStringRunes(n int) string {
 }
 
 func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
-	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
+	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(3)
 	if providerID == "self" { // local
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
 	} else { // remote
@@ -713,9 +713,9 @@ only applicable for non-interactive mode`)
 		ioconn := as.NewStreamIO(conn)
 		lg.Debugln("enter interactive io")
 		go io.Copy(ioconn, os.Stdin)
-		io.Copy(os.Stdout, ioconn)
+		_, err := io.Copy(os.Stdout, ioconn)
 		lg.Debugln("exit interactive io")
-		return nil
+		return err
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }
