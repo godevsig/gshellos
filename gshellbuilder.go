@@ -1110,8 +1110,8 @@ OPTIONS:
   A system with one gshell daemon running is a node in the
 service network, each node has an unique provider ID.
   Each job runs in one dedicated GRE(Gshell Runtime Environment)
-which by default runs in a random GRG(Gshell Runtime Group). GREs can be
-grouped into one named GRG for better performance.
+which runs in a named or by default a random GRG(Gshell Runtime Group).
+GREs can be grouped into one named GRG for better performance.
   gshell enters interactive mode if no options and no commands provided.
 `
 		fmt.Println(help)

@@ -1,18 +1,19 @@
 # What is gshell daemon
 
 gshell daemon should be running on every system to enable this system to join the service
-network so that the system is visible and accessable by other gshell enabled systems.
+network so that the system becomes a visible and accessable node by other gshell enabled
+nodes.
 
-The daemon and all the services running on the same system share one unique `Provider ID`,
+The daemon and all the services running on the same node share one unique `Provider ID`,
 currently it is the first physical network card's MAC address(may change in the future).
-`Provider ID` is used to identify the system in the service network.
+`Provider ID` is used to identify the node in the service network.
 
 A service is defined at programing time as {"publisher", "service"}, but at runtime, there
-can be many gshell enabled systems providing the same service at the same time, so the new
+can be many gshell enabled nodes providing the same service at the same time, so the new
 tuple {"publisher", "service", "provider"} is then used to uniquely locate a service in the
 network.
 
-On a gshell enabled system, `gshell list` command will list all the visible services, for example
+On a gshell enabled node, `gshell list` command will list all the visible services, for example
 below output:
 
 ```
@@ -64,19 +65,23 @@ $ chmod +x bin/gshell
 See help first:
 
 ```shell
-$ gshell daemon -h
+$ bin/gshell daemon -h
 Usage of daemon [options]
         Start local gshell daemon:
   -bcast string
         broadcast port for LAN
+  -invisible
+        make gshell daemon invisible in gshell service network
   -registry string
         root registry address
   -repo string
-        code repo https address in format site/org/proj/branch, require -root
+        code repo local path or https address in format site/org/proj/branch
   -root
         enable root registry service
   -update string
         url of artifacts to update gshell, require -root
+  -wd string
+        set working directory (default "/var/tmp/gshell")
 ```
 
 - use `-bcast` if you want to enable gshell discovery in LAN scope.
@@ -111,7 +116,10 @@ chown -R nobody:nogroup . && chmod ugo+s bin/gshell
 exit
 
 # start gshell daemon at log level info
-bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/%s &
+bin/gshell -loglevel info daemon -wd rootregistry -registry Your_Server_IP:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/%s &
+
+# after gshell daemon started, check code repo contents
+bin/gshell repo ls
 ```
 
 - registry: the same ip where you run gshell root registry
@@ -178,7 +186,7 @@ For example, to autoupdate gshell binary from official github repo, here we don'
 we just use github download page:
 
 ```
-bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update https://github.com/godevsig/gshellos/releases/latest/download/%s &
+bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update https://github.com/godevsig/gshellos/releases/latest/download/%s &
 ```
 
 Another example is autoupdating from private http file server:
@@ -186,7 +194,7 @@ Another example is autoupdating from private http file server:
 ```shell
 cd /path/to/gshell
 # start root gshell daemon
-bin/gshell -wd rootregistry -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/%s &
+bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/%s &
 # start file server on the same node(10.10.10.10) of root gshell daemon
 bin/gshell run util/fileserver/cmd/fileserver.go -dir /path/contains/gshell/release
 ```
@@ -217,7 +225,7 @@ $ cat rev
 When debugging gshell itself, we don't want auto update working:
 
 ```gshell
-GSHELL_NOUPDATE=1 bin/gshell -loglevel info -wd .working daemon -registry 10.10.10.10:11985 -bcast 9923 &
+GSHELL_NOUPDATE=1 bin/gshell -loglevel info daemon -wd .working -registry 10.10.10.10:11985 -bcast 9923 &
 ```
 
 # Q&A
