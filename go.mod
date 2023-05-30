@@ -3,7 +3,7 @@ module github.com/godevsig/gshellos
 go 1.18
 
 require (
-	github.com/godevsig/adaptiveservice v0.9.24-0.20230421000140-e0903914c33b
+	github.com/godevsig/adaptiveservice v0.9.24-0.20230529165341-d32f6b134d03
 	github.com/godevsig/grepo v0.2.2-0.20230524114720-e8ce18ed100f
 	github.com/traefik/yaegi v0.15.1
 	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c

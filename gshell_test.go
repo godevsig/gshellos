@@ -652,6 +652,15 @@ func TestCmdRepoRunRaw(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
+	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/grepo/-/tree/master//local/file.go")
+	t.Logf("\n%s", out)
+	if err == nil {
+		t.Fatal("run local file directly should return error")
+	}
+	if !strings.Contains(out, "not found") {
+		t.Fatal("unexpected output")
+	}
+
 	out, err = gshellTestCmd("run -i -import https://github.com/godevsig/gshellos/tree/master/testdata/figure", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
