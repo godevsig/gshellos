@@ -187,7 +187,7 @@ func (hdl gitlabHandler) getArchive() ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("content-length") == "0" {
 		return nil, fmt.Errorf("%s not found", hdl.path)
 	}
 
