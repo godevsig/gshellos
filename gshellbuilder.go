@@ -630,7 +630,8 @@ func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <path[/file.go]> [args...]",
 		"fetch code path[/file.go] from `gshell repo`",
-		"and run the go file(s) in a new GRE in specified GRG on local/remote node"),
+		"and run the go file(s) in a new GRE in specified GRG on local/remote node",
+		"path[/file.go] should be the path in `gshell repo ls [path]`"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "", `name of the GRG in the form name-version
 random group name will be used if no name specified
