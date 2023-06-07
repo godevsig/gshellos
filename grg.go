@@ -149,7 +149,8 @@ type greInfo struct {
 	StartTime          time.Time
 	EndTime            time.Time
 	RestartedNum       int
-	AutoRestartBalance uint // the remaining number of auto restart
+	AutoRestartBalance uint   // the remaining number of auto restart
+	RequestedBy        string // by which provider ID
 }
 
 type greCtl struct {
@@ -181,6 +182,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		gc.greInfo.Args = runMsg.Args
 		gc.RestartedNum = 0
 		gc.AutoRestartBalance = runMsg.AutoRestartMax
+		gc.RequestedBy = runMsg.RequestedBy
 	}
 	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
 	gc.statDir = filepath.Join(grg.statDir, gc.ID)
@@ -363,6 +365,7 @@ type grgCmdRun struct {
 	JobCmd
 	Interactive bool
 	AutoImport  bool
+	RequestedBy string // by which provider ID
 }
 
 func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {

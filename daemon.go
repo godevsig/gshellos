@@ -471,6 +471,7 @@ func (msg cmdJoblistSave) Handle(stream as.ContextStream) (reply interface{}) {
 // reply OK or error
 type cmdJoblistLoad struct {
 	joblist
+	requestedBy string // by which provider ID
 }
 
 func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
@@ -499,6 +500,7 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 				runMsg := &grgCmdRun{
 					JobCmd:      job.JobCmd,
 					Interactive: false,
+					RequestedBy: msg.requestedBy,
 				}
 
 				if err := grgconn.SendRecv(runMsg, nil); err != nil {

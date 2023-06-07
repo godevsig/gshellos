@@ -677,6 +677,14 @@ only applicable for non-interactive mode`)
 			*autoRestart = 0
 		}
 
+		selfID, _ := getSelfID()
+
+		conn := connectDaemon(providerID, lg)
+		if conn == nil {
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
+		}
+		defer conn.Close()
+
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
 				JobCmd: JobCmd{
@@ -686,17 +694,12 @@ only applicable for non-interactive mode`)
 				},
 				Interactive: *interactive,
 				AutoImport:  *autoImport,
+				RequestedBy: selfID,
 			},
 			GRGName:    grg,
 			RtPriority: rtPriority,
 			Maxprocs:   maxprocs,
 		}
-
-		conn := connectDaemon(providerID, lg)
-		if conn == nil {
-			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
-		}
-		defer conn.Close()
 
 		if err := conn.Send(&cmd); err != nil {
 			return err
@@ -783,6 +786,8 @@ func addJoblistCmd() {
 		}
 		defer conn.Close()
 
+		selfID, _ := getSelfID()
+
 		tiny := *tiny
 		switch action {
 		case "save":
@@ -852,7 +857,7 @@ func addJoblistCmd() {
 				}
 			}
 
-			if err := conn.SendRecv(&cmdJoblistLoad{jlist}, nil); err != nil {
+			if err := conn.SendRecv(&cmdJoblistLoad{jlist, selfID}, nil); err != nil {
 				return err
 			}
 		default:
@@ -885,23 +890,24 @@ func addPsCmd() {
 		if len(msg.IDPattern) != 0 { // info
 			for _, ggi := range ggis {
 				for _, grei := range ggi.GREInfos {
-					fmt.Println("GRE ID    :", grei.ID)
-					fmt.Println("IN GROUP  :", ggi.Name)
-					fmt.Println("NAME      :", grei.Name)
-					fmt.Println("ARGS      :", grei.Args)
-					fmt.Println("STATUS    :", grei.Stat)
-					fmt.Println("RESTARTED :", grei.RestartedNum)
+					fmt.Println("GRE ID       :", grei.ID)
+					fmt.Println("IN GROUP     :", ggi.Name)
+					fmt.Println("NAME         :", grei.Name)
+					fmt.Println("ARGS         :", grei.Args)
+					fmt.Println("REQUESTED BY :", grei.RequestedBy)
+					fmt.Println("STATUS       :", grei.Stat)
+					fmt.Println("RESTARTED    :", grei.RestartedNum)
 					startTime := ""
 					if !grei.StartTime.IsZero() {
 						startTime = fmt.Sprint(grei.StartTime)
 					}
-					fmt.Println("START AT  :", startTime)
+					fmt.Println("START AT     :", startTime)
 					endTime := ""
 					if grei.Stat == "exited" {
 						endTime = fmt.Sprint(grei.EndTime)
 					}
-					fmt.Println("END AT    :", endTime)
-					fmt.Printf("ERROR     : %v\n\n", grei.GREErr)
+					fmt.Println("END AT       :", endTime)
+					fmt.Printf("ERROR        : %v\n\n", grei.GREErr)
 				}
 			}
 		} else { // ps
