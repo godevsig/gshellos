@@ -562,51 +562,6 @@ func addStartCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func addRepoCmd() {
-	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "list contens of the central code repo"), flag.ExitOnError)
-
-	action := func() error {
-		if providerID != "self" {
-			return errors.New("command does not run on remote node")
-		}
-		args := cmd.Args()
-		lg := newLogger(log.DefaultStream, "main")
-		c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(0)
-		conn := <-c.Discover(godevsigPublisher, "codeRepo")
-		if conn == nil {
-			return (as.ErrServiceNotFound(godevsigPublisher, "codeRepo"))
-		}
-		defer conn.Close()
-		if len(args) == 0 {
-			addr := "NA"
-			conn.SendRecv(codeRepoAddr{}, &addr)
-			fmt.Println(addr)
-			return nil
-		}
-
-		if args[0] == "ls" {
-			path := ""
-			if len(args) >= 2 {
-				path = args[1]
-			}
-			var entries []dirEntry
-			if err := conn.SendRecv(codeRepoList{path}, &entries); err != nil {
-				return err
-			}
-			for _, e := range entries {
-				if e.isDir {
-					fmt.Printf("\x1b[34m%s\x1b[0m\n", e.name)
-				} else {
-					fmt.Println(e.name)
-				}
-			}
-			return nil
-		}
-		return fmt.Errorf("unknown command %s, see --help", args[0])
-	}
-	cmds = append(cmds, subCmd{cmd, action})
-}
-
 func randStringRunes(n int) string {
 	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
 	b := make([]rune, n)
@@ -624,6 +579,47 @@ func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
 	}
 	return
+}
+
+func addRepoCmd() {
+	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "list contens of the code repo seen on local/remote node"), flag.ExitOnError)
+
+	action := func() error {
+		args := cmd.Args()
+		lg := newLogger(log.DefaultStream, "main")
+		conn := connectDaemon(providerID, lg)
+		if conn == nil {
+			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
+		}
+		defer conn.Close()
+		if len(args) == 0 {
+			addr := "NA"
+			conn.SendRecv(codeRepoAddrByNode{}, &addr)
+			fmt.Println(addr)
+			return nil
+		}
+
+		if args[0] == "ls" {
+			path := ""
+			if len(args) >= 2 {
+				path = args[1]
+			}
+			var entries []dirEntry
+			if err := conn.SendRecv(codeRepoListByNode{codeRepoList{path}}, &entries); err != nil {
+				return err
+			}
+			for _, e := range entries {
+				if e.isDir {
+					fmt.Printf("\x1b[34m%s\x1b[0m\n", e.name)
+				} else {
+					fmt.Println(e.name)
+				}
+			}
+			return nil
+		}
+		return fmt.Errorf("unknown command %s, see --help", args[0])
+	}
+	cmds = append(cmds, subCmd{cmd, action})
 }
 
 func addRunCmd() {

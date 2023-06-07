@@ -525,6 +525,42 @@ func (msg *cmdJoblistLoad) Handle(stream as.ContextStream) (reply interface{}) {
 	return err
 }
 
+type codeRepoAddrByNode struct{}
+
+func (msg codeRepoAddrByNode) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
+	c := as.NewClient(as.WithLogger(gd.lg)).SetDiscoverTimeout(0)
+	conn := <-c.Discover(godevsigPublisher, "codeRepo")
+	if conn == nil {
+		return as.ErrServiceNotFound(godevsigPublisher, "codeRepo")
+	}
+	defer conn.Close()
+	addr := "NA"
+	if err := conn.SendRecv(codeRepoAddr{}, &addr); err != nil {
+		return err
+	}
+	return addr
+}
+
+type codeRepoListByNode struct {
+	codeRepoList
+}
+
+func (msg codeRepoListByNode) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
+	c := as.NewClient(as.WithLogger(gd.lg)).SetDiscoverTimeout(0)
+	conn := <-c.Discover(godevsigPublisher, "codeRepo")
+	if conn == nil {
+		return as.ErrServiceNotFound(godevsigPublisher, "codeRepo")
+	}
+	defer conn.Close()
+	var entries []dirEntry
+	if err := conn.SendRecv(msg.codeRepoList, &entries); err != nil {
+		return err
+	}
+	return entries
+}
+
 var daemonKnownMsgs = []as.KnownMessage{
 	(*cmdKill)(nil),
 	(*cmdRun)(nil),
@@ -534,6 +570,8 @@ var daemonKnownMsgs = []as.KnownMessage{
 	cmdInfo{},
 	cmdJoblistSave{},
 	(*cmdJoblistLoad)(nil),
+	codeRepoAddrByNode{},
+	codeRepoListByNode{},
 }
 
 type updater struct {
@@ -777,6 +815,8 @@ func init() {
 	as.RegisterType(cmdInfo{})
 	as.RegisterType(cmdJoblistSave{})
 	as.RegisterType((*joblist)(nil))
+	as.RegisterType(codeRepoAddrByNode{})
+	as.RegisterType(codeRepoListByNode{})
 	as.RegisterType(codeRepoAddr{})
 	as.RegisterType((*cmdJoblistLoad)(nil))
 	as.RegisterType(getCode{})
