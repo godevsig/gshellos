@@ -206,6 +206,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 	gc.codeDir = tmpDir
 
 	if err := unzipBufferToPath(runMsg.CodeZip, tmpDir); err != nil {
+		os.RemoveAll(tmpDir)
 		return nil, err
 	}
 	runMsg.CodeZip = nil // release the mem sooner
