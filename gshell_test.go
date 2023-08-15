@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/godevsig/grepo/lib/sys/shell"
+	"github.com/godevsig/glib/sys/shell"
 	gs "github.com/godevsig/gshellos"
 )
 

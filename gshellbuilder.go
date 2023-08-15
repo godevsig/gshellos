@@ -24,8 +24,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/grepo/lib/sys/log"
-	"github.com/godevsig/grepo/lib/sys/shell"
+	"github.com/godevsig/glib/sys/log"
+	"github.com/godevsig/glib/sys/shell"
 	"github.com/traefik/yaegi/interp"
 )
 

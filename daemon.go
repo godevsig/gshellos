@@ -16,8 +16,8 @@ import (
 	"time"
 
 	as "github.com/godevsig/adaptiveservice"
-	"github.com/godevsig/grepo/lib/sys/log"
-	"github.com/godevsig/grepo/lib/sys/shell"
+	"github.com/godevsig/glib/sys/log"
+	"github.com/godevsig/glib/sys/shell"
 )
 
 type daemon struct {

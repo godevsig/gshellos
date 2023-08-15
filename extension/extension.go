@@ -13,14 +13,15 @@ func init() {
 }
 
 //go:generate ./gen_symbols.sh github.com/godevsig/adaptiveservice
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/lib/sys/shell
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/lib/sys/log -fixlog
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/util/fileserver
+//go:generate ./gen_symbols.sh github.com/godevsig/glib/sys/shell
+//go:generate ./gen_symbols.sh github.com/godevsig/glib/sys/log -fixlog
+//go:generate ./gen_symbols.sh github.com/godevsig/glib/sys/pidinfo
 
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/example/echo -extramsg
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/benchmark/asbench
+////go:generate ./gen_symbols.sh github.com/godevsig/grepo/util/fileserver
 
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/lib/sys/pidinfo
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/perf/topidchart -extramsg
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/util/recorder -extramsg
-//go:generate ./gen_symbols.sh github.com/godevsig/grepo/render/docit
+////go:generate ./gen_symbols.sh github.com/godevsig/grepo/example/echo -extramsg
+////go:generate ./gen_symbols.sh github.com/godevsig/grepo/benchmark/asbench
+
+////go:generate ./gen_symbols.sh github.com/godevsig/grepo/perf/topidchart -extramsg
+////go:generate ./gen_symbols.sh github.com/godevsig/grepo/util/recorder -extramsg
+////go:generate ./gen_symbols.sh github.com/godevsig/grepo/render/docit

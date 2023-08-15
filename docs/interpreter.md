@@ -51,8 +51,8 @@ See `extension/extension.go`
 
 ```go
 //go:generate ../cmd/extract/extract -name extension -tag adaptiveservice github.com/godevsig/adaptiveservice
-//go:generate ../cmd/extract/extract -name extension -tag shell github.com/godevsig/grepo/lib-sys/shell
-//go:generate ../cmd/extract/extract -name extension -tag log github.com/godevsig/grepo/lib-sys/log
+//go:generate ../cmd/extract/extract -name extension -tag shell github.com/godevsig/glib/sys/shell
+//go:generate ../cmd/extract/extract -name extension -tag log github.com/godevsig/glib/sys/log
 ```
 
 If in the `go:generate` command a tag was used, you should decide which build type should include the tag

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/godevsig/grepo/lib/sys/lined"
+	"github.com/godevsig/glib/sys/lined"
 	"github.com/godevsig/gshellos/extension"
 	"github.com/godevsig/gshellos/stdlib"
 	"github.com/traefik/yaegi/interp"

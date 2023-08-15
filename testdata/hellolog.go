@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/godevsig/grepo/lib/sys/log"
+	"github.com/godevsig/glib/sys/log"
 )
 
 func main() {
