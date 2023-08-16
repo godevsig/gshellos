@@ -140,17 +140,19 @@ func addDaemonCmd() {
 		if len(*lanBroadcastPort) == 0 {
 			scope &= ^as.ScopeLAN // not ScopeLAN
 		}
-		if len(*updateURL) != 0 || *rootRegistry {
+		updateURL := *updateURL
+		if len(updateURL) != 0 || *rootRegistry {
 			if scope&as.ScopeWAN != as.ScopeWAN {
 				return errors.New("root registry address not set")
 			}
 		}
 
+		codeRepo := *codeRepo
 		crs := &codeRepoSvc{}
-		if len(*codeRepo) != 0 {
-			fi, err := os.Stat(*codeRepo)
+		if len(codeRepo) != 0 {
+			fi, err := os.Stat(codeRepo)
 			if err != nil || !fi.Mode().IsDir() {
-				crs.httpRepoInfo = strings.Split(*codeRepo, "/")
+				crs.httpRepoInfo = strings.Split(codeRepo, "/")
 				if len(crs.httpRepoInfo) != 4 {
 					return errors.New("wrong repo format")
 				}
@@ -158,7 +160,7 @@ func addDaemonCmd() {
 					return errors.New("http feature not enabled, check build tags")
 				}
 			} else {
-				crs.localRepoPath, _ = filepath.Abs(*codeRepo)
+				crs.localRepoPath, _ = filepath.Abs(codeRepo)
 			}
 		}
 
@@ -202,11 +204,12 @@ func addDaemonCmd() {
 			s.EnableRootRegistry()
 			s.EnableIPObserver()
 
-			if len(*updateURL) != 0 {
+			if len(updateURL) != 0 {
 				if httpOp == nil {
 					return errors.New("http feature not enabled, check build tags")
 				}
-				updtr := &updater{urlFmt: *updateURL, lg: lg}
+				updateURL = strings.TrimSuffix(updateURL, "/")
+				updtr := &updater{url: updateURL, lg: lg}
 				if err := s.Publish("updater",
 					updaterKnownMsgs,
 					as.OnNewStreamFunc(func(ctx as.Context) { ctx.SetContext(updtr) }),

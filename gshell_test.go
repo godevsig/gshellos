@@ -770,7 +770,7 @@ func TestMain(m *testing.M) {
 		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
 		cmdstr += "-loglevel debug daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
 		cmdstr += "-root -repo . "
-		cmdstr += "-update http://127.0.0.1:9001/%s"
+		cmdstr += "-update http://127.0.0.1:9001"
 		go func() {
 			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).CombinedOutput()
 			fmt.Println(string(output))

@@ -575,8 +575,8 @@ var daemonKnownMsgs = []as.KnownMessage{
 }
 
 type updater struct {
-	urlFmt string
-	lg     *log.Logger
+	url string
+	lg  *log.Logger
 }
 
 type gshellBin struct {
@@ -594,7 +594,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	updtr := stream.GetContext().(*updater)
 	updtr.lg.Debugf("tryUpdate: %v", msg)
 
-	rev, err := httpOp.readFile(fmt.Sprintf(updtr.urlFmt, "rev"))
+	rev, err := httpOp.readFile(updtr.url + "/rev")
 	if err != nil {
 		return err
 	}
@@ -610,7 +610,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 		return ErrNoUpdate
 	}
 
-	checksum, err := httpOp.readFile(fmt.Sprintf(updtr.urlFmt, "md5sum"))
+	checksum, err := httpOp.readFile(updtr.url + "/md5sum")
 	if err != nil {
 		return err
 	}
@@ -631,7 +631,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 		return fmt.Errorf("arch %s not supported", msg.arch)
 	}
 
-	bin, err := httpOp.readFile(fmt.Sprintf(updtr.urlFmt, "gshell."+msg.arch))
+	bin, err := httpOp.readFile(updtr.url + "/gshell." + msg.arch)
 	if err != nil {
 		return err
 	}
