@@ -5,7 +5,7 @@
 ```
 $ alias gsh='bin/gshell'
 
-$ gsh -loglevel info daemon -wd rootregistry -registry :11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master &
+$ gsh -loglevel info daemon -wd rootregistry -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 $ gsh list
 PUBLISHER                 SERVICE                   PROVIDER      WLOP(SCOPE)

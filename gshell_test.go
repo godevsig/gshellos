@@ -616,7 +616,7 @@ func TestCmdRepo(t *testing.T) {
 }
 
 func TestCmdRepoRunRaw(t *testing.T) {
-	out, err := gshellRunCmd("run -i https://github.com/godevsig/grepo/tree/master/example/hello")
+	out, err := gshellRunCmd("run -i https://github.com/godevsig/ghub/tree/master/example/hello")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -625,7 +625,7 @@ func TestCmdRepoRunRaw(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellRunCmd("run -i https://github.com/godevsig/grepo/tree/master/example/hello/hello.go")
+	out, err = gshellRunCmd("run -i https://github.com/godevsig/ghub/tree/master/example/hello/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -634,7 +634,7 @@ func TestCmdRepoRunRaw(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/grepo/-/tree/master/example/hello")
+	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/ghub/-/tree/master/example/hello")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -643,7 +643,7 @@ func TestCmdRepoRunRaw(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/grepo/-/tree/master/example/hello/hello.go")
+	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/ghub/-/tree/master/example/hello/hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -652,7 +652,7 @@ func TestCmdRepoRunRaw(t *testing.T) {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/grepo/-/tree/master//local/file.go")
+	out, err = gshellRunCmd("run -i https://gitlab.com/godevsig/ghub/-/tree/master//local/file.go")
 	t.Logf("\n%s", out)
 	if err == nil {
 		t.Fatal("run local file directly should return error")

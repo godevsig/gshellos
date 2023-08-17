@@ -116,7 +116,7 @@ chown -R nobody:nogroup . && chmod ugo+s bin/gshell
 exit
 
 # start gshell daemon at log level info
-bin/gshell -loglevel info daemon -wd rootregistry -registry Your_Server_IP:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/ &
+bin/gshell -loglevel info daemon -wd rootregistry -registry Your_Server_IP:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master -update http://10.10.10.10:8088/gshell/release/latest/ &
 
 # after gshell daemon started, check code repo contents
 bin/gshell repo ls
@@ -186,7 +186,7 @@ For example, to autoupdate gshell binary from official github repo, here we don'
 we just use github download page:
 
 ```
-bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update https://github.com/godevsig/gshellos/releases/latest/download/ &
+bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master -update https://github.com/godevsig/gshellos/releases/latest/download/ &
 ```
 
 Another example is autoupdating from private http file server:
@@ -194,7 +194,7 @@ Another example is autoupdating from private http file server:
 ```shell
 cd /path/to/gshell
 # start root gshell daemon
-bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/grepo/master -update http://10.10.10.10:8088/gshell/release/latest/ &
+bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master -update http://10.10.10.10:8088/gshell/release/latest/ &
 # start file server on the same node(10.10.10.10) of root gshell daemon
 bin/gshell run util/fileserver/cmd/fileserver.go -dir /path/contains/gshell/release
 ```
