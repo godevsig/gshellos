@@ -3,22 +3,22 @@ module github.com/godevsig/gshellos
 go 1.18
 
 require (
-	github.com/godevsig/adaptiveservice v0.9.24-0.20230529165341-d32f6b134d03
-	github.com/godevsig/glib v0.0.0-20230817010609-1c103efadb00
-	github.com/godevsig/grepo v0.2.2-0.20230817095114-27db7b374d02
+	github.com/godevsig/adaptiveservice v0.9.25
+	github.com/godevsig/glib v0.1.1
+	github.com/godevsig/grepo v0.2.4
 	github.com/traefik/yaegi v0.15.1
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/barkimedes/go-deepcopy v0.0.0-20200817023428-a044a1957ca4 // indirect
+	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df // indirect
 	github.com/go-echarts/go-echarts/v2 v2.0.0-20210921152819-048776e902c7 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
-	github.com/mattn/go-runewidth v0.0.13 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/niubaoshu/gotiny v0.0.3 // indirect
 	github.com/peterh/liner v1.2.2 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
-	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1 // indirect
+	github.com/rivo/uniseg v0.4.4 // indirect
+	golang.org/x/sys v0.11.0 // indirect
 )
 
 replace (
