@@ -205,13 +205,13 @@ func gshellRunCmdTimeout(cmdstr string, nSec int) (string, error) {
 }
 
 func TestCmdAutoRestart(t *testing.T) {
-	out, err := gshellRunCmd("run -group autorestart testdata/hello.go")
+	out, err := gshellRunCmd("run -group autorestart hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -group autorestart testdata/sleep.go 300")
+	out, err = gshellRunCmd("run -group autorestart sleep.go 300")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -249,13 +249,13 @@ func TestCmdAutoRestart(t *testing.T) {
 }
 
 func TestCmdRunWrongGRGVer(t *testing.T) {
-	out, err := gshellRunCmd("run -group testgrg testdata/hello.go")
+	out, err := gshellRunCmd("run -group testgrg hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -group testgrg-v0.0.0 testdata/hello.go")
+	out, err = gshellRunCmd("run -group testgrg-v0.0.0 hello.go")
 	t.Logf("\n%s", out)
 	if !strings.Contains(out, "running GRG version v0.0.0 not found") {
 		t.Fatal("expected version not found error")
@@ -331,7 +331,24 @@ func TestCmdExecDir(t *testing.T) {
 }
 
 func TestCmdRun(t *testing.T) {
-	out, err := gshellTestCmd("run -i testdata/hello.go", "testdata/hello.go")
+	out, err := gshellTestCmd("run -i hello.go", "testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCmdRunLocal(t *testing.T) {
+	shell.Run("mkdir -p .working/testcode")
+	shell.Run("cp testdata/hello.go .working/testcode/hello.go")
+	out, err := gshellTestCmd("run -i .working/testcode/hello.go", "testdata/hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shell.Run("cp -a testdata/figure .working/testcode/")
+	out, err = gshellTestCmd("run -i .working/testcode/figure", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -339,7 +356,7 @@ func TestCmdRun(t *testing.T) {
 }
 
 func TestCmdRunRT(t *testing.T) {
-	out, err := gshellRunCmd("run -group testrt -rt 50 testdata/hello.go")
+	out, err := gshellRunCmd("run -group testrt -rt 50 hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -353,20 +370,20 @@ func TestCmdRunRT(t *testing.T) {
 
 func TestCmdRunDir(t *testing.T) {
 	// single file without vendor dir will not compile
-	out, err := gshellRunCmd("run -i testdata/figure/figure.go")
+	out, err := gshellRunCmd("run -i figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// with -import single file can compile
-	out, err = gshellTestCmd("run -i -import testdata/figure/figure.go", "testdata/figure/figure.go")
+	out, err = gshellTestCmd("run -i -import figure/figure.go", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err = gshellTestCmd("run -i testdata/figure", "testdata/figure/figure.go")
+	out, err = gshellTestCmd("run -i figure", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -374,13 +391,13 @@ func TestCmdRunDir(t *testing.T) {
 }
 
 func TestCmdKill(t *testing.T) {
-	out, err := gshellRunCmd("run -group test testdata/hello.go")
+	out, err := gshellRunCmd("run -group test hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -group test2 testdata/hello.go")
+	out, err = gshellRunCmd("run -group test2 hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -449,7 +466,7 @@ func TestCmdPs(t *testing.T) {
 }
 
 func TestCmdJoblist(t *testing.T) {
-	out, err := gshellRunCmd("run -group testjoblist testdata/hello.go")
+	out, err := gshellRunCmd("run -group testjoblist hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -461,7 +478,7 @@ func TestCmdJoblist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err = gshellRunCmd("run -group aftersave testdata/sleep.go 300")
+	out, err = gshellRunCmd("run -group aftersave sleep.go 300")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -512,7 +529,7 @@ func TestCmdJoblist(t *testing.T) {
 }
 
 func TestCmdPsID(t *testing.T) {
-	out, err := gshellRunCmd("run testdata/hello.go")
+	out, err := gshellRunCmd("run hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -528,7 +545,7 @@ func TestCmdPsID(t *testing.T) {
 }
 
 func TestCmdStopRm(t *testing.T) {
-	out, err := gshellRunCmd("run testdata/sleep.go")
+	out, err := gshellRunCmd("run sleep.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -554,7 +571,7 @@ func TestCmdStopRm(t *testing.T) {
 }
 
 func TestCmdStart(t *testing.T) {
-	out, err := gshellRunCmd("run testdata/hello.go")
+	out, err := gshellRunCmd("run hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -582,7 +599,7 @@ func TestCmdInfo(t *testing.T) {
 }
 
 func TestCmdLog(t *testing.T) {
-	out, err := gshellRunCmd("run testdata/hello.go")
+	out, err := gshellRunCmd("run hello.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -723,7 +740,7 @@ func TestAutoUpdate(t *testing.T) {
 	oldpid, _ := shell.Run("pidof gshell.tester")
 	t.Logf("\n%s", oldpid)
 
-	out, err := gshellRunCmd("run testdata/fileserver.go -dir bin -port 9001")
+	out, err := gshellRunCmd("run fileserver.go -dir bin -port 9001")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -769,7 +786,7 @@ func TestMain(m *testing.M) {
 	if len(flag.Args()) == 0 {
 		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
 		cmdstr += "-loglevel debug daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
-		cmdstr += "-root -repo . "
+		cmdstr += "-root -repo testdata "
 		cmdstr += "-update http://127.0.0.1:9001"
 		go func() {
 			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).CombinedOutput()

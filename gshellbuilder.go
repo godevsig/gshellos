@@ -585,7 +585,7 @@ func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
 }
 
 func addRepoCmd() {
-	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "list contens of the code repo seen on local/remote node"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "List contens of the code repo seen on local/remote node"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -628,9 +628,9 @@ func addRepoCmd() {
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <path[/file.go]> [args...]",
-		"fetch code path[/file.go] from `gshell repo`",
-		"and run the go file(s) in a new GRE in specified GRG on local/remote node",
-		"path[/file.go] should be the path in `gshell repo ls [path]`"),
+		"Try local code path[/file.go] first or fetch the code from `gshell repo`,",
+		"and run it in a new GRE in specified GRG on local/remote node",
+		"Use `gshell repo ls [path]` to see available code files"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "", `name of the GRG in the form name-version
 random group name will be used if no name specified
@@ -684,13 +684,21 @@ only applicable for non-interactive mode`)
 		}
 		defer conn.Close()
 
+		jobcmd := JobCmd{
+			Args:           args,
+			AutoRemove:     *autoRemove,
+			AutoRestartMax: *autoRestart,
+		}
+
+		// try to use local file/path if it exits
+		filePath := args[0]
+		if zip, err := zipPathToBuffer(filePath); err == nil {
+			jobcmd.CodeZip = zip
+		}
+
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
-				JobCmd: JobCmd{
-					Args:           args,
-					AutoRemove:     *autoRemove,
-					AutoRestartMax: *autoRestart,
-				},
+				JobCmd:      jobcmd,
 				Interactive: *interactive,
 				AutoImport:  *autoImport,
 				RequestedBy: selfID,

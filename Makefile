@@ -24,7 +24,7 @@ testbin: dep ## Generate test version of main binary
 	@ln -snf gshell.tester bin/gshell.test
 
 rmtestfiles:
-	@rm -rf .working; rm -rf .test
+	@rm -rf .working; rm -rf .test; rm -f default.joblist.yaml
 
 test: rmtestfiles testbin ## Run unit tests
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
