@@ -30,7 +30,9 @@ func init() {
 		"OnConnectFunc":          reflect.ValueOf(adaptiveservice.OnConnectFunc),
 		"OnDisconnectFunc":       reflect.ValueOf(adaptiveservice.OnDisconnectFunc),
 		"OnNewStreamFunc":        reflect.ValueOf(adaptiveservice.OnNewStreamFunc),
+		"OnStreamCloseFunc":      reflect.ValueOf(adaptiveservice.OnStreamCloseFunc),
 		"RegisterType":           reflect.ValueOf(adaptiveservice.RegisterType),
+		"RegisterTypeNoPanic":    reflect.ValueOf(adaptiveservice.RegisterTypeNoPanic),
 		"ScopeAll":               reflect.ValueOf(adaptiveservice.ScopeAll),
 		"ScopeLAN":               reflect.ValueOf(adaptiveservice.ScopeLAN),
 		"ScopeNetwork":           reflect.ValueOf(adaptiveservice.ScopeNetwork),
@@ -143,6 +145,7 @@ func (W _github_com_godevsig_adaptiveservice_Context) SetContext(v interface{}) 
 // _github_com_godevsig_adaptiveservice_ContextStream is an interface wrapper for ContextStream type
 type _github_com_godevsig_adaptiveservice_ContextStream struct {
 	IValue          interface{}
+	WClose          func()
 	WGetContext     func() interface{}
 	WGetNetconn     func() adaptiveservice.Netconn
 	WGetVar         func(v interface{})
@@ -154,6 +157,9 @@ type _github_com_godevsig_adaptiveservice_ContextStream struct {
 	WSetRecvTimeout func(d time.Duration)
 }
 
+func (W _github_com_godevsig_adaptiveservice_ContextStream) Close() {
+	W.WClose()
+}
 func (W _github_com_godevsig_adaptiveservice_ContextStream) GetContext() interface{} {
 	return W.WGetContext()
 }
@@ -263,6 +269,7 @@ func (W _github_com_godevsig_adaptiveservice_Netconn) RemoteAddr() net.Addr {
 // _github_com_godevsig_adaptiveservice_Stream is an interface wrapper for Stream type
 type _github_com_godevsig_adaptiveservice_Stream struct {
 	IValue          interface{}
+	WClose          func()
 	WGetNetconn     func() adaptiveservice.Netconn
 	WRecv           func(msgPtr interface{}) error
 	WSend           func(msg interface{}) error
@@ -270,6 +277,9 @@ type _github_com_godevsig_adaptiveservice_Stream struct {
 	WSetRecvTimeout func(d time.Duration)
 }
 
+func (W _github_com_godevsig_adaptiveservice_Stream) Close() {
+	W.WClose()
+}
 func (W _github_com_godevsig_adaptiveservice_Stream) GetNetconn() adaptiveservice.Netconn {
 	return W.WGetNetconn()
 }

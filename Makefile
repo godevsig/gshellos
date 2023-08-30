@@ -61,6 +61,8 @@ generate: gen-extlib gen-stdlib ## Generate libraries
 
 gen-extlib: extractbin
 	@go generate github.com/godevsig/gshellos/extension
+	@echo Checking if the generated files were forgotten to commit...
+	@DIFF=$$(git diff --cached); echo -n "$$DIFF"; test -z "$$DIFF"
 
 gen-stdlib: extractbin
 	@go generate github.com/godevsig/gshellos/stdlib

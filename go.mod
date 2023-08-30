@@ -3,9 +3,9 @@ module github.com/godevsig/gshellos
 go 1.18
 
 require (
-	github.com/godevsig/adaptiveservice v0.9.25
-	github.com/godevsig/glib v0.1.2-0.20230826061212-649e5e40e117
-	github.com/godevsig/grepo v0.2.5-0.20230826171148-67dfadfd16c2
+	github.com/godevsig/adaptiveservice v0.9.26-0.20230830014831-c95dfbc18882
+	github.com/godevsig/glib v0.1.2-0.20230830021401-ee447d68739c
+	github.com/godevsig/grepo v0.2.5-0.20230830023323-8a7036b699b7
 	github.com/traefik/yaegi v0.15.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -17,7 +17,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/niubaoshu/gotiny v0.0.3 // indirect
 	github.com/peterh/liner v1.2.2 // indirect
-	github.com/rivo/uniseg v0.4.4 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 )
 
