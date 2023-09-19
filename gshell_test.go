@@ -291,6 +291,18 @@ func TestCmdList(t *testing.T) {
 	}
 }
 
+func TestCmdListWithMsgTrace(t *testing.T) {
+	out, err := gshellRunCmd("-trace *adaptiveservice.ListService,*adaptiveservice.queryServiceInLAN,*adaptiveservice.queryServiceInWAN list")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out, "adaptiveservice.ListService{}") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestCmdID(t *testing.T) {
 	out, err := gshellRunCmd("id")
 	t.Logf("\n%s", out)

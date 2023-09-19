@@ -190,7 +190,8 @@ func addDaemonCmd() {
 		s := as.NewServer(opts...).
 			SetPublisher(godevsigPublisher).
 			SetScaleFactors(4, 0, 0).
-			EnableServiceLister()
+			EnableServiceLister().
+			EnableMessageTracer()
 		defer s.Close()
 
 		if len(*lanBroadcastPort) != 0 {
@@ -1066,6 +1067,27 @@ func addLogCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
+func addMsgTraceCmd() {
+	cmd := flag.NewFlagSet(newCmd("mtrace", "<list>", "List traceable message types"), flag.ExitOnError)
+
+	action := func() error {
+		args := cmd.Args()
+		if len(args) == 0 || args[0] != "list" {
+			return errors.New("wrong usage, see --help")
+		}
+
+		types := as.GetKnownMessageTypes()
+		sort.Slice(types, func(i, j int) bool {
+			return types[i] < types[j]
+		})
+		for i, name := range types {
+			fmt.Println(i, name)
+		}
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
 // ShellMain is the main entry of gshell
 func ShellMain() error {
 	// no arg, shell mode
@@ -1078,10 +1100,12 @@ func ShellMain() error {
 		return nil
 	}
 
+	var traceList string
 	flag.StringVar(&loglevel, "l", loglevel, "")
 	flag.StringVar(&loglevel, "loglevel", loglevel, "")
 	flag.StringVar(&providerID, "p", providerID, "")
 	flag.StringVar(&providerID, "provider", providerID, "")
+	flag.StringVar(&traceList, "trace", "", "")
 
 	addIDCmd()
 	addExecCmd()
@@ -1096,6 +1120,7 @@ func ShellMain() error {
 	addInfoCmd()
 	addLogCmd()
 	addJoblistCmd()
+	addMsgTraceCmd()
 
 	usage := func() {
 		const opt = `Usage: [OPTIONS] COMMAND ...
@@ -1104,6 +1129,8 @@ OPTIONS:
         loglevel, debug/info/warn/error (default "%s")
   -p, --provider
         provider ID, run following command on the remote node with this ID (default "%s")
+  --trace
+        Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
 `
 		fmt.Printf(opt, loglevel, providerID)
 		fmt.Println("COMMANDS:")
@@ -1139,15 +1166,36 @@ GREs can be grouped into one named GRG for better performance.
 		if len(args) == 0 {
 			return errors.New("no command provided, see --help")
 		}
+
+		var tokens []string
+		if len(traceList) != 0 {
+			fields := strings.Split(traceList, ",")
+			for _, name := range fields {
+				token, err := as.TraceMsgByName(name)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				fmt.Printf("Tracing <%s> with token %s\n\n", name, token)
+				tokens = append(tokens, token)
+			}
+		}
 		str := args[0]
 		for _, cmd := range cmds {
 			if str == strings.Split(cmd.Name(), " ")[0] {
 				cmd.SetOutput(os.Stdout)
 				cmd.Parse(args[1:])
-				if err := cmd.action(); err != nil {
-					return err
+				err := cmd.action()
+				for _, token := range tokens {
+					fmt.Printf("\nTraced records with token: %s\n", token)
+					msgs, err := as.ReadTracedMsg(token)
+					if err != nil {
+						fmt.Println(err)
+						continue
+					}
+					fmt.Println(msgs)
 				}
-				return nil
+				return err
 			}
 		}
 		return fmt.Errorf("unknown command: %s, see --help", str)

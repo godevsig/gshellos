@@ -30,7 +30,7 @@ test: rmtestfiles testbin ## Run unit tests
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate
 
-COVER_GOAL := 77.5
+COVER_GOAL := 78
 coverage: rmtestfiles testbin ## Generate global code coverage report
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
