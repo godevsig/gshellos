@@ -10,16 +10,16 @@ import (
 )
 
 func usage() string {
-	return os.Args[0] + ` <list|start msgNameList|show tokenList>
+	return os.Args[0] + ` <list|tag msgNameList|show tokenList>
 
 list:
     list traceable message type names
-start <msgNameList>:
-    Start a one-time session to trace the message types specified in msgNameList and return tokens
-    msgNameList is a comma-separated list containing the names of the message types to be traced
+tag <msgNameList>:
+    Tag the message types in msgNameList to be traced and return tracing tokens
+    msgNameList is a comma-separated list containing the names of the message types
 show <tokenList>:
     Display the tracing results specified by a list of tokens
-    tokenList is a comma-separated list returned by start command
+    tokenList is a comma-separated list containing tracing tokens
 `
 }
 
@@ -40,7 +40,7 @@ func main() {
 		for i, name := range types {
 			fmt.Println(i, name)
 		}
-	case "start":
+	case "tag":
 		if len(args) != 3 {
 			fmt.Println("wrong usage, see --help")
 			return

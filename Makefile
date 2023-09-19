@@ -75,6 +75,7 @@ extractbin:
 clean: rmtestfiles ## Remove previous build and test files
 	@rm -rf bin `find -name "\.test"` `find -name "test"`
 	@rm -f cmd/extract/extract
+	@rm -f *.log
 
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
