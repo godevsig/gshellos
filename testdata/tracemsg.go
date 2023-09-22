@@ -4,22 +4,34 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	as "github.com/godevsig/adaptiveservice"
 )
 
 func usage() string {
-	return os.Args[0] + ` <list|tag msgNameList|show tokenList>
+	return os.Args[0] + ` <list|tag ...|untag ... |show ...|purge>
 
 list:
     list traceable message type names
-tag <msgNameList>:
-    Tag the message types in msgNameList to be traced and return tracing tokens
-    msgNameList is a comma-separated list containing the names of the message types
+tag <msgNameList> [count <number>]:
+    Tag the message types specified in <msgNameList> for tracing and return tracing tokens.
+    <msgNameList> is a comma-separated list containing the names of the message types.
+    Each token corresponds one tracing session associated with a message type.
+    The tracing stops after sending <number> messages maching specified message type, generating
+    a set of sequential tokens sharing the same prefix, in below form if number is 100:
+    750768e4-f572-4c4e-9302-46d84c756361.0..99
+    The default value for <number> is 1.
+untag <all|msgNameList>:
+    Untag all message types that have been tagged or the message types specified in <msgNameList>.
 show <tokenList>:
-    Display the tracing results specified by a list of tokens
-    tokenList is a comma-separated list containing tracing tokens
+    Display the tracing results specified by a list of tokens.
+    <tokenList> is a comma-separated list containing tracing tokens.
+purge:
+    Read and remove all traced messages for all tracing sessions, including those triggered by others.
+    CAUTION: this will trigger a force cleanup across all service nodes, resulting missing traced message
+    records for other tracing sessions even on remote nodes.
 `
 }
 
@@ -41,35 +53,84 @@ func main() {
 			fmt.Println(i, name)
 		}
 	case "tag":
+		count := uint32(1)
+		switch len(args) {
+		case 5:
+			if args[3] != "count" {
+				fmt.Println("wrong usage, see --help")
+				return
+			}
+			num, err := strconv.ParseUint(args[4], 10, 32)
+			if err != nil {
+				fmt.Println("parse count error:", err)
+				return
+			}
+			count = uint32(num)
+			fallthrough
+		case 3:
+			fields := strings.Split(args[2], ",")
+			for _, name := range fields {
+				token, err := as.TraceMsgByNameWithCount(name, count)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				fmt.Printf("Tracing <%s> with token %s\n\n", name, token)
+			}
+		default:
+			fmt.Println("wrong usage, see --help")
+		}
+	case "untag":
 		if len(args) != 3 {
 			fmt.Println("wrong usage, see --help")
 			return
 		}
-		traceList := args[2]
-		fields := strings.Split(traceList, ",")
-		for _, name := range fields {
-			token, err := as.TraceMsgByName(name)
-			if err != nil {
-				fmt.Println(err)
-				continue
+		if args[2] == "all" {
+			as.UnTraceMsgAll()
+		} else {
+			fields := strings.Split(args[2], ",")
+			for _, name := range fields {
+				_, err := as.TraceMsgByNameWithCount(name, 0)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				fmt.Printf("Tracing <%s> stopped\n", name)
 			}
-			fmt.Printf("Tracing <%s> with token %s\n\n", name, token)
 		}
 	case "show":
 		if len(args) != 3 {
 			fmt.Println("wrong usage, see --help")
 			return
 		}
-		tokenList := args[2]
-		tokens := strings.Split(tokenList, ",")
-		for _, token := range tokens {
-			fmt.Printf("\nTraced records with token: %s\n", token)
-			msgs, err := as.ReadTracedMsg(token)
-			if err != nil {
-				fmt.Println(err)
-				continue
+		for _, mt := range strings.Split(args[2], ",") {
+			count := 1
+			strs := strings.Split(mt, "..")
+			if len(strs) == 2 {
+				num, err := strconv.ParseUint(strs[1], 10, 32)
+				if err != nil {
+					fmt.Println("parse count error:", err)
+					continue
+				}
+				count = int(num) + 1
 			}
-			fmt.Println(msgs)
+			prefix := strings.TrimSuffix(strs[0], ".0")
+			for i := 0; i < count; i++ {
+				token := fmt.Sprintf("%s.%d", prefix, i)
+				fmt.Printf("\nTraced records with token: %s\n", token)
+				msgs, err := as.ReadTracedMsg(token)
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
+				fmt.Println(msgs)
+			}
 		}
+	case "purge":
+		msgs, err := as.ReadAllTracedMsg()
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(msgs)
 	}
 }
