@@ -895,6 +895,23 @@ func addPsCmd() {
 			return err
 		}
 
+		for _, ggi := range ggis {
+			grei := ggi.GREInfos
+			sort.Slice(grei, func(i int, j int) bool {
+				return grei[i].StartTime.After(grei[j].StartTime)
+			})
+		}
+
+		sort.Slice(ggis, func(i, j int) bool {
+			if len(ggis[i].GREInfos) == 0 {
+				return false
+			}
+			if len(ggis[j].GREInfos) == 0 {
+				return true
+			}
+			return ggis[i].GREInfos[0].StartTime.After(ggis[j].GREInfos[0].StartTime)
+		})
+
 		if len(msg.IDPattern) != 0 { // info
 			for _, ggi := range ggis {
 				for _, grei := range ggi.GREInfos {
