@@ -71,8 +71,8 @@ Message tracing can be enabled per message type dynamically, without any code mo
 
 In this scenario, we have a service called 'echoservice' running. The 'echoclient' sends hundreds of `echo.Request` messages to the server, and we want to trace how `echo.Request` is going to be processed. It's important to note that message tracing operates on a session-based approach, and here's how it works:
 1. We tag message type `echo.Request` with a special 'traced' flag, return a unique token.
-2. The client consumes the token upon sending a `echo.Request` because it matches 'traced' message type. Each token is specific to a session and gets consumed, so subsequent messages of type echo.Request won't be traced unless tagged again.
-3. When the server-side handles an `echo.Request`, all messages involved in processing that request, in the order they occur, are tagged as 'traced' messages (see the demo example). In this scenario, we don't have dependent messages, so the server responds with `echo.Reply` to the client.
+2. The client consumes the token upon sending a `echo.Request` because it matches 'traced' message type. Each token is specific to a session and gets consumed, so subsequent messages of type `echo.Request` won't be traced unless tagged again.
+3. When the server-side handles an `echo.Request`, all messages involved in processing that request, in the order they occur, are tagged as 'traced' messages (see the demo example). In our scenario here, we don't have dependent messages, so the server responds with `echo.Reply` to the client.
 4. Events related to the client sending, server receiving, server sending, and client receiving are recorded throughout the tracing process.
 5. We use the token to access traced records. The records will be read and then cleared.
 
@@ -126,6 +126,9 @@ Summary(paste below content to http://www.plantuml.com/plantuml):
 "example/echo.v1.0@0f4de739464d" -> "client": 12:32:14.411652 echo.Reply{}
 ```
 
+The sequence diagram:  
+![tracing session for echo server](tracing_echo_server.png)
+
 ## Trace sequential sessions
 ```shell
 cd gshellos
@@ -165,7 +168,6 @@ gsh run -rm -i testdata/tracemsg.go show ac098704-9971-4810-b338-8398ec27bf78.0.
 ```
 
 Sequential tracing session result includes many session results, from `ac098704-9971-4810-b338-8398ec27bf78.0` to `ac098704-9971-4810-b338-8398ec27bf78.8`, with each one displayed separately.
-```
 
 ## The help
 
