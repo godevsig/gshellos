@@ -129,7 +129,7 @@ Summary(paste below content to http://www.plantuml.com/plantuml):
 The sequence diagram:  
 ![tracing session for echo server](tracing_echo_server.png)
 
-## Trace sequential sessions
+## Trace sequential sessions with filters
 ```shell
 cd gshellos
 alias gsh='bin/gshell'
@@ -155,9 +155,11 @@ c493ceaf848c  uzfayo-v2.0.1       echoserver          2023/09/19 12:26:13  runni
 # same as gsh mtrace list
 gsh run -group echoclient -rm -i testdata/tracemsg.go list
 
-# tag echo.Request, must run it in the same group(-group option) with echo client
-# also provide count option to trace the message type multiple times
-gsh run -group echoclient -rm -i testdata/tracemsg.go tag echo.Request count 9
+# tag echo.Request, must run it in the same group(-group option) with echo client,
+# also provide count option to trace the message type multiple times.
+# with filters option, only those with the field 'Msg' maches "ni*o" and field 'Num' matches "*90*" in the
+# message(type echo.Request) content will be traced and recorded.
+gsh run -group echoclient -rm -i testdata/tracemsg.go tag echo.Request count 9 filters 'Msg=ni*o,Num=*90*'
 ## output Tracing <echo.Request> with token ac098704-9971-4810-b338-8398ec27bf78.0..8
 
 # rerun echo client
@@ -177,22 +179,24 @@ $ gsh run -rm -i testdata/tracemsg.go -h
 testdata/tracemsg.go <list|tag ...|untag ... |show ...|purge>
 
 list:
-    list traceable message type names
-tag <msgNameList> [count <number>]:
+    List traceable message type names
+tag <msgName> [count <number>] [filters <filterList>]:
     Tag the message types specified in <msgNameList> for tracing and return tracing tokens.
-    <msgNameList> is a comma-separated list containing the names of the message types.
-    Each token corresponds one tracing session associated with a message type.
-    The tracing stops after sending <number> messages maching specified message type, generating
-    a set of sequential tokens sharing the same prefix, in below form if number is 100:
+    <number>: The tracing stops after sending <number> messages maching specified message type,
+    generating a set of sequential tokens sharing the same prefix, in below form if number is 100:
     750768e4-f572-4c4e-9302-46d84c756361.0..99
     The default value for <number> is 1.
+    <filterList>: comma-separated list of filters in the form field1=pattern1,field2=pattern2 ...
+    The default value for <filterList> is nil.
 untag <all|msgNameList>:
     Untag all message types that have been tagged or the message types specified in <msgNameList>.
+    <msgNameList> is a comma-separated list containing the names of the message types.
 show <tokenList>:
     Display the tracing results specified by a list of tokens.
-    <tokenList> is a comma-separated list containing tracing tokens.
+    Note: Tracing results are read cleared, so 2nd show with the same token will be empty.
+    <tokenList> is a comma-separated list containing tracing tokens returned by tag subcommand.
 purge:
     Read and remove all traced messages for all tracing sessions, including those triggered by others.
-    CAUTION: this will trigger a force cleanup across all service nodes, resulting missing traced message
+    CAUTION: this will trigger a force cleanup across all service nodes, resulting missing traced message.
     records for other tracing sessions even on remote nodes.
 ```

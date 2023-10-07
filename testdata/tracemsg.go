@@ -14,33 +14,37 @@ func usage() string {
 	return os.Args[0] + ` <list|tag ...|untag ... |show ...|purge>
 
 list:
-    list traceable message type names
-tag <msgNameList> [count <number>]:
+    List traceable message type names
+tag <msgName> [count <number>] [filters <filterList>]:
     Tag the message types specified in <msgNameList> for tracing and return tracing tokens.
-    <msgNameList> is a comma-separated list containing the names of the message types.
-    Each token corresponds one tracing session associated with a message type.
-    The tracing stops after sending <number> messages maching specified message type, generating
-    a set of sequential tokens sharing the same prefix, in below form if number is 100:
+    <number>: The tracing stops after sending <number> messages maching specified message type,
+    generating a set of sequential tokens sharing the same prefix, in below form if number is 100:
     750768e4-f572-4c4e-9302-46d84c756361.0..99
     The default value for <number> is 1.
+    <filterList>: comma-separated list of filters in the form field1=pattern1,field2=pattern2 ...
+    The default value for <filterList> is nil.
 untag <all|msgNameList>:
     Untag all message types that have been tagged or the message types specified in <msgNameList>.
+    <msgNameList> is a comma-separated list containing the names of the message types.
 show <tokenList>:
     Display the tracing results specified by a list of tokens.
-    <tokenList> is a comma-separated list containing tracing tokens.
+    Note: Tracing results are read cleared, so 2nd show with the same token will be empty.
+    <tokenList> is a comma-separated list containing tracing tokens returned by tag subcommand.
 purge:
     Read and remove all traced messages for all tracing sessions, including those triggered by others.
-    CAUTION: this will trigger a force cleanup across all service nodes, resulting missing traced message
+    CAUTION: this will trigger a force cleanup across all service nodes, resulting missing traced message.
     records for other tracing sessions even on remote nodes.
 `
 }
 
-func main() {
+func do() (err error) {
 	args := os.Args
-	if len(args) < 2 {
-		fmt.Println("wrong usage, see --help")
-		return
-	}
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("wrong usage, see --help")
+		}
+	}()
+
 	switch args[1] {
 	case "-h", "--help":
 		fmt.Println(usage())
@@ -53,44 +57,43 @@ func main() {
 			fmt.Println(i, name)
 		}
 	case "tag":
+		msgName := args[2]
 		count := uint32(1)
-		switch len(args) {
-		case 5:
-			if args[3] != "count" {
-				fmt.Println("wrong usage, see --help")
-				return
-			}
-			num, err := strconv.ParseUint(args[4], 10, 32)
-			if err != nil {
-				fmt.Println("parse count error:", err)
-				return
-			}
-			count = uint32(num)
-			fallthrough
-		case 3:
-			fields := strings.Split(args[2], ",")
-			for _, name := range fields {
-				token, err := as.TraceMsgByNameWithCount(name, count)
+		var filters []string
+
+		args = args[3:]
+		for len(args) > 0 {
+			switch args[0] {
+			case "count":
+				num, err := strconv.ParseUint(args[1], 10, 32)
 				if err != nil {
-					fmt.Println(err)
-					continue
+					return fmt.Errorf("parse count error: %v", err)
 				}
-				fmt.Printf("Tracing <%s> with token %s\n\n", name, token)
+				count = uint32(num)
+			case "filters":
+				strs := strings.Split(args[1], ",")
+				for _, str := range strs {
+					if len(strings.Split(str, "=")) != 2 {
+						return fmt.Errorf("%s filter format error", str)
+					}
+					filters = append(filters, str)
+				}
 			}
-		default:
-			fmt.Println("wrong usage, see --help")
+			args = args[2:]
 		}
+
+		token, err := as.TraceMsgByNameWithFilters(msgName, count, filters)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Tracing <%s> with token %s\n\n", msgName, token)
 	case "untag":
-		if len(args) != 3 {
-			fmt.Println("wrong usage, see --help")
-			return
-		}
 		if args[2] == "all" {
 			as.UnTraceMsgAll()
 		} else {
-			fields := strings.Split(args[2], ",")
-			for _, name := range fields {
-				_, err := as.TraceMsgByNameWithCount(name, 0)
+			strs := strings.Split(args[2], ",")
+			for _, name := range strs {
+				_, err := as.TraceMsgByName(name, 0)
 				if err != nil {
 					fmt.Println(err)
 					continue
@@ -99,10 +102,6 @@ func main() {
 			}
 		}
 	case "show":
-		if len(args) != 3 {
-			fmt.Println("wrong usage, see --help")
-			return
-		}
 		for _, mt := range strings.Split(args[2], ",") {
 			count := 1
 			strs := strings.Split(mt, "..")
@@ -132,5 +131,13 @@ func main() {
 			fmt.Println(err)
 		}
 		fmt.Println(msgs)
+	}
+	return nil
+}
+
+func main() {
+	if err := do(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }

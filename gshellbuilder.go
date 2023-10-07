@@ -1188,7 +1188,7 @@ GREs can be grouped into one named GRG for better performance.
 		if len(traceList) != 0 {
 			fields := strings.Split(traceList, ",")
 			for _, name := range fields {
-				token, err := as.TraceMsgByName(name)
+				token, err := as.TraceMsgByName(name, 1)
 				if err != nil {
 					fmt.Println(err)
 					continue
