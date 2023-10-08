@@ -13,6 +13,7 @@ import (
 	"github.com/godevsig/glib/sys/lined"
 	"github.com/godevsig/gshellos/extension"
 	"github.com/godevsig/gshellos/stdlib"
+	"github.com/godevsig/gshellos/stdlib/unsafe"
 	"github.com/traefik/yaegi/interp"
 )
 
@@ -31,6 +32,9 @@ func newShell(opt interp.Options) (*gshell, error) {
 	opt.GoPath = tmpDir
 	i := interp.New(opt)
 	if err := i.Use(stdlib.Symbols); err != nil {
+		return nil, err
+	}
+	if err := i.Use(unsafe.Symbols); err != nil {
 		return nil, err
 	}
 	if err := i.Use(extension.Symbols); err != nil {
