@@ -23,8 +23,6 @@ func init() {
 //go:generate ../cmd/extract/extract -name stdlib -tag stdcommon archive/tar compress/gzip crypto/md5 crypto/rand
 //go:generate ../cmd/extract/extract -name stdlib -tag stdcommon encoding/binary encoding/gob encoding/hex encoding/json
 
-//go:generate ../cmd/extract/extract -name stdlib -tag stdext embed plugin
-
 //go:generate ../cmd/extract/extract -name stdlib -tag stdarchive archive/zip
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdcompress compress/bzip2 compress/flate compress/lzw compress/zlib

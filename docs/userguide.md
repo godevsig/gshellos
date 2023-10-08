@@ -86,7 +86,7 @@ f987918bf1bf  ohhrco-v23.05.25    topid               2023/05/30 09:06:05  runni
 
 $ gsh info
 Version: v23.05.25
-Build tags: stdbase,stdcommon,stdruntime,stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding,stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode,debug,adaptiveservice,shell,log,pidinfo,asbench,echo,fileserver,topidchart,docit,recorder
+Build tags: stdbase,stdcommon,stdruntime,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding,stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode,debug,adaptiveservice,shell,log,pidinfo,asbench,echo,fileserver,topidchart,docit,recorder
 Commit: 1e0a1f5a2d49a6dfe1baa7663d95e784b2d291c0
 
 $ gsh -h

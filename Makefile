@@ -53,7 +53,7 @@ lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build lite release binary to bin dir
 
 full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
-full: STDTAGS := $(STDTAGS),stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
+full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
 full: build ## Build full release binary to bin dir
 

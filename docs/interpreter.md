@@ -72,7 +72,6 @@ Current feature set table:
 | stdbase         | Y    | Y    |
 | stdcommon       | Y    | Y    |
 | stdruntime      | Y    | Y    |
-| stdext          | N    | Y    |
 | stdarchive      | N    | Y    |
 | stdcompress     | N    | Y    |
 | stdcontainer    | N    | Y    |
@@ -99,7 +98,7 @@ The table will change over time, use `gshell info` to check the tags in use:
 ```
 $ gshell info
 Version: v1.1.3
-Build tags: stdbase,stdcommon,stdruntime,stdext,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding,stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode,debug,adaptiveservice,shell,log
+Build tags: stdbase,stdcommon,stdruntime,stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding,stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode,debug,adaptiveservice,shell,log
 Commit: 6f579e5b1ad853c5789f946baf17585cbf99c68f
 ```
 
