@@ -75,6 +75,3 @@ func init() {
 //go:generate ../cmd/extract/extract -name stdlib -tag stdunicode unicode unicode/utf16 unicode/utf8
 
 //go:generate ../cmd/extract/extract -name stdlib -tag stdother time/tzdata
-
-//go:generate ../cmd/extract/extract -name stdlib -tag stdunsafe unsafe
-//go:generate ../cmd/extract/extract -name stdlib -tag stdsyscall syscall
