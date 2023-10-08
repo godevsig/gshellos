@@ -13,8 +13,8 @@ github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177 h1:Ga+4dO0xF4eju
 github.com/godevsig/gotiny v0.0.4-0.20210913173728-083dd4b72177/go.mod h1:QdEauSzqdF5tbLIVtGYO6sqOhUKVPSZGd5x7xK5oeS4=
 github.com/godevsig/grepo v0.2.5-0.20230922061707-44104971fe06 h1:qMDnHR4n/f+qYwR6jR1CjWWS2KotJ8cDOY+TpWQXym8=
 github.com/godevsig/grepo v0.2.5-0.20230922061707-44104971fe06/go.mod h1:UH7vB+rOuR4zc7eJ4dQz7pBE3wyuTnnwEV5SIVJRyZo=
-github.com/godevsig/yaegi v0.9.24-0.20230616025128-5fe181a7a634 h1:UzR0OwaPIlWrpNFBeuv3vAaXT4GnUwmIHykHO0tA6N8=
-github.com/godevsig/yaegi v0.9.24-0.20230616025128-5fe181a7a634/go.mod h1:AVRxhaI2G+nUsaM1zyktzwXn69G3t/AuTDrCiTds9p0=
+github.com/godevsig/yaegi v0.15.2-0.20231008092440-48f887591519 h1:+KRUsscbFGdaX7SGot7D3cxpVtAVtGGPU37CnAQVn1o=
+github.com/godevsig/yaegi v0.15.2-0.20231008092440-48f887591519/go.mod h1:pkOs3wa7+hKuTCqPav6dNWzfV5G5ZYK5hl5F9xBHp6I=
 github.com/google/uuid v1.3.1 h1:KjJaJ9iWZ3jOFZIf1Lqf4laDRCasjl0BCmnEGxkdLb4=
 github.com/google/uuid v1.3.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
