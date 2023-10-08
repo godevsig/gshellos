@@ -7,7 +7,7 @@ import "reflect"
 var Symbols = map[string]map[string]reflect.Value{}
 
 func init() {
-	Symbols["github.com/godevsig/gshellos/extension"] = map[string]reflect.Value{
+	Symbols["github.com/godevsig/gshellos/extension/extension"] = map[string]reflect.Value{
 		"Symbols": reflect.ValueOf(Symbols),
 	}
 }
