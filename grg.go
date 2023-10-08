@@ -3,10 +3,12 @@ package gshellos
 import (
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -159,7 +161,7 @@ type greCtl struct {
 	log        *os.File
 	stdin      io.Reader
 	stdout     io.Writer
-	stderr     strings.Builder
+	stderr     *strings.Builder
 	args       []string
 	stat       int32
 	greErr     error // returned error when GRE exits
@@ -278,6 +280,7 @@ func (gc *greCtl) reset() error {
 	gc.log = output
 	gc.stdin = nullIO{}
 	gc.stdout = output
+	gc.stderr = &strings.Builder{}
 	return nil
 }
 
@@ -294,7 +297,7 @@ func (gc *greCtl) newShell() (err error) {
 	gc.gsh, err = newShell(interp.Options{
 		Stdin:  gc.stdin,
 		Stdout: gc.stdout,
-		Stderr: &gc.stderr,
+		Stderr: gc.stderr,
 		Args:   gc.args,
 	})
 	return
@@ -314,12 +317,12 @@ func (gc *greCtl) runGRE() {
 	gc.greInfoToFile()
 
 	if err := gc.newShell(); err != nil {
-		fmt.Fprintln(&gc.stderr, err)
+		fmt.Fprintln(gc.stderr, err)
 	} else {
 		if err := gc.gsh.evalPathWithContext(ctx, gc.codeDir); err != nil {
-			fmt.Fprintln(&gc.stderr, err)
+			fmt.Fprintln(gc.stderr, err)
 			if p, ok := err.(interp.Panic); ok {
-				fmt.Fprintln(&gc.stderr, string(p.Stack))
+				fmt.Fprintln(gc.stderr, string(p.Stack))
 			}
 		}
 	}
@@ -327,9 +330,26 @@ func (gc *greCtl) runGRE() {
 	gc.EndTime = time.Now()
 	stderrStr := gc.stderr.String()
 	if len(stderrStr) != 0 {
-		gc.greErr = fmt.Errorf("%s", stderrStr)
-		gc.GREErr = stderrStr
-		fmt.Fprint(gc.stdout, stderrStr)
+		errstr := stderrStr
+		index := strings.Index(errstr, "goroutine")
+		if index != -1 {
+			errstr = errstr[:index]
+		}
+		re := regexp.MustCompile(`os\.Exit\(.*\)`)
+		if m := re.FindString(errstr); m != "" {
+			if m == "os.Exit(0)" {
+				//not an error
+				stderrStr = ""
+			} else {
+				//user called os.Exit()
+				stderrStr = fmt.Sprintln(m)
+			}
+		}
+		if stderrStr != "" {
+			gc.greErr = errors.New(stderrStr)
+			gc.GREErr = stderrStr
+			fmt.Fprint(gc.stdout, stderrStr)
+		}
 	}
 	gc.log.Close()
 	if gc.greErr == nil {
