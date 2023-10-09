@@ -348,7 +348,7 @@ func (gc *greCtl) runGRE() {
 		if stderrStr != "" {
 			gc.greErr = errors.New(stderrStr)
 			gc.GREErr = stderrStr
-			fmt.Fprint(gc.stdout, stderrStr)
+			//fmt.Fprint(gc.stdout, stderrStr)
 		}
 	}
 	gc.log.Close()
