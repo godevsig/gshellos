@@ -38,6 +38,9 @@ var version string
 //go:embed bin/buildtag
 var buildTags string
 
+//go:embed bin/buildtime
+var buildTime string
+
 const (
 	defaultWorkDir    = "/var/tmp/gshell"
 	godevsigPublisher = "godevsig"
@@ -55,6 +58,12 @@ func init() {
 	}
 	if len(version) == 0 {
 		version = commitRev[:5]
+	}
+	if len(buildTags) == 0 {
+		buildTags = "unknown"
+	}
+	if len(buildTime) == 0 {
+		buildTime = "unknown"
 	}
 }
 

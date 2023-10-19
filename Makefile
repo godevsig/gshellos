@@ -3,6 +3,7 @@ SHELL=bash
 PKG_ALL = $(shell go list ./... | grep -v unsafe)
 GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
 COMMIT_REV = $(shell git rev-parse HEAD)
+BUILD_TIME = $(shell date "+%Y.%m.%d %H:%M:%S")
 STDTAGS := stdbase,stdcommon,stdruntime
 EXTTAGS := adaptiveservice,shell,log,pidinfo,asbench
 
@@ -44,6 +45,7 @@ dep:
 	@echo -n $(GIT_TAG) > bin/gittag
 	@echo -n $(STDTAGS),$(EXTTAGS) > bin/buildtag
 	@echo -n $(COMMIT_REV) > bin/rev
+	@echo -n $(BUILD_TIME) > bin/buildtime
 
 build: dep
 	@go build -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell

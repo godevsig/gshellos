@@ -432,8 +432,9 @@ type cmdInfo struct{}
 func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Version: %s\n", version)
-	fmt.Fprintf(&b, "Build tags: %s\n", buildTags)
 	fmt.Fprintf(&b, "Commit: %s\n", commitRev)
+	fmt.Fprintf(&b, "Build time: %s\n", buildTime)
+	fmt.Fprintf(&b, "Build tags: %s\n", buildTags)
 
 	return b.String()
 }
