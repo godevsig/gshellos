@@ -41,12 +41,17 @@ type githubHandler struct {
 	urlInfo
 }
 
-var ghpKey string
+var ghKey string
+var glKey string
 
 func init() {
-	const sk = "QmVhcmVyIGdocF9BZVFnY0JFTER2WUoxWXNlN2pUVDFxVWFCbElLb24zMzBsb3M="
+	sk := "QmVhcmVyIGdocF9BZVFnY0JFTER2WUoxWXNlN2pUVDFxVWFCbElLb24zMzBsb3M="
 	data, _ := base64.StdEncoding.DecodeString(sk)
-	ghpKey = string(data)
+	ghKey = string(data)
+
+	sk = "QmVhcmVyIGdscGF0LS1DTHM3RkhDQzNnMkdpc1NOU1Fu"
+	data, _ = base64.StdEncoding.DecodeString(sk)
+	glKey = string(data)
 }
 
 func (hdl githubHandler) list() ([]httpFileInfo, error) {
@@ -55,7 +60,7 @@ func (hdl githubHandler) list() ([]httpFileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", ghpKey)
+	req.Header.Set("Authorization", ghKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -123,6 +128,7 @@ func (hdl gitlabHandler) list() ([]httpFileInfo, error) {
 		return nil, err
 	}
 
+	req.Header.Set("Authorization", glKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -144,10 +150,11 @@ func (hdl gitlabHandler) list() ([]httpFileInfo, error) {
 	if len(fis) == 0 { // it is a single file
 		url := fmt.Sprintf("https://%s/api/v4/projects/%s%%2F%s/repository/files/%s?ref=%s",
 			hdl.domain, hdl.owner, hdl.repo, strings.ReplaceAll(hdl.path, "/", "%2F"), hdl.ref)
-		req, err := http.NewRequest("HEAD", url, nil)
+		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return nil, err
 		}
+		req.Header.Set("Authorization", glKey)
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return nil, err
@@ -182,6 +189,7 @@ func (hdl gitlabHandler) getArchive() ([]byte, error) {
 		return nil, err
 	}
 
+	req.Header.Set("Authorization", glKey)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
