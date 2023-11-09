@@ -25,12 +25,6 @@ type urlInfo struct {
 	path   string
 }
 
-func (ui urlInfo) replacePath(path string) urlInfo {
-	nui := ui
-	nui.path = path
-	return nui
-}
-
 type httpHandler interface {
 	list() ([]httpFileInfo, error)
 	replacePath(path string) httpHandler
@@ -39,19 +33,20 @@ type httpHandler interface {
 
 type githubHandler struct {
 	urlInfo
+	key string
 }
 
-var ghKey string
-var glKey string
+var githubKey string
+var gitlabRebornLinuxKey string
 
 func init() {
 	sk := "QmVhcmVyIGdocF9BZVFnY0JFTER2WUoxWXNlN2pUVDFxVWFCbElLb24zMzBsb3M="
 	data, _ := base64.StdEncoding.DecodeString(sk)
-	ghKey = string(data)
+	githubKey = string(data)
 
 	sk = "QmVhcmVyIGdscGF0LS1DTHM3RkhDQzNnMkdpc1NOU1Fu"
 	data, _ = base64.StdEncoding.DecodeString(sk)
-	glKey = string(data)
+	gitlabRebornLinuxKey = string(data)
 }
 
 func (hdl githubHandler) list() ([]httpFileInfo, error) {
@@ -60,7 +55,9 @@ func (hdl githubHandler) list() ([]httpFileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", ghKey)
+	if len(hdl.key) != 0 {
+		req.Header.Set("Authorization", hdl.key)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -102,7 +99,8 @@ func (hdl githubHandler) list() ([]httpFileInfo, error) {
 }
 
 func (hdl githubHandler) replacePath(path string) httpHandler {
-	return githubHandler{hdl.urlInfo.replacePath(path)}
+	hdl.urlInfo.path = path
+	return hdl
 }
 
 func (hdl githubHandler) getArchive() ([]byte, error) {
@@ -119,6 +117,7 @@ func (hdl githubHandler) getArchive() ([]byte, error) {
 
 type gitlabHandler struct {
 	urlInfo
+	key string
 }
 
 func (hdl gitlabHandler) list() ([]httpFileInfo, error) {
@@ -128,7 +127,9 @@ func (hdl gitlabHandler) list() ([]httpFileInfo, error) {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", glKey)
+	if len(hdl.key) != 0 {
+		req.Header.Set("Authorization", hdl.key)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -154,7 +155,9 @@ func (hdl gitlabHandler) list() ([]httpFileInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", glKey)
+		if len(hdl.key) != 0 {
+			req.Header.Set("Authorization", hdl.key)
+		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return nil, err
@@ -179,7 +182,8 @@ func (hdl gitlabHandler) list() ([]httpFileInfo, error) {
 }
 
 func (hdl gitlabHandler) replacePath(path string) httpHandler {
-	return gitlabHandler{hdl.urlInfo.replacePath(path)}
+	hdl.urlInfo.path = path
+	return hdl
 }
 
 func (hdl gitlabHandler) getArchive() ([]byte, error) {
@@ -189,7 +193,9 @@ func (hdl gitlabHandler) getArchive() ([]byte, error) {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", glKey)
+	if len(hdl.key) != 0 {
+		req.Header.Set("Authorization", hdl.key)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -235,25 +241,35 @@ func parseURL(url string) (handler httpHandler, err error) {
 			err = fmt.Errorf("url %s format error", url)
 		}
 	}()
+	domain := urlFields[2]
+	owner := urlFields[3]
 	switch {
-	case strings.Contains(urlFields[2], "github"):
+	case strings.Contains(domain, "github"):
 		ui := urlInfo{
-			domain: urlFields[2],
-			owner:  urlFields[3],
+			domain: domain,
+			owner:  owner,
 			repo:   urlFields[4],
 			ref:    urlFields[6],
 			path:   strings.Join(urlFields[7:], "/"),
 		}
-		return githubHandler{ui}, nil
-	case strings.Contains(urlFields[2], "gitlab"):
+		h := githubHandler{ui, ""}
+		if domain == "github.com" {
+			h.key = githubKey
+		}
+		return h, nil
+	case strings.Contains(domain, "gitlab"):
 		ui := urlInfo{
-			domain: urlFields[2],
-			owner:  urlFields[3],
+			domain: domain,
+			owner:  owner,
 			repo:   urlFields[4],
 			ref:    urlFields[7],
 			path:   strings.Join(urlFields[8:], "/"),
 		}
-		return gitlabHandler{ui}, nil
+		h := gitlabHandler{ui, ""}
+		if domain == "gitlabe1.ext.net.nokia.com" && owner == "rebornlinux" {
+			h.key = gitlabRebornLinuxKey
+		}
+		return h, nil
 	}
 	return nil, fmt.Errorf("rest api for %s unsupported", urlFields[2])
 }
