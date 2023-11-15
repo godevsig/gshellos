@@ -14,8 +14,8 @@ hello, gshell
 - stdlib was pre-loaded, import other packages on demand
 - Ctrl+D to exit, Ctrl+C to interrupt the current line
 
-# Example
-
+# Examples
+## Get observd IP
 Enter gshell interactive mode and then issue below code to get your observed IP:
 
 ```go
@@ -67,3 +67,14 @@ func GetObservedIP() string {
   `err := conn.SendRecv(as.GetObservedIP{}, &ip)` means the server will return error
   if there was something wrong to obtain the client IP, the error will be the stored
   in `err` variable.
+
+## Query message queue info of a service
+```go
+>> import as "github.com/godevsig/adaptiveservice"
+>> c := as.NewClient()
+>> conn := <-c.Discover("example", "serviceA")
+>> var mqi as.MsgQInfo
+>> conn.SendRecv(as.QueryMsgQInfo{}, &mqi)
+>> fmt.Printf("%#v\n", mqi)
+adaptiveservice.MsgQInfo{NumCPU:24, ResidentWorkers:1, QueueWeight:8, QueueLen:0, QueueSize:3072, BusyWorkerNum:0, IdleWorkerNum:1}
+```
