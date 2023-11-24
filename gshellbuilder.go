@@ -130,10 +130,25 @@ func addDaemonCmd() {
 	codeRepo := cmd.String("repo", "", "code repo local path or https address in format site/org/proj/branch")
 	updateURL := cmd.String("update", "", "url of artifacts to update gshell, require -root")
 
+	daemonRunning := func() bool {
+		c := as.NewClient(as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
+		conn := <-c.Discover(godevsigPublisher, "gshellDaemon")
+		if conn == nil {
+			return false
+		}
+		conn.Close()
+		return true
+	}
+
 	action := func() error {
 		if providerID != "self" {
 			return errors.New("command does not run on remote node")
 		}
+
+		if daemonRunning() {
+			return errors.New("detected a running gshell daemon on local node")
+		}
+
 		workDir := *workDir
 		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
 			return err
@@ -585,10 +600,11 @@ func randStringRunes(n int) string {
 }
 
 func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
-	c := as.NewClient(as.WithLogger(lg)).SetDiscoverTimeout(3)
 	if providerID == "self" { // local
+		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
 	} else { // remote
+		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeNetwork)).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
 	}
 	return
