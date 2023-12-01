@@ -466,17 +466,6 @@ func TestCmdKill(t *testing.T) {
 	}
 }
 
-func TestCmdPs(t *testing.T) {
-	out, err := gshellRunCmd("ps")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "GRE ID        IN GROUP            NAME                START AT             STATUS") {
-		t.Fatal("unexpected output")
-	}
-}
-
 func TestCmdJoblist(t *testing.T) {
 	out, err := gshellRunCmd("run -group testjoblist hello.go")
 	t.Logf("\n%s", out)
@@ -540,6 +529,17 @@ func TestCmdJoblist(t *testing.T) {
 	}
 }
 
+func TestCmdPs(t *testing.T) {
+	out, err := gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "GRE ID        IN GROUP            NAME                START AT             STATUS") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestCmdPsID(t *testing.T) {
 	out, err := gshellRunCmd("run hello.go")
 	t.Logf("\n%s", out)
@@ -547,6 +547,27 @@ func TestCmdPsID(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err = gshellRunCmd("ps " + strings.TrimSpace(out))
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "NAME         : hello") {
+		t.Fatal("unexpected output")
+	}
+}
+
+func TestCmdPsIDWithProviderID(t *testing.T) {
+	selfID, err := gshellRunCmd("id")
+	t.Logf("\n%s", selfID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := gshellRunCmd("-p " + selfID + " run hello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = gshellRunCmd("-p " + selfID + " ps " + strings.TrimSpace(out))
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
