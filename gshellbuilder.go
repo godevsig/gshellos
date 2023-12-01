@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -67,17 +68,22 @@ func init() {
 	}
 }
 
-func getSelfID() (selfID string, err error) {
-	c := as.NewClient(as.WithScope(as.ScopeProcess | as.ScopeOS)).SetDiscoverTimeout(0)
-	conn := <-c.Discover(as.BuiltinPublisher, as.SrvProviderInfo)
-	if conn == nil {
-		err = as.ErrServiceNotFound(as.BuiltinPublisher, as.SrvProviderInfo)
-		return
-	}
-	defer conn.Close()
+var getSelfID = getSelfIDFunc()
 
-	err = conn.SendRecv(&as.ReqProviderInfo{}, &selfID)
-	return
+func getSelfIDFunc() func() string {
+	var selfID = "NA"
+	var once sync.Once
+	return func() string {
+		once.Do(func() {
+			c := as.NewClient(as.WithScope(as.ScopeProcess | as.ScopeOS)).SetDiscoverTimeout(3)
+			conn := <-c.Discover(as.BuiltinPublisher, as.SrvProviderInfo)
+			if conn != nil {
+				conn.SendRecv(&as.ReqProviderInfo{}, &selfID)
+				conn.Close()
+			}
+		})
+		return selfID
+	}
 }
 
 func trimName(name string, size int) string {
@@ -375,7 +381,7 @@ func addListCmd() {
 			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
 		}
-		selfID, _ := getSelfID()
+		selfID := getSelfID()
 
 		c := as.NewClient(opts...).SetDiscoverTimeout(0)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
@@ -449,10 +455,7 @@ func addIDCmd() {
 		if providerID != "self" {
 			return errors.New("command does not run on remote node")
 		}
-		selfID, err := getSelfID()
-		if err != nil {
-			selfID = "NA"
-		}
+		selfID := getSelfID()
 		fmt.Println(selfID)
 		return nil
 	}
@@ -600,7 +603,7 @@ func randStringRunes(n int) string {
 }
 
 func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
-	if providerID == "self" { // local
+	if providerID == "self" || providerID == getSelfID() { // local
 		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
 	} else { // remote
@@ -702,7 +705,7 @@ only applicable for non-interactive mode`)
 			*autoRestart = 0
 		}
 
-		selfID, _ := getSelfID()
+		selfID := getSelfID()
 
 		conn := connectDaemon(providerID, lg)
 		if conn == nil {
@@ -819,7 +822,7 @@ func addJoblistCmd() {
 		}
 		defer conn.Close()
 
-		selfID, _ := getSelfID()
+		selfID := getSelfID()
 
 		tiny := *tiny
 		switch action {
