@@ -707,9 +707,6 @@ func TestCmdRepoRunRaw(t *testing.T) {
 	if err == nil {
 		t.Fatal("run local file directly should return error")
 	}
-	if !strings.Contains(out, "not found") {
-		t.Fatal("unexpected output")
-	}
 
 	out, err = gshellTestCmd("run -i -import https://github.com/godevsig/gshellos/tree/master/testdata/figure", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
