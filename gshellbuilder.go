@@ -719,7 +719,7 @@ only applicable for non-interactive mode`)
 			AutoRestartMax: *autoRestart,
 		}
 
-		// try to use local file/path if it exits
+		// try to use local file/path if it exists
 		filePath := args[0]
 		if zip, err := zipPathToBuffer(filePath); err == nil {
 			jobcmd.CodeZip = zip
