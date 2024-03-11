@@ -2,7 +2,9 @@ package gshellos
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -189,11 +191,12 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
 	gc.statDir = filepath.Join(grg.statDir, gc.ID)
 
+	if err := gc.reset(); err != nil {
+		return nil, err
+	}
+
 	if gi == nil {
 		if err := os.MkdirAll(gc.statDir, 0755); err != nil {
-			return nil, err
-		}
-		if err := gc.reset(); err != nil {
 			return nil, err
 		}
 		if err := gc.runMsgToFile(); err != nil {
@@ -201,15 +204,18 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		}
 	}
 
-	tmpDir, err := os.MkdirTemp(gshellTempDir, "gre-code-")
-	if err != nil {
-		return nil, err
-	}
-	gc.codeDir = tmpDir
+	hash := md5.Sum(runMsg.CodeZip)
+	gc.codeDir = filepath.Join(gshellTempDir, hex.EncodeToString(hash[:]))
 
-	if err := unzipBufferToPath(runMsg.CodeZip, tmpDir); err != nil {
-		os.RemoveAll(tmpDir)
-		return nil, err
+	if fi, err := os.Stat(gc.codeDir); err != nil || !fi.Mode().IsDir() {
+		os.Remove(gc.codeDir)
+		if err := os.MkdirAll(gc.codeDir, 0755); err != nil {
+			return nil, err
+		}
+		if err := unzipBufferToPath(runMsg.CodeZip, gc.codeDir); err != nil {
+			os.RemoveAll(gc.codeDir)
+			return nil, err
+		}
 	}
 	runMsg.CodeZip = nil // release the mem sooner
 
@@ -265,10 +271,12 @@ func (gc *greCtl) changeStat(newStat int32) {
 	gc.Stat = greStatString[gc.stat]
 }
 
-func (gc *greCtl) changeStatIf(oldStat, newStat int32) {
+func (gc *greCtl) changeStatIf(oldStat, newStat int32) (changed bool) {
 	if atomic.CompareAndSwapInt32(&gc.stat, oldStat, newStat) {
 		gc.Stat = greStatString[gc.stat]
+		return true
 	}
+	return false
 }
 
 func (gc *greCtl) reset() error {
@@ -285,9 +293,6 @@ func (gc *greCtl) reset() error {
 }
 
 func (gc *greCtl) close() {
-	if gc.gsh != nil {
-		gc.gsh.close()
-	}
 	os.Remove(gc.outputFile)
 	os.RemoveAll(gc.statDir)
 	os.RemoveAll(gc.codeDir)
@@ -351,6 +356,7 @@ func (gc *greCtl) runGRE() {
 			//fmt.Fprint(gc.stdout, stderrStr)
 		}
 	}
+	gc.gsh.close()
 	gc.log.Close()
 	if gc.greErr == nil {
 		gc.AutoRestartBalance = 0
@@ -530,9 +536,8 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 	for _, gc := range gcs {
 		switch msg.Cmd {
 		case "stop":
-			if gc.stat == greStatRunning { // no need to atomic
+			if gc.changeStatIf(greStatRunning, greStatAborting) {
 				gc.cancel()
-				gc.changeStatIf(greStatRunning, greStatAborting)
 				ids = append(ids, gc.ID)
 			}
 		case "rm":
