@@ -217,6 +217,12 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 			return nil, err
 		}
 	}
+	greidDir := filepath.Join(gc.codeDir, ".GSHGREID")
+	os.MkdirAll(greidDir, 0755)
+	// place an empty file inside to prevent early removal of gc.codeDir
+	if file, err := os.Create(filepath.Join(greidDir, gc.ID)); err == nil {
+		file.Close()
+	}
 	runMsg.CodeZip = nil // release the mem sooner
 
 	return gc, nil
@@ -295,7 +301,12 @@ func (gc *greCtl) reset() error {
 func (gc *greCtl) close() {
 	os.Remove(gc.outputFile)
 	os.RemoveAll(gc.statDir)
-	os.RemoveAll(gc.codeDir)
+	greidDir := filepath.Join(gc.codeDir, ".GSHGREID")
+	os.Remove(filepath.Join(greidDir, gc.ID))
+	entries, _ := os.ReadDir(greidDir)
+	if len(entries) == 0 {
+		os.RemoveAll(gc.codeDir)
+	}
 }
 
 func (gc *greCtl) newShell() (err error) {
