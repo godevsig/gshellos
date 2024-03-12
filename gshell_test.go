@@ -205,7 +205,7 @@ func gshellRunCmdTimeout(cmdstr string, nSec int) (string, error) {
 }
 
 func TestCmdAutoRestart(t *testing.T) {
-	out, err := gshellRunCmd("run -group autorestart hello.go")
+	out, err := gshellRunCmd("run -group autorestart sleep.go 3")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -223,7 +223,7 @@ func TestCmdAutoRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 4)
 	pidOld, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", pidOld)
 	shell.Run(fmt.Sprintf("kill -9 %s", pidOld))
