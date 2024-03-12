@@ -79,7 +79,9 @@ func (mw *mWriter) Write(p []byte) (n int, err error) {
 func multiWriter(writers ...io.Writer) io.Writer {
 	mw := &mWriter{}
 	for _, w := range writers {
-		mw.writers = append(mw.writers, &writerStat{w: w})
+		if w != nil {
+			mw.writers = append(mw.writers, &writerStat{w: w})
+		}
 	}
 	return mw
 }
