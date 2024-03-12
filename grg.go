@@ -86,9 +86,8 @@ func (grg *grg) loadGREs() error {
 				return
 			}
 			grg.addGRE(gc)
-
 			switch gi.Stat {
-			case "starting", "running":
+			case "running":
 				go grg.runGRE(gc)
 				grg.lg.Infof("gre %s restarted", greid)
 			case "aborting", "exited":
@@ -131,14 +130,12 @@ func (grg *grg) rmGRE(gc *greCtl) {
 }
 
 const (
-	greStatStarting int32 = iota
-	greStatRunning
+	greStatRunning int32 = iota
 	greStatAborting
 	greStatExited
 )
 
 var greStatString = []string{
-	greStatStarting: "starting",
 	greStatRunning:  "running",
 	greStatAborting: "aborting",
 	greStatExited:   "exited",
@@ -149,7 +146,7 @@ type greInfo struct {
 	Name               string
 	ID                 string
 	Args               []string
-	Stat               string // starting running exited
+	Stat               string
 	StartTime          time.Time
 	EndTime            time.Time
 	RestartedNum       int
@@ -160,7 +157,6 @@ type greInfo struct {
 type greCtl struct {
 	*greInfo
 	cancel     context.CancelFunc
-	log        *os.File
 	stdin      io.Reader
 	stdout     io.Writer
 	stderr     *strings.Builder
@@ -190,10 +186,6 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 	}
 	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
 	gc.statDir = filepath.Join(grg.statDir, gc.ID)
-
-	if err := gc.reset(); err != nil {
-		return nil, err
-	}
 
 	if gi == nil {
 		if err := os.MkdirAll(gc.statDir, 0755); err != nil {
@@ -232,9 +224,6 @@ func (grg *grg) runGRE(gc *greCtl) {
 	for {
 		gc.runGRE()
 		if gc.AutoRestartBalance == 0 {
-			break
-		}
-		if err := gc.reset(); err != nil {
 			break
 		}
 		gc.RestartedNum++
@@ -285,19 +274,6 @@ func (gc *greCtl) changeStatIf(oldStat, newStat int32) (changed bool) {
 	return false
 }
 
-func (gc *greCtl) reset() error {
-	gc.changeStat(greStatStarting)
-	output, err := os.OpenFile(gc.outputFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return fmt.Errorf("GRE output file not created: %v", err)
-	}
-	gc.log = output
-	gc.stdin = nullIO{}
-	gc.stdout = output
-	gc.stderr = &strings.Builder{}
-	return nil
-}
-
 func (gc *greCtl) close() {
 	os.Remove(gc.outputFile)
 	os.RemoveAll(gc.statDir)
@@ -320,17 +296,67 @@ func (gc *greCtl) newShell() (err error) {
 }
 
 func (gc *greCtl) runGRE() {
+	gc.stderr = &strings.Builder{}
+	gc.greErr = nil
+	gc.GREErr = ""
+	gc.StartTime = time.Now()
+	gc.EndTime = time.Time{}
+	gc.changeStat(greStatRunning)
+	gc.greInfoToFile()
+
+	defer func() {
+		gc.EndTime = time.Now()
+		stderrStr := gc.stderr.String()
+		if len(stderrStr) != 0 {
+			errstr := stderrStr
+			index := strings.Index(errstr, "goroutine")
+			if index != -1 {
+				errstr = errstr[:index]
+			}
+			re := regexp.MustCompile(`os\.Exit\(.*\)`)
+			if m := re.FindString(errstr); m != "" {
+				if m == "os.Exit(0)" {
+					//not an error
+					stderrStr = ""
+				} else {
+					//user called os.Exit()
+					stderrStr = fmt.Sprintln(m)
+				}
+			}
+			if stderrStr != "" {
+				gc.greErr = errors.New(stderrStr)
+				gc.GREErr = stderrStr
+			}
+		}
+		gc.stdin = nullIO{}
+		gc.stdout = nil
+
+		if gc.greErr == nil {
+			gc.AutoRestartBalance = 0
+		}
+		if gc.AutoRestartBalance > 0 {
+			gc.AutoRestartBalance--
+		}
+		gc.changeStat(greStatExited)
+		gc.greInfoToFile()
+	}()
+
+	log, err := os.OpenFile(gc.outputFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Fprintln(gc.stderr, err)
+		return
+	}
+	defer log.Close()
+
+	if gc.stdout != nil {
+		gc.stdout = multiWriter(gc.stdout, log)
+	} else {
+		gc.stdout = log
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	gc.cancel = cancel
-
-	gc.StartTime = time.Now()
-	gc.greErr = nil
-	gc.GREErr = ""
-	gc.EndTime = time.Time{}
-
-	gc.changeStat(greStatRunning)
-	gc.greInfoToFile()
 
 	if err := gc.newShell(); err != nil {
 		fmt.Fprintln(gc.stderr, err)
@@ -342,41 +368,7 @@ func (gc *greCtl) runGRE() {
 			}
 		}
 	}
-
-	gc.EndTime = time.Now()
-	stderrStr := gc.stderr.String()
-	if len(stderrStr) != 0 {
-		errstr := stderrStr
-		index := strings.Index(errstr, "goroutine")
-		if index != -1 {
-			errstr = errstr[:index]
-		}
-		re := regexp.MustCompile(`os\.Exit\(.*\)`)
-		if m := re.FindString(errstr); m != "" {
-			if m == "os.Exit(0)" {
-				//not an error
-				stderrStr = ""
-			} else {
-				//user called os.Exit()
-				stderrStr = fmt.Sprintln(m)
-			}
-		}
-		if stderrStr != "" {
-			gc.greErr = errors.New(stderrStr)
-			gc.GREErr = stderrStr
-			//fmt.Fprint(gc.stdout, stderrStr)
-		}
-	}
 	gc.gsh.close()
-	gc.log.Close()
-	if gc.greErr == nil {
-		gc.AutoRestartBalance = 0
-	}
-	if gc.AutoRestartBalance > 0 {
-		gc.AutoRestartBalance--
-	}
-	gc.changeStat(greStatExited)
-	gc.greInfoToFile()
 }
 
 type grgGREInfo struct {
@@ -438,7 +430,7 @@ func (msg *grgCmdRun) Handle(stream as.ContextStream) (reply interface{}) {
 		clientIO := as.NewStreamIO(stream)
 		defer clientIO.Close()
 		gc.stdin = clientIO
-		gc.stdout = multiWriter(clientIO, gc.log)
+		gc.stdout = clientIO
 		gc.runGRE()
 		if msg.AutoRemove {
 			grg.rmGRE(gc)
@@ -558,10 +550,6 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 			}
 		case "start":
 			if gc.stat == greStatExited {
-				if err := gc.reset(); err != nil {
-					grg.lg.Errorln(err)
-					break
-				}
 				gc := gc
 				go gc.runGRE()
 				ids = append(ids, gc.ID)
