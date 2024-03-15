@@ -3,6 +3,8 @@ package gshellos
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -11,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/godevsig/glib/sys/lined"
 	"github.com/godevsig/gshellos/extension"
@@ -20,7 +23,7 @@ import (
 )
 
 type gshell struct {
-	codeDir     string
+	src         *sourceCode
 	interpreter *interp.Interpreter
 }
 
@@ -41,7 +44,10 @@ func mainPkgToGshellPkg(path string) error {
 	if err != nil {
 		return err
 	}
-	if fi.Mode().IsRegular() && strings.HasSuffix(fi.Name(), ".go") {
+	if fi.Mode().IsRegular() {
+		if !strings.HasSuffix(fi.Name(), ".go") {
+			return errors.New("wrong file suffix, .go expected")
+		}
 		return modifyGoFile(path, fi.Mode().Perm())
 	}
 
@@ -60,52 +66,103 @@ func mainPkgToGshellPkg(path string) error {
 	return nil
 }
 
-// unzip source code into codeDir in required source code layout
-func prepareSourceCode(codeDir string, codeZip []byte) error {
-	pkgDir := filepath.Join(codeDir, "src", "gshellmain")
-	if err := os.MkdirAll(pkgDir, 0755); err != nil {
-		return err
-	}
-	if err := unzipBufferToPath(codeZip, pkgDir); err != nil {
-		//os.RemoveAll(codeDir)
-		return err
-	}
-	if err := mainPkgToGshellPkg(pkgDir); err != nil {
-		//os.RemoveAll(codeDir)
-		return err
-	}
-	return nil
+var (
+	sharedCodeDir     = make(map[string]int) // [codeDir]refCnt
+	sharedCodeDirLock sync.Mutex
+)
+
+type sourceCode struct {
+	codeDir string
 }
 
-// new an interpreter, with GOPATH set to codeDir, which might have been
-// prepared by prepareSourceCode()
-func newShell(codeDir string, opt interp.Options) (*gshell, error) {
+// unzip source code in required source code layout
+func newSharedSourceCode(codeZip []byte) (src *sourceCode, err error) {
+	hash := md5.Sum(codeZip)
+	hashstr := hex.EncodeToString(hash[:])
+	codeDir := filepath.Join(gshellTempDir, hashstr)
+	src = &sourceCode{codeDir}
+
+	sharedCodeDirLock.Lock()
+	defer sharedCodeDirLock.Unlock()
+	refCnt := sharedCodeDir[codeDir]
+	if refCnt == 0 {
+		defer func() {
+			if err != nil {
+				os.RemoveAll(codeDir)
+			}
+		}()
+		pkgDir := filepath.Join(codeDir, "src", "gshellmain")
+		if err := os.MkdirAll(pkgDir, 0755); err != nil {
+			return src, err
+		}
+		if err := unzipBufferToPath(codeZip, pkgDir); err != nil {
+			return src, err
+		}
+		if err := mainPkgToGshellPkg(pkgDir); err != nil {
+			return src, err
+		}
+	}
+	sharedCodeDir[codeDir] = refCnt + 1
+	return src, nil
+}
+
+func (src *sourceCode) close() {
+	sharedCodeDirLock.Lock()
+	defer sharedCodeDirLock.Unlock()
+	refCnt := sharedCodeDir[src.codeDir] - 1
+	if refCnt == 0 {
+		os.RemoveAll(src.codeDir)
+	}
+}
+
+func newShellWithCodeZip(codeZip []byte) (*gshell, error) {
 	gsh := &gshell{}
-	gsh.codeDir = codeDir
-	opt.GoPath = codeDir
+	if codeZip != nil {
+		src, err := newSharedSourceCode(codeZip)
+		if err != nil {
+			return nil, err
+		}
+		gsh.src = src
+	}
+
+	return gsh, nil
+}
+
+func newShell() (*gshell, error) {
+	return newShellWithCodeZip(nil)
+}
+
+func (gsh *gshell) close() {
+	if gsh.src != nil {
+		gsh.src.close()
+	}
+	gsh.interpreter = nil
+}
+
+func (gsh *gshell) init(opt interp.Options) error {
+	if gsh.src != nil {
+		opt.GoPath = gsh.src.codeDir
+	}
+
 	i := interp.New(opt)
 	if err := i.Use(stdlib.Symbols); err != nil {
-		return nil, err
+		return err
 	}
 	if err := i.Use(unsafe.Symbols); err != nil {
-		return nil, err
+		return err
 	}
 	if err := i.Use(extension.Symbols); err != nil {
-		return nil, err
+		return err
 	}
 	i.ImportUsed()
 	os.Args = opt.Args //reset os.Args for interpreter
 	gsh.interpreter = i
-	var err error
-	if codeDir != "" {
-		_, err = i.Eval(`import "gshellmain"`)
+	if gsh.src != nil {
+		if _, err := i.Eval(`import "gshellmain"`); err != nil {
+			return err
+		}
 	}
-	return gsh, err
-}
-
-func (gsh *gshell) close() {
-	//os.RemoveAll(gsh.codeDir)
-	gsh.interpreter = nil
+	return nil
 }
 
 func (gsh *gshell) start(ctx context.Context) (err error) {
@@ -117,56 +174,6 @@ func (gsh *gshell) stop(cancel context.CancelFunc) {
 	if _, err := gsh.interpreter.Eval("gshellmain.Stop()"); err != nil {
 		cancel()
 	}
-}
-
-func (gsh *gshell) evalPath(path string) error {
-	return gsh.evalPathWithContext(nil, path)
-}
-
-func (gsh *gshell) evalPathWithContext(ctx context.Context, path string) error {
-	var err error
-	path, err = filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	fi, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-
-	dir := path
-	file := ""
-	if fi.Mode().IsRegular() {
-		dir = filepath.Dir(path)
-		file = filepath.Base(path)
-		if !strings.HasSuffix(file, ".go") {
-			return errors.New("wrong file suffix, .go expected")
-		}
-	}
-
-	srcPath := filepath.Join(gsh.codeDir, "src")
-	if file != "" {
-		if err := os.Symlink(dir, srcPath); err != nil {
-			return err
-		}
-		srcPath = filepath.Join(srcPath, file)
-	} else {
-		if err := os.MkdirAll(srcPath, 0755); err != nil {
-			return err
-		}
-		if err := os.Symlink(dir, filepath.Join(srcPath, "vendor")); err != nil {
-			return err
-		}
-		srcPath = "."
-	}
-
-	if ctx == nil {
-		_, err = gsh.interpreter.EvalPath(srcPath)
-	} else {
-		_, err = gsh.interpreter.EvalPathWithContext(ctx, srcPath)
-	}
-
-	return err
 }
 
 func (gsh *gshell) runREPL() {
