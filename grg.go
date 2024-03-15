@@ -201,13 +201,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 
 	if fi, err := os.Stat(gc.codeDir); err != nil || !fi.Mode().IsDir() {
 		os.Remove(gc.codeDir)
-		if err := os.MkdirAll(gc.codeDir, 0755); err != nil {
-			return nil, err
-		}
-		if err := unzipBufferToPath(runMsg.CodeZip, gc.codeDir); err != nil {
-			os.RemoveAll(gc.codeDir)
-			return nil, err
-		}
+		prepareSourceCode(gc.codeDir, runMsg.CodeZip)
 	}
 	greidDir := filepath.Join(gc.codeDir, ".GSHGREID")
 	os.MkdirAll(greidDir, 0755)
@@ -285,16 +279,6 @@ func (gc *greCtl) close() {
 	}
 }
 
-func (gc *greCtl) newShell() (err error) {
-	gc.gsh, err = newShell(interp.Options{
-		Stdin:  gc.stdin,
-		Stdout: gc.stdout,
-		Stderr: gc.stderr,
-		Args:   gc.args,
-	})
-	return
-}
-
 func (gc *greCtl) runGRE() {
 	gc.stderr = &strings.Builder{}
 	gc.greErr = nil
@@ -358,17 +342,25 @@ func (gc *greCtl) runGRE() {
 	defer cancel()
 	gc.cancel = cancel
 
-	if err := gc.newShell(); err != nil {
+	gsh, err := newShell(gc.codeDir,
+		interp.Options{
+			Stdin:  gc.stdin,
+			Stdout: gc.stdout,
+			Stderr: gc.stderr,
+			Args:   gc.args,
+		})
+	gc.gsh = gsh
+	if err != nil {
 		fmt.Fprintln(gc.stderr, err)
 	} else {
-		if err := gc.gsh.evalPathWithContext(ctx, gc.codeDir); err != nil {
+		if err := gsh.start(ctx); err != nil {
 			fmt.Fprintln(gc.stderr, err)
 			if p, ok := err.(interp.Panic); ok {
 				fmt.Fprintln(gc.stderr, string(p.Stack))
 			}
 		}
 	}
-	gc.gsh.close()
+	gsh.close()
 }
 
 type grgGREInfo struct {
@@ -540,7 +532,7 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 		switch msg.Cmd {
 		case "stop":
 			if gc.changeStatIf(greStatRunning, greStatAborting) {
-				gc.cancel()
+				gc.gsh.stop(gc.cancel)
 				ids = append(ids, gc.ID)
 			}
 		case "rm":

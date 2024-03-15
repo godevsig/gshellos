@@ -1,6 +1,7 @@
 package gshellos
 
 import (
+	"context"
 	"crypto/md5"
 	_ "embed" // go embed
 	"encoding/base64"
@@ -474,13 +475,31 @@ func addExecCmd() {
 			return errors.New("no path provided, see --help")
 		}
 
-		gsh, err := newShell(interp.Options{Args: args})
+		filePath := args[0]
+		zip, err := zipPathToBuffer(filePath)
+		if err != nil {
+			return err
+		}
+
+		codeDir := filepath.Join(gshellTempDir, genID(16))
+		if err := os.MkdirAll(codeDir, 0755); err != nil {
+			return err
+		}
+
+		if err := prepareSourceCode(codeDir, zip); err != nil {
+			return err
+		}
+		//defer os.RemoveAll(codeDir)
+
+		gsh, err := newShell(codeDir, interp.Options{Args: args})
 		if err != nil {
 			return nil
 		}
 		defer gsh.close()
 
-		return gsh.evalPath(filepath.Clean(args[0]))
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		return gsh.start(ctx)
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }
@@ -1137,7 +1156,7 @@ func addMsgTraceCmd() {
 func ShellMain() error {
 	// no arg, shell mode
 	if len(os.Args) == 1 {
-		gsh, err := newShell(interp.Options{})
+		gsh, err := newShell("", interp.Options{})
 		if err != nil {
 			return err
 		}
