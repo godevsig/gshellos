@@ -481,21 +481,15 @@ func addExecCmd() {
 			return err
 		}
 
-		codeDir := filepath.Join(gshellTempDir, genID(16))
-		if err := os.MkdirAll(codeDir, 0755); err != nil {
-			return err
-		}
-
-		if err := prepareSourceCode(codeDir, zip); err != nil {
-			return err
-		}
-		//defer os.RemoveAll(codeDir)
-
-		gsh, err := newShell(codeDir, interp.Options{Args: args})
+		gsh, err := newShellWithCodeZip(zip)
 		if err != nil {
-			return nil
+			return err
 		}
 		defer gsh.close()
+
+		if err := gsh.init(interp.Options{Args: args}); err != nil {
+			return err
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -1156,10 +1150,14 @@ func addMsgTraceCmd() {
 func ShellMain() error {
 	// no arg, shell mode
 	if len(os.Args) == 1 {
-		gsh, err := newShell("", interp.Options{})
+		gsh, err := newShell()
 		if err != nil {
 			return err
 		}
+		if err := gsh.init(interp.Options{}); err != nil {
+			return err
+		}
+
 		gsh.runREPL()
 		return nil
 	}

@@ -2,9 +2,7 @@ package gshellos
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/gob"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -196,19 +194,11 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		}
 	}
 
-	hash := md5.Sum(runMsg.CodeZip)
-	gc.codeDir = filepath.Join(gshellTempDir, hex.EncodeToString(hash[:]))
-
-	if fi, err := os.Stat(gc.codeDir); err != nil || !fi.Mode().IsDir() {
-		os.Remove(gc.codeDir)
-		prepareSourceCode(gc.codeDir, runMsg.CodeZip)
+	gsh, err := newShellWithCodeZip(runMsg.CodeZip)
+	if err != nil {
+		return nil, err
 	}
-	greidDir := filepath.Join(gc.codeDir, ".GSHGREID")
-	os.MkdirAll(greidDir, 0755)
-	// place an empty file inside to prevent early removal of gc.codeDir
-	if file, err := os.Create(filepath.Join(greidDir, gc.ID)); err == nil {
-		file.Close()
-	}
+	gc.gsh = gsh
 	runMsg.CodeZip = nil // release the mem sooner
 
 	return gc, nil
@@ -271,12 +261,7 @@ func (gc *greCtl) changeStatIf(oldStat, newStat int32) (changed bool) {
 func (gc *greCtl) close() {
 	os.Remove(gc.outputFile)
 	os.RemoveAll(gc.statDir)
-	greidDir := filepath.Join(gc.codeDir, ".GSHGREID")
-	os.Remove(filepath.Join(greidDir, gc.ID))
-	entries, _ := os.ReadDir(greidDir)
-	if len(entries) == 0 {
-		os.RemoveAll(gc.codeDir)
-	}
+	gc.gsh.close()
 }
 
 func (gc *greCtl) runGRE() {
@@ -342,15 +327,13 @@ func (gc *greCtl) runGRE() {
 	defer cancel()
 	gc.cancel = cancel
 
-	gsh, err := newShell(gc.codeDir,
-		interp.Options{
-			Stdin:  gc.stdin,
-			Stdout: gc.stdout,
-			Stderr: gc.stderr,
-			Args:   gc.args,
-		})
-	gc.gsh = gsh
-	if err != nil {
+	gsh := gc.gsh
+	if err := gsh.init(interp.Options{
+		Stdin:  gc.stdin,
+		Stdout: gc.stdout,
+		Stderr: gc.stderr,
+		Args:   gc.args,
+	}); err != nil {
 		fmt.Fprintln(gc.stderr, err)
 	} else {
 		if err := gsh.start(ctx); err != nil {
@@ -360,7 +343,7 @@ func (gc *greCtl) runGRE() {
 			}
 		}
 	}
-	gsh.close()
+	//gsh.close()
 }
 
 type grgGREInfo struct {
