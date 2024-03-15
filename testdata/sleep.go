@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+var stopChan = make(chan struct{})
+
+// Stop stops the app
+func Stop() {
+	fmt.Println("stopping...")
+	close(stopChan)
+}
+
 func main() {
 	fmt.Println(os.Args)
 	cnt := 30
@@ -16,6 +24,15 @@ func main() {
 		}
 	}
 	fmt.Printf("sleeping %d seconds\n", cnt)
-	time.Sleep(time.Duration(cnt) * time.Second)
-	fmt.Println("wakeup")
+	go func() {
+		time.Sleep(time.Duration(cnt) * time.Second)
+		stopChan <- struct{}{}
+	}()
+
+	_, ok := <-stopChan
+	if ok {
+		fmt.Println("wakeup")
+	} else {
+		fmt.Println("canceled")
+	}
 }
