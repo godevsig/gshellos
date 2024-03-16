@@ -343,7 +343,6 @@ func (gc *greCtl) runGRE() {
 			}
 		}
 	}
-	//gsh.close()
 }
 
 type grgGREInfo struct {
