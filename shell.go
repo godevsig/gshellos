@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-	"sync"
+	"syscall"
 
 	"github.com/godevsig/glib/sys/lined"
 	"github.com/godevsig/gshellos/extension"
@@ -66,32 +66,37 @@ func mainPkgToGshellPkg(path string) error {
 	return nil
 }
 
-var (
-	sharedCodeDir     = make(map[string]int) // [codeDir]refCnt
-	sharedCodeDirLock sync.Mutex
-)
-
 type sourceCode struct {
 	codeDir string
+	idFile  string
 }
 
 // unzip source code in required source code layout
-func newSharedSourceCode(codeZip []byte) (src *sourceCode, err error) {
+func newSharedSourceCode(codeZip []byte) (*sourceCode, error) {
 	hash := md5.Sum(codeZip)
 	hashstr := hex.EncodeToString(hash[:])
 	codeDir := filepath.Join(gshellTempDir, hashstr)
-	src = &sourceCode{codeDir}
+	idDir := filepath.Join(codeDir, ".IDHOLDER")
+	idFile := filepath.Join(idDir, genID(4))
+	src := &sourceCode{codeDir, idFile}
 
-	sharedCodeDirLock.Lock()
-	defer sharedCodeDirLock.Unlock()
-	refCnt := sharedCodeDir[codeDir]
-	if refCnt == 0 {
-		defer func() {
-			if err != nil {
-				os.RemoveAll(codeDir)
-			}
-		}()
-		pkgDir := filepath.Join(codeDir, "src", "gshellmain")
+	if err := os.MkdirAll(idDir, 0755); err != nil {
+		return nil, err
+	}
+	lockFile := filepath.Join(codeDir, ".lock")
+	flock, err := os.OpenFile(lockFile, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer flock.Close()
+
+	if err := syscall.Flock(int(flock.Fd()), syscall.LOCK_EX); err != nil {
+		return nil, err
+	}
+	defer syscall.Flock(int(flock.Fd()), syscall.LOCK_UN)
+
+	pkgDir := filepath.Join(codeDir, "src", "gshellmain")
+	if _, err := os.Stat(pkgDir); err != nil {
 		if err := os.MkdirAll(pkgDir, 0755); err != nil {
 			return src, err
 		}
@@ -102,15 +107,19 @@ func newSharedSourceCode(codeZip []byte) (src *sourceCode, err error) {
 			return src, err
 		}
 	}
-	sharedCodeDir[codeDir] = refCnt + 1
+
+	// place an empty file inside to prevent early removal of codeDir
+	if file, err := os.Create(idFile); err == nil {
+		file.Close()
+	}
+
 	return src, nil
 }
 
 func (src *sourceCode) close() {
-	sharedCodeDirLock.Lock()
-	defer sharedCodeDirLock.Unlock()
-	refCnt := sharedCodeDir[src.codeDir] - 1
-	if refCnt == 0 {
+	os.Remove(src.idFile)
+	entries, _ := os.ReadDir(filepath.Dir(src.idFile))
+	if len(entries) == 0 {
 		os.RemoveAll(src.codeDir)
 	}
 }
