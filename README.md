@@ -1,8 +1,16 @@
 # Introduction
 
-gshell is gshellos based service management tool.  
-gshellos is a simple pure golang service framework for linux devices that provides:
+gshell is a simple pure golang service framework for linux devices.
 
+Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
+Each node has an unique provider ID.
+
+Each job runs in one dedicated GRE(Gshell Runtime Environment) which runs in a GRG(Gshell Runtime Group).
+GREs can be grouped into one named GRG for better performance.
+
+gshell enters interactive mode if no options and no commands provided.
+
+gshell features:
 - Flexible running model
   - Mixed execution mode to run go apps/services
     - interpreted mode for flexibility, compiled mode for performance
@@ -45,6 +53,9 @@ gshellos is a simple pure golang service framework for linux devices that provid
   - zero config, self discovered and managed network
   - auto reverse proxy for service behind NAT
 
+# User guide
+[gshell command line guide](docs/userguide.md)
+
 # Architecture
 
 ![gshell architecture](docs/gshellos_architecture.PNG)
@@ -53,10 +64,9 @@ gshellos is a simple pure golang service framework for linux devices that provid
 
 - [Interpreted mode VS compiled mode](docs/interpreter.md)
 - [Deploy gshell daemon](docs/daemon.md)
-- [Run go apps/services in GRE and GRG](docs/gregrg.md)
 - [Service and message](docs/adaptiveservice.md)
-- [Command line guide](docs/userguide.md)
 - [Debugging using interactive shell](docs/debugging.md)
+- [Dynamic messages tracing in gshell mesh](docs/messagetracing.md)
 
 # See also
 
