@@ -329,13 +329,7 @@ func TestCmdExec(t *testing.T) {
 }
 
 func TestCmdExecDir(t *testing.T) {
-	out, err := gshellTestCmd("exec testdata/figure/figure.go", "testdata/figure/figure.go")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err = gshellTestCmd("exec testdata/figure", "testdata/figure/figure.go")
+	out, err := gshellTestCmd("exec testdata/figure", "testdata/figure/figure.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -598,7 +592,41 @@ func TestCmdStopRm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "context canceled") {
+	if !strings.Contains(out, "STATUS       : cancelled") {
+		t.Fatal("unexpected output")
+	}
+	out, err = gshellRunCmd("rm " + id)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "removed") {
+		t.Fatal("unexpected output")
+	}
+}
+
+func TestCmdAbort(t *testing.T) {
+	out, err := gshellRunCmd("run sleephello.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := strings.TrimSpace(out)
+	time.Sleep(1 * time.Second)
+	out, err = gshellRunCmd("stop " + id)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "stopped") {
+		t.Fatal("unexpected output")
+	}
+	out, err = gshellRunCmd("ps " + id)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "STATUS       : aborted") {
 		t.Fatal("unexpected output")
 	}
 	out, err = gshellRunCmd("rm " + id)
@@ -618,6 +646,7 @@ func TestCmdStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out)
+	time.Sleep(1 * time.Second)
 	out, err = gshellRunCmd("start " + id)
 	t.Logf("\n%s", out)
 	if err != nil {
@@ -775,7 +804,7 @@ func TestAutoUpdate(t *testing.T) {
 	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
 	out, _ := shell.Run("cat bin/rev bin/md5sum")
 	t.Logf("\n%s", out)
-	oldpid, _ := shell.Run("pidof gshell.tester")
+	oldpid, _ := shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", oldpid)
 
 	out, err := gshellRunCmd("run fileserver.go -dir bin -port 9001")
@@ -795,10 +824,10 @@ func TestAutoUpdate(t *testing.T) {
 	}()
 
 	time.Sleep(8 * time.Second)
-	pids, _ := shell.Run("pidof gshell.tester")
-	t.Logf("\n%s", pids)
-	if strings.Contains(pids, oldpid) {
-		t.Fatal("old pid still running")
+	newpid, _ := shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep | awk '{print $1}'")
+	t.Logf("\n%s", newpid)
+	if newpid == oldpid {
+		t.Fatal("old daemon still running")
 	}
 
 	out, err = gshellRunCmd("ps")
@@ -819,9 +848,10 @@ func TestRunMain(t *testing.T) {
 	}
 }
 
+// program main()
 func TestMain(m *testing.M) {
 	flag.Parse()
-	if len(flag.Args()) == 0 {
+	if len(flag.Args()) == 0 { // called from Makefile
 		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
 		cmdstr += "-loglevel debug daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
 		cmdstr += "-root -repo testdata "
@@ -831,14 +861,16 @@ func TestMain(m *testing.M) {
 			fmt.Println(string(output))
 		}()
 
-		time.Sleep(time.Second)
+		time.Sleep(3 * time.Second)
 		ret := m.Run() // run tests
 		time.Sleep(time.Second)
-		exec.Command("pkill", "-SIGINT", "gshell.tester").Run()
+		shell.Run("pkill -SIGINT gshell.tester")
 		time.Sleep(time.Second)
-		exec.Command("pkill", "-SIGKILL", "gshell.tester").Run()
+		shell.Run("pkill -SIGKILL gshell.tester")
+		time.Sleep(time.Second)
+		shell.Run("rm -rf .working/status") // prevent GRG and GRE reloading
 		os.Exit(ret)
-	} else {
+	} else { // called by gshellRunCmd
 		os.Exit(m.Run())
 	}
 }

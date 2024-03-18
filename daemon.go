@@ -343,7 +343,7 @@ func (msg *cmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 		}
 		if ggi != nil {
 			for _, grei := range ggi.GREInfos {
-				if grei.Stat != "exited" {
+				if !greStatIsTerminated(greStatStrToStat(grei.Stat)) {
 					grei.EndTime = time.Now()
 				}
 			}
