@@ -1209,13 +1209,14 @@ OPTIONS:
 
 	switch os.Args[1] {
 	case "-h", "--help":
-		help := `  gshell is gshellos based service management tool.
-  gshellos is a simple pure golang service framework for linux devices.
-  A system with one gshell daemon running is a node in the
-service network, each node has an unique provider ID.
-  Each job runs in one dedicated GRE(Gshell Runtime Environment)
-which runs in a named or by default a random GRG(Gshell Runtime Group).
-GREs can be grouped into one named GRG for better performance.
+		help := `  gshell is a simple pure golang service framework for linux devices.
+
+  Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
+  Each node has an unique provider ID.
+
+  Each job runs in one dedicated GRE(Gshell Runtime Environment) which runs in a GRG(Gshell Runtime Group).
+  GREs can be grouped into one named GRG for better performance.
+
   gshell enters interactive mode if no options and no commands provided.
 `
 		fmt.Println(help)
