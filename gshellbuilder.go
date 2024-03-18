@@ -287,8 +287,10 @@ func addDaemonCmd() {
 					continue
 				}
 				var gshellbin *gshellBin
+				lg.Debugln("trying to update")
 				err := conn.SendRecv(tryUpdate{revInuse: commitRev, arch: runtime.GOARCH}, &gshellbin)
 				conn.Close()
+				lg.Debugln("updater returned with", err)
 				if err != nil {
 					if strings.Contains(err.Error(), ErrNoUpdate.Error()) {
 						lg.Debugln(ErrNoUpdate)
@@ -307,7 +309,7 @@ func addDaemonCmd() {
 					continue
 				}
 
-				lg.Debugf(shell.Run("ls -lh " + newFile))
+				lg.Debugln(shell.Run("ls -lh " + newFile))
 				lg.Infof("updating gshell version...")
 
 				if err := os.Rename(newFile, exe); err != nil {
@@ -969,7 +971,7 @@ func addPsCmd() {
 					}
 					fmt.Println("START AT     :", startTime)
 					endTime := ""
-					if grei.Stat == "exited" {
+					if greStatIsTerminated(greStatStrToStat(grei.Stat)) {
 						endTime = fmt.Sprint(grei.EndTime)
 					}
 					fmt.Println("END AT       :", endTime)
