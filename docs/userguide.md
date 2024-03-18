@@ -203,7 +203,7 @@ Some sub commands like `gshell run` accepts a `-p` option to operate sub command
 
 Here we took provider ID `244de4b51737` from above `gsh list` as the remote node, we ran `example/hello` and checked its output on that remote node.
 
-This ability enables gshell to deploy gshell tasks on any distributed gshell node and debug it in remotely.
+This ability enables gshell to deploy gshell tasks on any distributed gshell node and debug it remotely.
 ```shell
 $ gsh -p 244de4b51737 ps
 GRE ID        IN GROUP            NAME                START AT             STATUS
@@ -231,6 +231,7 @@ Build tags: stdbase,stdcommon,stdruntime,stdarchive,stdcompress,stdcontainer,std
 
 # gshell help
 ```shell
+$ gsh -h
   gshell is a simple pure golang service framework for linux devices.
 
   Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
