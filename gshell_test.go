@@ -804,6 +804,12 @@ func TestAutoUpdate(t *testing.T) {
 	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
 	out, _ := shell.Run("cat bin/rev bin/md5sum")
 	t.Logf("\n%s", out)
+
+	if out, err := shell.Run("ps -eo pid,args"); err != nil {
+		t.Logf("\n%v", err)
+	} else {
+		t.Logf("\n%v", out)
+	}
 	oldpid, _ := shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", oldpid)
 
@@ -824,6 +830,12 @@ func TestAutoUpdate(t *testing.T) {
 	}()
 
 	time.Sleep(8 * time.Second)
+
+	if out, err := shell.Run("ps -eo pid,args"); err != nil {
+		t.Logf("\n%v", err)
+	} else {
+		t.Logf("\n%v", out)
+	}
 	newpid, _ := shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep | awk '{print $1}'")
 	t.Logf("\n%s", newpid)
 	if newpid == oldpid {

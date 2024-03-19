@@ -13,13 +13,13 @@ require (
 require (
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df // indirect
 	github.com/go-echarts/go-echarts/v2 v2.2.7 // indirect
-	github.com/google/uuid v1.3.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/niubaoshu/gotiny v0.0.3 // indirect
 	github.com/peterh/liner v1.2.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/timandy/routine v1.1.1 // indirect
+	github.com/timandy/routine v1.1.3 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 )
 

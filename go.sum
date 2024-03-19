@@ -15,8 +15,8 @@ github.com/godevsig/grepo v0.2.5-0.20231016075844-edd47a3b9016 h1:zfLADIfCUIjWFx
 github.com/godevsig/grepo v0.2.5-0.20231016075844-edd47a3b9016/go.mod h1:bX9rEr1se1nY9oVMbxCk8x3yi6rmt10hbq7Sk1JTOqc=
 github.com/godevsig/yaegi v0.15.2-0.20231008092440-48f887591519 h1:+KRUsscbFGdaX7SGot7D3cxpVtAVtGGPU37CnAQVn1o=
 github.com/godevsig/yaegi v0.15.2-0.20231008092440-48f887591519/go.mod h1:pkOs3wa7+hKuTCqPav6dNWzfV5G5ZYK5hl5F9xBHp6I=
-github.com/google/uuid v1.3.1 h1:KjJaJ9iWZ3jOFZIf1Lqf4laDRCasjl0BCmnEGxkdLb4=
-github.com/google/uuid v1.3.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
 github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=
