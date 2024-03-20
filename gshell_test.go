@@ -592,9 +592,20 @@ func TestCmdStopRm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(out, "STATUS       : cancelling") {
+		t.Fatal("unexpected output")
+	}
+
+	time.Sleep(4 * time.Second)
+	out, err = gshellRunCmd("ps " + id)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(out, "STATUS       : cancelled") {
 		t.Fatal("unexpected output")
 	}
+
 	out, err = gshellRunCmd("rm " + id)
 	t.Logf("\n%s", out)
 	if err != nil {

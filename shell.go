@@ -181,10 +181,10 @@ func (gsh *gshell) start(ctx context.Context) (err error) {
 
 func (gsh *gshell) stop(cancel context.CancelFunc) greStat {
 	if _, err := gsh.interpreter.Eval("gshellmain.Stop()"); err == nil {
-		return greStatCancelled
+		return greStatCancelling
 	}
 	cancel()
-	return greStatAborted
+	return greStatAborting
 }
 
 func (gsh *gshell) runREPL() {
