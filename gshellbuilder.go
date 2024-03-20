@@ -76,7 +76,7 @@ func getSelfIDFunc() func() string {
 	var once sync.Once
 	return func() string {
 		once.Do(func() {
-			c := as.NewClient(as.WithScope(as.ScopeProcess | as.ScopeOS)).SetDiscoverTimeout(3)
+			c := as.NewClient(as.WithScope(as.ScopeProcess | as.ScopeOS)).SetDiscoverTimeout(0)
 			conn := <-c.Discover(as.BuiltinPublisher, as.SrvProviderInfo)
 			if conn != nil {
 				conn.SendRecv(&as.ReqProviderInfo{}, &selfID)
@@ -384,7 +384,6 @@ func addListCmd() {
 			as.WithScope(as.ScopeProcess | as.ScopeOS),
 			as.WithLogger(newLogger(log.DefaultStream, "main")),
 		}
-		selfID := getSelfID()
 
 		c := as.NewClient(opts...).SetDiscoverTimeout(0)
 		conn := <-c.Discover(as.BuiltinPublisher, as.SrvServiceLister)
@@ -398,6 +397,7 @@ func addListCmd() {
 		if err := conn.SendRecv(&msg, &scopes); err != nil {
 			return err
 		}
+		selfID := getSelfID()
 		if *verbose {
 			for _, services := range scopes {
 				for _, svc := range services {
@@ -720,8 +720,6 @@ only applicable for non-interactive mode`)
 			*autoRestart = 0
 		}
 
-		selfID := getSelfID()
-
 		conn := connectDaemon(providerID, lg)
 		if conn == nil {
 			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
@@ -740,6 +738,7 @@ only applicable for non-interactive mode`)
 			jobcmd.CodeZip = zip
 		}
 
+		selfID := getSelfID()
 		cmd := cmdRun{
 			grgCmdRun: grgCmdRun{
 				JobCmd:      jobcmd,
@@ -837,8 +836,6 @@ func addJoblistCmd() {
 		}
 		defer conn.Close()
 
-		selfID := getSelfID()
-
 		tiny := *tiny
 		switch action {
 		case "save":
@@ -908,6 +905,7 @@ func addJoblistCmd() {
 				}
 			}
 
+			selfID := getSelfID()
 			if err := conn.SendRecv(&cmdJoblistLoad{jlist, selfID}, nil); err != nil {
 				return err
 			}
