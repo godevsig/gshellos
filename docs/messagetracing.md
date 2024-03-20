@@ -48,7 +48,7 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -wd .working -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # list traceable message type names
 gsh mtrace list
@@ -84,7 +84,7 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -wd .working -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # run echo server
 gsh run example/echo/server/echoserver.go
@@ -137,7 +137,7 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -wd .working -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # run echo server
 gsh run example/echo/server/echoserver.go
