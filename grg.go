@@ -84,14 +84,14 @@ func (grg *grg) loadGREs() error {
 				return
 			}
 			grg.addGRE(gc)
-			switch gc.stat {
+			switch gc.Stat {
 			case greStatInit, greStatRunning:
 				go grg.runGRE(gc)
 				grg.lg.Infof("gre %s restarted", greid)
-			case greStatStopping:
+			case greStatStopping, greStatAborting, greStatCancelling:
 				gc.changeStat(greStatAborted)
 			default:
-				grg.lg.Infof("gre %s not restarted with status %s", greid, gi.Stat)
+				grg.lg.Infof("gre %s not restarted with status %s", greid, greStatToStr(gi.Stat))
 			}
 		}()
 	}
@@ -133,37 +133,25 @@ const (
 	greStatInit greStat = iota
 	greStatRunning
 	greStatStopping
+	greStatCancelling
+	greStatAborting
 	greStatCancelled
 	greStatAborted
 	greStatExited
 )
 
-var greStatString = []string{
-	greStatInit:      "init",
-	greStatRunning:   "running",
-	greStatStopping:  "stopping",
-	greStatCancelled: "cancelled",
-	greStatAborted:   "aborted",
-	greStatExited:    "exited",
-}
-
-func greStatStrToStat(statStr string) greStat {
-	var stat greStat
-	switch statStr {
-	case "running":
-		stat = greStatRunning
-	case "stopping":
-		stat = greStatStopping
-	case "cancelled":
-		stat = greStatCancelled
-	case "aborted":
-		stat = greStatAborted
-	case "exited":
-		stat = greStatExited
-	default:
-		stat = greStatInit
+func greStatToStr(stat greStat) string {
+	greStatString := []string{
+		greStatInit:       "init",
+		greStatRunning:    "running",
+		greStatStopping:   "stopping",
+		greStatCancelling: "cancelling",
+		greStatAborting:   "aborting",
+		greStatCancelled:  "cancelled",
+		greStatAborted:    "aborted",
+		greStatExited:     "exited",
 	}
-	return stat
+	return greStatString[stat]
 }
 
 func greStatIsTerminated(stat greStat) bool {
@@ -179,7 +167,7 @@ type greInfo struct {
 	Name               string
 	ID                 string
 	Args               []string
-	Stat               string
+	Stat               greStat
 	StartTime          time.Time
 	EndTime            time.Time
 	RestartedNum       int
@@ -193,8 +181,6 @@ type greCtl struct {
 	stdin      io.Reader
 	stdout     io.Writer
 	stderr     *strings.Builder
-	args       []string
-	stat       greStat
 	greErr     error // returned error when GRE exits
 	runMsg     *grgCmdRun
 	outputFile string
@@ -205,24 +191,23 @@ type greCtl struct {
 
 // gi is not nil when loading from file
 func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
-	gc := &greCtl{args: runMsg.Args, runMsg: runMsg}
+	gc := &greCtl{runMsg: runMsg}
 	if gi == nil {
 		gi = &greInfo{}
 		name := filepath.Base(runMsg.Args[0])
 		gi.Name = strings.TrimSuffix(name, filepath.Ext(name))
 		gi.ID = genID(greIDWidth)
 		gi.Args = runMsg.Args
-		gi.Stat = greStatString[greStatInit]
+		gi.Stat = greStatInit
 		gi.RestartedNum = 0
 		gi.AutoRestartBalance = runMsg.AutoRestartMax
 		gi.RequestedBy = runMsg.RequestedBy
 	}
 	gc.greInfo = gi
-	gc.stat = greStatStrToStat(gi.Stat)
 	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
 	gc.statDir = filepath.Join(grg.statDir, gc.ID)
 
-	if gc.stat == greStatInit {
+	if gc.Stat == greStatInit {
 		if err := os.MkdirAll(gc.statDir, 0755); err != nil {
 			return nil, err
 		}
@@ -284,16 +269,11 @@ func (gc *greCtl) greInfoToFile() error {
 }
 
 func (gc *greCtl) changeStat(newStat greStat) {
-	atomic.StoreInt32(&gc.stat, newStat)
-	gc.Stat = greStatString[gc.stat]
+	atomic.StoreInt32(&gc.Stat, newStat)
 }
 
 func (gc *greCtl) changeStatIf(oldStat, newStat greStat) (changed bool) {
-	if atomic.CompareAndSwapInt32(&gc.stat, oldStat, newStat) {
-		gc.Stat = greStatString[gc.stat]
-		return true
-	}
-	return false
+	return atomic.CompareAndSwapInt32(&gc.Stat, oldStat, newStat)
 }
 
 func (gc *greCtl) close() {
@@ -344,6 +324,8 @@ func (gc *greCtl) runGRE() {
 		if gc.AutoRestartBalance > 0 {
 			gc.AutoRestartBalance--
 		}
+		gc.changeStatIf(greStatCancelling, greStatCancelled)
+		gc.changeStatIf(greStatAborting, greStatAborted)
 		gc.changeStatIf(greStatRunning, greStatExited)
 		gc.greInfoToFile()
 	}()
@@ -370,7 +352,7 @@ func (gc *greCtl) runGRE() {
 		Stdin:  gc.stdin,
 		Stdout: gc.stdout,
 		Stderr: gc.stderr,
-		Args:   gc.args,
+		Args:   gc.Args,
 	}); err != nil {
 		fmt.Fprintln(gc.stderr, err)
 	} else {
@@ -557,13 +539,13 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 			}
 		case "rm":
 			grg.lg.Infoln("checking rm GRE", gc.ID)
-			if gc.stat != greStatRunning {
+			if gc.Stat != greStatRunning {
 				grg.lg.Infoln("rm GRE", gc.ID)
 				grg.rmGRE(gc)
 				ids = append(ids, gc.ID)
 			}
 		case "start":
-			if greStatIsTerminated(gc.stat) {
+			if greStatIsTerminated(gc.Stat) {
 				gc := gc
 				go gc.runGRE()
 				ids = append(ids, gc.ID)
@@ -585,7 +567,7 @@ func (msg grgCmdKill) Handle(stream as.ContextStream) (reply interface{}) {
 		grg.RLock()
 		defer grg.RUnlock()
 		for _, gc := range grg.gres {
-			if !greStatIsTerminated(gc.stat) {
+			if !greStatIsTerminated(gc.Stat) {
 				allExited = false
 				continue
 			}

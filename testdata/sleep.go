@@ -33,6 +33,8 @@ func main() {
 	if ok {
 		fmt.Println("wakeup")
 	} else {
+		fmt.Println("do some cleanup work...")
+		time.Sleep(3 * time.Second)
 		fmt.Println("canceled")
 	}
 }

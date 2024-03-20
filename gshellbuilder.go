@@ -961,7 +961,7 @@ func addPsCmd() {
 					fmt.Println("NAME         :", grei.Name)
 					fmt.Println("ARGS         :", grei.Args)
 					fmt.Println("REQUESTED BY :", grei.RequestedBy)
-					fmt.Println("STATUS       :", grei.Stat)
+					fmt.Println("STATUS       :", greStatToStr(grei.Stat))
 					fmt.Println("RESTARTED    :", grei.RestartedNum)
 					startTime := ""
 					if !grei.StartTime.IsZero() {
@@ -969,7 +969,7 @@ func addPsCmd() {
 					}
 					fmt.Println("START AT     :", startTime)
 					endTime := ""
-					if greStatIsTerminated(greStatStrToStat(grei.Stat)) {
+					if greStatIsTerminated(grei.Stat) {
 						endTime = fmt.Sprint(grei.EndTime)
 					}
 					fmt.Println("END AT       :", endTime)
@@ -988,8 +988,8 @@ func addPsCmd() {
 				for _, grei := range ggi.GREInfos {
 
 					created := grei.StartTime.Format("2006/01/02 15:04:05")
-					stat := grei.Stat
-					if stat == "exited" {
+					stat := greStatToStr(grei.Stat)
+					if grei.Stat == greStatExited {
 						ret := ":OK"
 						if len(grei.GREErr) != 0 {
 							ret = ":ERR"
