@@ -154,6 +154,7 @@ func (gd *daemon) setupgrg(grgName string, rtPriority int, maxprocs int) (as.Con
 	}
 
 	c.SetDiscoverTimeout(3)
+	c.SetCheckInterval(100)
 	conn = <-c.Discover(godevsigPublisher, "grg-"+grgName)
 	if conn != nil {
 		return conn, nil
@@ -593,14 +594,15 @@ type tryUpdate struct {
 
 func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	updtr := stream.GetContext().(*updater)
-	updtr.lg.Debugf("tryUpdate: %v", msg)
+	lg := updtr.lg
+	lg.Debugf("tryUpdate: %v", msg)
 
 	rev, err := httpOp.readFile(updtr.url + "/rev")
 	if err != nil {
 		return err
 	}
 	revNew := strings.TrimSpace(string(rev))
-	updtr.lg.Debugf("tryUpdate rev: %s", revNew)
+	lg.Debugf("tryUpdate rev: %s", revNew)
 	if revNew != commitRev { // check root registry rev
 		// not update other gshell daemons if root registry is not the latest
 		if stream.GetNetconn().LocalAddr().Network() != "chan" {
@@ -615,6 +617,7 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	if err != nil {
 		return err
 	}
+	lg.Debugf("tryUpdate md5sum: %s", checksum)
 
 	var md5 string
 	b := bytes.NewBuffer(checksum)
