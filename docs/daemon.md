@@ -16,7 +16,7 @@ network.
 On a gshell enabled node, `gshell list` command will list all the visible services, for example
 below output:
 
-```
+```shell
 $ gshell list
 PUBLISHER                 SERVICE                   PROVIDER      WLOP(SCOPE)
 builtin                   IPObserver                self          1000
@@ -96,8 +96,9 @@ If you run gshell daemon as normal user, you are exposing your user permissions 
 The current quick solution is run gshell daemon under nobody:nogroup permission, which is done
 by below commands:
 
-```
+```shell
 cd gshell
+# change to user nobody on x86 workstations, you can skip this step if running gshell on boards
 sudo chown -R nobody:nogroup . && sudo chmod ugo+ws bin/gshell
 ```
 
@@ -151,7 +152,7 @@ bin/gshell info || bin/gshell -loglevel info daemon -registry 10.10.10.10:11985 
 If you decide to deploy gshell daemon on your Linux PC or inside a VM or a docker container only
 in standalone mode, use below commands:
 
-```
+```shell
 # in gshell work dir
 cd /path/to/gshell
 
@@ -165,7 +166,7 @@ bin/gshell daemon &
 Adding `-bcast port` on starting gshell daemon then makes this daemon and all the services under
 it scope LAN visible to the other gshell systems that also started with the same broadcast port:
 
-```
+```shell
 # in gshell work dir
 cd /path/to/gshell
 
@@ -185,7 +186,7 @@ and a http file service should be running, this is done by starting a gshell app
 For example, to autoupdate gshell binary from official github repo, here we don't need to start our own http file server,
 we just use github download page:
 
-```
+```shell
 bin/gshell -loglevel info daemon -wd rootregistry -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master -update https://github.com/godevsig/gshellos/releases/latest/download/ &
 ```
 
@@ -201,7 +202,7 @@ bin/gshell run util/fileserver/cmd/fileserver.go -dir /path/contains/gshell/rele
 
 The file server should contain:
 
-```
+```shell
 $ ls
 gshell.386  gshell.aarch64  gshell.amd64  gshell.arm64  gshell.i386  gshell.mips64  gshell.ppc  gshell.ppc64  gshell.x86_64  md5sum  rev
 
@@ -224,7 +225,7 @@ $ cat rev
 
 When debugging gshell itself, we don't want auto update working:
 
-```gshell
+```shell
 GSHELL_NOUPDATE=1 bin/gshell -loglevel info daemon -wd .working -registry 10.10.10.10:11985 -bcast 9923 &
 ```
 

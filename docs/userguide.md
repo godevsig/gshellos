@@ -12,10 +12,10 @@
 # Start root gshell daemon
 A root [gshell daemon](daemon.md) is the only one that runs with `-root` option in gshell service mesh, which usually provides global service lookup in [WAN scope](adaptiveservice.md) and code repo services.
 
-Below command starts a root(`-root`) gshell daemon with TCP port 11985(`:11985`) providing service registry service and UDP port(`-bcast 9923`) providing service broadcasting, it also provides a code repo service that later `gshell run` commands on local/remote nodes can get source code from 'github.com/godevsig/ghub' at its master branch(`-repo github.com/godevsig/ghub/master`).
+Below command starts a root(`-root`) gshell daemon with this machine's IP `10.10.10.10` TCP port `11985`(by `-registry 10.10.10.10:11985`) providing service registry service and UDP port(`-bcast 9923`) providing service broadcasting, it also provides a code repo service that later `gshell run` commands on local/remote nodes can get source code from 'github.com/godevsig/ghub' at its master branch(`-repo github.com/godevsig/ghub/master`).
 ```shell
 $ alias gsh='bin/gshell'
-$ gsh -loglevel info daemon -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+$ gsh -loglevel info daemon -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 ```
 
 # Start none root gshell daemon
