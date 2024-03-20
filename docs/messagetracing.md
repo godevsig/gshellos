@@ -48,7 +48,7 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -wd .working -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # list traceable message type names
 gsh mtrace list
@@ -84,7 +84,7 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -wd .working -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # run echo server
 gsh run example/echo/server/echoserver.go
@@ -100,17 +100,17 @@ GRE ID        IN GROUP            NAME                START AT             STATU
 c493ceaf848c  uzfayo-v2.0.1       echoserver          2023/09/19 12:26:13  running    11m37.875056216s
 
 # same as gsh mtrace list
-gsh run -group echoclient -rm -i testdata/tracemsg.go list
+gsh run -group echoclient -rm -i debug/as/tracemsg.go list
 
 # tag echo.Request, must run it in the same group(-group option) with echo client
-gsh run -group echoclient -rm -i testdata/tracemsg.go tag echo.Request
+gsh run -group echoclient -rm -i debug/as/tracemsg.go tag echo.Request
 ## output Tracing <echo.Request> with token 7ab68ca9-f2b1-4901-a470-4be0f536dc94.0
 
 # rerun echo client
 gsh start echoclient
 
 # show tracing result, read clear
-gsh run -rm -i testdata/tracemsg.go show 7ab68ca9-f2b1-4901-a470-4be0f536dc94.0
+gsh run -rm -i debug/as/tracemsg.go show 7ab68ca9-f2b1-4901-a470-4be0f536dc94.0
 ```
 
 `tracemsg.go show` showed the results below:
@@ -137,7 +137,7 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -wd .working -registry :11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # run echo server
 gsh run example/echo/server/echoserver.go
@@ -153,20 +153,20 @@ GRE ID        IN GROUP            NAME                START AT             STATU
 c493ceaf848c  uzfayo-v2.0.1       echoserver          2023/09/19 12:26:13  running    11m37.875056216s
 
 # same as gsh mtrace list
-gsh run -group echoclient -rm -i testdata/tracemsg.go list
+gsh run -group echoclient -rm -i debug/as/tracemsg.go list
 
 # tag echo.Request, must run it in the same group(-group option) with echo client,
 # also provide count option to trace the message type multiple times.
 # with filters option, only those with the field 'Msg' maches "ni*o" and field 'Num' matches "*90*" in the
 # message(type echo.Request) content will be traced and recorded.
-gsh run -group echoclient -rm -i testdata/tracemsg.go tag echo.Request count 9 filters 'Msg=ni*o,Num=*90*'
+gsh run -group echoclient -rm -i debug/as/tracemsg.go tag echo.Request count 9 filters 'Msg=ni*o,Num=*90*'
 ## output Tracing <echo.Request> with token ac098704-9971-4810-b338-8398ec27bf78.0..8
 
 # rerun echo client
 gsh start echoclient
 
 # show tracing result, read clear
-gsh run -rm -i testdata/tracemsg.go show ac098704-9971-4810-b338-8398ec27bf78.0..8
+gsh run -rm -i debug/as/tracemsg.go show ac098704-9971-4810-b338-8398ec27bf78.0..8
 ```
 
 Sequential tracing session result includes many session results, from `ac098704-9971-4810-b338-8398ec27bf78.0` to `ac098704-9971-4810-b338-8398ec27bf78.8`, with each one displayed separately.
@@ -175,8 +175,8 @@ Sequential tracing session result includes many session results, from `ac098704-
 
 `tracemsg.go` help:
 ```shell
-$ gsh run -rm -i testdata/tracemsg.go -h
-testdata/tracemsg.go <list|tag ...|untag ... |show ...|purge>
+$ gsh run -rm -i debug/as/tracemsg.go -h
+debug/as/tracemsg.go <list|tag ...|untag ... |show ...|purge>
 
 list:
     List traceable message type names
