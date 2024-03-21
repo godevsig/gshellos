@@ -174,17 +174,18 @@ func (gsh *gshell) init(opt interp.Options) error {
 	return nil
 }
 
-func (gsh *gshell) start(ctx context.Context) (err error) {
-	_, err = gsh.interpreter.EvalWithContext(ctx, "gshellmain.main()")
-	return
+func (gsh *gshell) start(ctx context.Context) error {
+	_, err := gsh.interpreter.EvalWithContext(ctx, "gshellmain.main()")
+	return err
 }
 
-func (gsh *gshell) stop(cancel context.CancelFunc) greStat {
-	if _, err := gsh.interpreter.Eval("gshellmain.Stop()"); err == nil {
-		return greStatCancelling
-	}
+func (gsh *gshell) stop() error {
+	_, err := gsh.interpreter.Eval("gshellmain.Stop()")
+	return err
+}
+
+func (gsh *gshell) abort(cancel context.CancelFunc) {
 	cancel()
-	return greStatAborting
 }
 
 func (gsh *gshell) runREPL() {
