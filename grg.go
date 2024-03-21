@@ -88,7 +88,7 @@ func (grg *grg) loadGREs() error {
 			case greStatInit, greStatRunning:
 				go grg.runGRE(gc)
 				grg.lg.Infof("gre %s restarted", greid)
-			case greStatStopping, greStatAborting, greStatCancelling:
+			case greStatAborting, greStatCancelling:
 				gc.changeStat(greStatAborted)
 			default:
 				grg.lg.Infof("gre %s not restarted with status %s", greid, greStatToStr(gi.Stat))
@@ -125,41 +125,6 @@ func (grg *grg) rmGRE(gc *greCtl) {
 		grg.server.Close()
 	}
 	grg.Unlock()
-}
-
-type greStat = int32
-
-const (
-	greStatInit greStat = iota
-	greStatRunning
-	greStatStopping
-	greStatCancelling
-	greStatAborting
-	greStatCancelled
-	greStatAborted
-	greStatExited
-)
-
-func greStatToStr(stat greStat) string {
-	greStatString := []string{
-		greStatInit:       "init",
-		greStatRunning:    "running",
-		greStatStopping:   "stopping",
-		greStatCancelling: "cancelling",
-		greStatAborting:   "aborting",
-		greStatCancelled:  "cancelled",
-		greStatAborted:    "aborted",
-		greStatExited:     "exited",
-	}
-	return greStatString[stat]
-}
-
-func greStatIsTerminated(stat greStat) bool {
-	switch stat {
-	case greStatAborted, greStatCancelled, greStatExited:
-		return true
-	}
-	return false
 }
 
 type greInfo struct {
@@ -533,8 +498,13 @@ func (msg *grgCmdPatternAction) Handle(stream as.ContextStream) (reply interface
 	for _, gc := range gcs {
 		switch msg.Cmd {
 		case "stop":
-			if gc.changeStatIf(greStatRunning, greStatStopping) {
-				gc.changeStat(gc.gsh.stop(gc.cancel))
+			if gc.Stat == greStatRunning {
+				if err := gc.gsh.stop(); err != nil {
+					gc.gsh.abort(gc.cancel)
+					gc.changeStat(greStatAborting)
+				} else {
+					gc.changeStat(greStatCancelling)
+				}
 				ids = append(ids, gc.ID)
 			}
 		case "rm":

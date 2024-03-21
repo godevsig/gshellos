@@ -20,12 +20,53 @@ import (
 	as "github.com/godevsig/adaptiveservice"
 )
 
+var gshellTempDir = "/tmp/gshell"
+
 var (
 	// ErrBrokenGRG is an error where the specified GRG has problem to run.
 	ErrBrokenGRG = errors.New("broken GRG")
 	// ErrNoUpdate is an error that no update available
 	ErrNoUpdate = errors.New("no update available")
 )
+
+type greStat = int32
+
+const (
+	greStatInit       greStat = 0
+	greStatRunning    greStat = 1000
+	greStatExited     greStat = 2000
+	greStatCancelling greStat = 1100
+	greStatAborting   greStat = 1200
+	greStatCancelled  greStat = 2100
+	greStatAborted    greStat = 2200
+)
+
+func greStatToStr(stat greStat) string {
+	statStr := "init"
+	switch stat {
+	case greStatRunning:
+		statStr = "running"
+	case greStatExited:
+		statStr = "exited"
+	case greStatCancelled:
+		statStr = "cancelled"
+	case greStatAborted:
+		statStr = "aborted"
+	case greStatCancelling:
+		statStr = "cancelling"
+	case greStatAborting:
+		statStr = "aborting"
+	}
+	return statStr
+}
+
+func greStatIsTerminated(stat greStat) bool {
+	switch stat {
+	case greStatAborted, greStatCancelled, greStatExited:
+		return true
+	}
+	return false
+}
 
 func genID(width int) string {
 	b := make([]byte, width)
@@ -92,10 +133,7 @@ func (nullIO) Close() error                  { return nil }
 func (nullIO) Write(buf []byte) (int, error) { return len(buf), nil }
 func (nullIO) Read(buf []byte) (int, error)  { return 0, io.EOF }
 
-var gshellTempDir = "/tmp/gshell"
-
 func init() {
-	os.MkdirAll(gshellTempDir, 0755)
 	as.RegisterType((*net.DNSError)(nil))
 	as.RegisterType((*net.OpError)(nil))
 	as.RegisterType((*net.TCPAddr)(nil))
