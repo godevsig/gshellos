@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	loglevel     = "error"
+	loglevel     = "info"
 	providerID   = "self"
 	debugService func(lg *log.Logger)
 )
@@ -132,10 +132,11 @@ func addDaemonCmd() {
 	workDir := cmd.String("wd", defaultWorkDir, "set working directory")
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
 	invisible := cmd.Bool("invisible", false, "make gshell daemon invisible in gshell service network")
-	registryAddr := cmd.String("registry", "", "root registry address")
+	registryAddr := cmd.String("registry", "", "root registry address in IP:Port format")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
 	codeRepo := cmd.String("repo", "", "code repo local path or https address in format site/org/proj/branch")
 	updateURL := cmd.String("update", "", "url of artifacts to update gshell, require -root")
+	clean := cmd.Bool("clean", false, "clean status/log/code files from old runs before starting the new run")
 
 	daemonRunning := func() bool {
 		c := as.NewClient(as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
@@ -157,6 +158,19 @@ func addDaemonCmd() {
 		}
 
 		workDir := *workDir
+		if *clean {
+			if err := os.RemoveAll(workDir); err != nil {
+				return err
+			}
+			if err := os.RemoveAll(gshellTempDir); err != nil {
+				return err
+			}
+		}
+
+		if err := os.MkdirAll(gshellTempDir, 0755); err != nil {
+			return err
+		}
+
 		if err := os.MkdirAll(workDir+"/logs", 0755); err != nil {
 			return err
 		}
@@ -332,7 +346,13 @@ func addDaemonCmd() {
 				if cmdArgs[0] == "gshell.tester" {
 					args = append([]string{"-test.run", "^TestRunMain$", "--"}, args...)
 				}
-				if err := exec.Command(cmd, args...).Start(); err != nil {
+				var newArgs []string
+				for _, s := range args {
+					if !strings.Contains(s, "-clean") {
+						newArgs = append(newArgs, s)
+					}
+				}
+				if err := exec.Command(cmd, newArgs...).Start(); err != nil {
 					lg.Errorf("start new gshell failed: %v", err)
 				} else {
 					lg.Infof("new version gshell started")
