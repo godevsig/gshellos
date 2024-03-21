@@ -816,9 +816,6 @@ func TestAutoUpdate(t *testing.T) {
 	out, _ := shell.Run("cat bin/rev bin/md5sum")
 	t.Logf("\n%s", out)
 
-	oldpid, _ := shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep | awk '{print $1}'")
-	t.Logf("\n%s", oldpid)
-
 	out, err := gshellRunCmd("run fileserver.go -dir bin -port 9001")
 	t.Logf("\n%s", out)
 	if err != nil {
@@ -832,22 +829,18 @@ func TestAutoUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// if out, err := shell.Run("ps -eo pid,args"); err != nil {
-	// 	t.Logf("\n%v", err)
-	// } else {
-	// 	t.Logf("\n%v", out)
-	// }
+	out, _ = shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep")
+	t.Logf("\n%v", out)
+	oldpid := strings.Fields(out)[0]
+	t.Logf("\n%s", oldpid)
 
 	time.Sleep(8 * time.Second)
 
-	// if out, err := shell.Run("ps -eo pid,args"); err != nil {
-	// 	t.Logf("\n%v", err)
-	// } else {
-	// 	t.Logf("\n%v", out)
-	// }
-
-	newpid, _ := shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep | awk '{print $1}'")
+	out, _ = shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep")
+	t.Logf("\n%v", out)
+	newpid := strings.Fields(out)[0]
 	t.Logf("\n%s", newpid)
+
 	if newpid == oldpid {
 		t.Fatal("old daemon still running")
 	}
@@ -875,7 +868,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	if len(flag.Args()) == 0 { // called from Makefile
 		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
-		cmdstr += "-loglevel debug daemon -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
+		cmdstr += "-loglevel debug daemon -clean -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
 		cmdstr += "-root -repo testdata "
 		cmdstr += "-update http://127.0.0.1:9001"
 		go func() {

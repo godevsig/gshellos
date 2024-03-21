@@ -177,6 +177,17 @@ func addDaemonCmd() {
 		if err := os.MkdirAll(workDir+"/status", 0755); err != nil {
 			return err
 		}
+
+		logStream := log.NewStream("daemon")
+		if err := logStream.SetOutput("file:" + workDir + "/logs/daemon.log"); err != nil {
+			return err
+		}
+		lg := newLogger(logStream, "daemon")
+		lg.Infof("daemon version: %s", version)
+		if *clean {
+			lg.Infof("work dir and temp dir recreated")
+		}
+
 		cmdArgs := os.Args
 		scope := as.ScopeAll
 		if len(*registryAddr) == 0 {
@@ -217,13 +228,6 @@ func addDaemonCmd() {
 		if err := syscall.Setregid(egid, egid); err != nil {
 			return err
 		}
-
-		logStream := log.NewStream("daemon")
-		if err := logStream.SetOutput("file:" + workDir + "/logs/daemon.log"); err != nil {
-			return err
-		}
-		lg := newLogger(logStream, "daemon")
-		lg.Infof("daemon version: %s", version)
 
 		opts := []as.Option{
 			as.WithScope(scope),
@@ -344,7 +348,8 @@ func addDaemonCmd() {
 				cmd := cmdArgs[0]
 				args := cmdArgs[1:]
 				if cmdArgs[0] == "gshell.tester" {
-					args = append([]string{"-test.run", "^TestRunMain$", "--"}, args...)
+					coverageOpt := "-test.coverprofile=.test/l2_gshelld" + genID(3) + ".cov"
+					args = append([]string{"-test.run", "^TestRunMain$", coverageOpt, "--"}, args...)
 				}
 				var newArgs []string
 				for _, s := range args {
