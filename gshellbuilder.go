@@ -132,7 +132,7 @@ func addDaemonCmd() {
 	workDir := cmd.String("wd", defaultWorkDir, "set working directory")
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
 	invisible := cmd.Bool("invisible", false, "make gshell daemon invisible in gshell service network")
-	registryAddr := cmd.String("registry", "", "root registry address in IP:Port format")
+	registryAddr := cmd.String("registry", "", "root registry address in host:port format")
 	lanBroadcastPort := cmd.String("bcast", "", "broadcast port for LAN")
 	codeRepo := cmd.String("repo", "", "code repo local path or https address in format site/org/proj/branch")
 	updateURL := cmd.String("update", "", "url of artifacts to update gshell, require -root")
