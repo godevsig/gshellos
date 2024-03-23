@@ -52,13 +52,13 @@ func (gd *daemon) grgRestarter() {
 				gd.lg.Infof("grg status %s unlocked, grg died abnormally", grgStatDir)
 				syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 				strs := strings.Split(filepath.Base(grgStatDir), "-")
-				if len(strs) != 4 {
+				if len(strs) != 5 {
 					gd.lg.Warnf("grg dir name format incompatible: %v", strs)
 					return
 				}
 				grgName := strs[1]
-				rtprio, _ := strconv.Atoi(strs[2])
-				maxprocs, _ := strconv.Atoi(strs[3])
+				rtprio, _ := strconv.Atoi(strs[3])
+				maxprocs, _ := strconv.Atoi(strs[4])
 				conn, err := gd.setupgrg(grgName, rtprio, maxprocs)
 				if err != nil {
 					gd.lg.Errorf("restart grg %s failed with error: %v", grgName, err)
@@ -182,20 +182,6 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 					gd.lg.Warnf("grgCmdKill for %s failed: %v", grg, err)
 					return
 				}
-				if !pInfo.killing && msg.Force && pInfo.pid != 0 {
-					process, err := os.FindProcess(pInfo.pid)
-					if err != nil {
-						gd.lg.Warnf("pid of %s not found: %v", pInfo.name, err)
-						return
-					}
-					// prevent grgRestarter keeps restarting the grg
-					os.RemoveAll(pInfo.statDir)
-					if err := process.Signal(syscall.SIGKILL); err != nil {
-						gd.lg.Warnf("kill %s failed: %v", pInfo.name, err)
-						return
-					}
-					pInfo.killing = true
-				}
 				if pInfo.killing {
 					killingList = append(killingList, &pInfo)
 				}
@@ -254,6 +240,60 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+
+	killGrgByName := func(pattern string) {
+		proc := "/proc"
+		entries, err := os.ReadDir(proc)
+		if err != nil {
+			return
+		}
+
+		for _, ent := range entries {
+			if ent.IsDir() {
+				func() {
+					pid, err := strconv.Atoi(ent.Name())
+					if err != nil {
+						return
+					}
+					pidDir := filepath.Join(proc, ent.Name())
+					buf, err := os.ReadFile(filepath.Join(pidDir, "cmdline"))
+					if err != nil {
+						return
+					}
+					strs := strings.Split(string(bytes.TrimRight(buf, string("\x00"))), string(byte(0)))
+					cmdline := strings.Join(strs, " ")
+					_, after, found := strings.Cut(cmdline, "__start -group")
+					if found {
+						grgNameVer := strings.Fields(after)[0]
+						if wildcardMatch(pattern, grgNameVer) {
+							fdDir := filepath.Join(pidDir, "fd")
+							if fds, err := os.ReadDir(fdDir); err == nil {
+								for _, fd := range fds {
+									if link, err := os.Readlink(filepath.Join(fdDir, fd.Name())); err == nil {
+										if strings.Contains(link, "status/grg-") {
+											// prevent grgRestarter keeps restarting the grg
+											os.RemoveAll(filepath.Dir(link))
+										}
+									}
+								}
+							}
+							if process, err := os.FindProcess(pid); err == nil {
+								process.Signal(syscall.SIGKILL)
+								fmt.Fprintf(&b, "%s ", grgNameVer)
+							}
+						}
+					}
+				}()
+			}
+		}
+		return
+	}
+
+	if msg.Force {
+		for _, name := range msg.GRGNames {
+			killGrgByName(name)
+		}
 	}
 
 	if len(b.String()) == 0 {

@@ -555,7 +555,6 @@ func addStartCmd() {
 			return errors.New("no GRG name, see --help")
 		}
 		grgNameVer := *grgName
-		grgName := strings.Split(grgNameVer, "-")[0]
 
 		workDir := *workDir
 		logStream := log.NewStream("grg")
@@ -574,7 +573,7 @@ func addStartCmd() {
 				maxProcs = i
 			}
 		}
-		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%d", workDir, grgName, rtprio, maxProcs)
+		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%d", workDir, grgNameVer, rtprio, maxProcs)
 		if err := os.MkdirAll(grgStatDir, 0755); err != nil {
 			return err
 		}
@@ -803,14 +802,21 @@ func addKillCmd() {
 	cmd := flag.NewFlagSet(newCmd("kill",
 		"[options] names ...",
 		"Terminate the named GRG(s) on local/remote node",
-		"wildcard(*) is supported"),
+		"name supports simple wildcard(*), but must be full RGRG name when force kill"),
 		flag.ExitOnError)
-	force := cmd.Bool("f", false, "force terminate even if there are still running GREs")
+	force := cmd.Bool("f", false, "force terminate the GRG even if there are still running GREs in it")
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no GRG specified, see --help")
+		}
+		force := *force
+		if force {
+			str := strings.Join(args, " ")
+			if strings.Contains(str, "*") {
+				return errors.New("wildcard not supported when force kill, see --help")
+			}
 		}
 
 		lg := newLogger(log.DefaultStream, "main")
@@ -822,7 +828,7 @@ func addKillCmd() {
 
 		cmd := cmdKill{
 			GRGNames: args,
-			Force:    *force,
+			Force:    force,
 		}
 		var reply string
 		if err := conn.SendRecv(&cmd, &reply); err != nil {
