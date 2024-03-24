@@ -159,12 +159,9 @@ func addDaemonCmd() {
 
 		workDir := *workDir
 		if *clean {
-			if err := os.RemoveAll(workDir); err != nil {
-				return err
-			}
-			if err := os.RemoveAll(gshellTempDir); err != nil {
-				return err
-			}
+			killGrgByName("*")
+			os.RemoveAll(workDir)
+			os.RemoveAll(gshellTempDir)
 		}
 
 		if err := os.MkdirAll(gshellTempDir, 0755); err != nil {
