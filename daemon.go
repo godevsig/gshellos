@@ -167,6 +167,62 @@ type cmdKill struct {
 	Force    bool
 }
 
+func killGrgByName(pattern string) (killingList []*processInfo) {
+	proc := "/proc"
+	entries, err := os.ReadDir(proc)
+	if err != nil {
+		return
+	}
+
+	for _, ent := range entries {
+		if ent.IsDir() {
+			func() {
+				pid, err := strconv.Atoi(ent.Name())
+				if err != nil {
+					return
+				}
+				pidDir := filepath.Join(proc, ent.Name())
+				buf, err := os.ReadFile(filepath.Join(pidDir, "cmdline"))
+				if err != nil {
+					return
+				}
+				strs := strings.Split(string(bytes.TrimRight(buf, string("\x00"))), string(byte(0)))
+				cmdline := strings.Join(strs, " ")
+				_, after, found := strings.Cut(cmdline, "__start -group")
+				if found {
+					grgNameVer := strings.Fields(after)[0]
+					if wildcardMatch(pattern, grgNameVer) {
+						fdDir := filepath.Join(pidDir, "fd")
+						pInfo := processInfo{
+							name: grgNameVer,
+							pid:  pid,
+						}
+						if fds, err := os.ReadDir(fdDir); err == nil {
+							for _, fd := range fds {
+								if link, err := os.Readlink(filepath.Join(fdDir, fd.Name())); err == nil {
+									if strings.Contains(link, "status/grg-") {
+										// prevent grgRestarter keeps restarting the grg
+										statDir := filepath.Dir(link)
+										pInfo.statDir = statDir
+										os.RemoveAll(statDir)
+									}
+								}
+							}
+						}
+
+						if process, err := os.FindProcess(pid); err == nil {
+							process.Signal(syscall.SIGINT)
+							pInfo.killing = true
+							killingList = append(killingList, &pInfo)
+						}
+					}
+				}
+			}()
+		}
+	}
+	return
+}
+
 func (gd *daemon) doKill(msg *cmdKill) string {
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var b strings.Builder
@@ -186,6 +242,15 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 					killingList = append(killingList, &pInfo)
 				}
 			}()
+		}
+	}
+
+	if msg.Force {
+		for _, name := range msg.GRGNames {
+			klist := killGrgByName(name)
+			if len(klist) != 0 {
+				killingList = append(killingList, klist...)
+			}
 		}
 	}
 
@@ -223,7 +288,9 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 				continue
 			}
 			// prevent grgRestarter keeps restarting the grg
-			os.RemoveAll(pInfo.statDir)
+			if len(pInfo.statDir) != 0 {
+				os.RemoveAll(pInfo.statDir)
+			}
 			if process, err := os.FindProcess(pInfo.pid); err == nil {
 				process.Signal(syscall.SIGKILL)
 			}
@@ -240,60 +307,6 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 			break
 		}
 		time.Sleep(100 * time.Millisecond)
-	}
-
-	killGrgByName := func(pattern string) {
-		proc := "/proc"
-		entries, err := os.ReadDir(proc)
-		if err != nil {
-			return
-		}
-
-		for _, ent := range entries {
-			if ent.IsDir() {
-				func() {
-					pid, err := strconv.Atoi(ent.Name())
-					if err != nil {
-						return
-					}
-					pidDir := filepath.Join(proc, ent.Name())
-					buf, err := os.ReadFile(filepath.Join(pidDir, "cmdline"))
-					if err != nil {
-						return
-					}
-					strs := strings.Split(string(bytes.TrimRight(buf, string("\x00"))), string(byte(0)))
-					cmdline := strings.Join(strs, " ")
-					_, after, found := strings.Cut(cmdline, "__start -group")
-					if found {
-						grgNameVer := strings.Fields(after)[0]
-						if wildcardMatch(pattern, grgNameVer) {
-							fdDir := filepath.Join(pidDir, "fd")
-							if fds, err := os.ReadDir(fdDir); err == nil {
-								for _, fd := range fds {
-									if link, err := os.Readlink(filepath.Join(fdDir, fd.Name())); err == nil {
-										if strings.Contains(link, "status/grg-") {
-											// prevent grgRestarter keeps restarting the grg
-											os.RemoveAll(filepath.Dir(link))
-										}
-									}
-								}
-							}
-							if process, err := os.FindProcess(pid); err == nil {
-								process.Signal(syscall.SIGKILL)
-								fmt.Fprintf(&b, "%s ", grgNameVer)
-							}
-						}
-					}
-				}()
-			}
-		}
-		return
-	}
-
-	if msg.Force {
-		for _, name := range msg.GRGNames {
-			killGrgByName(name)
-		}
 	}
 
 	if len(b.String()) == 0 {
