@@ -51,6 +51,7 @@ const (
 var (
 	loglevel     = "info"
 	providerID   = "self"
+	pluginDir    = "/usr/lib/gshell"
 	debugService func(lg *log.Logger)
 )
 
@@ -498,6 +499,9 @@ func addExecCmd() {
 		if len(args) == 0 {
 			return errors.New("no path provided, see --help")
 		}
+		if err := loadExtensions(pluginDir); err != nil {
+			return err
+		}
 
 		filePath := args[0]
 		zip, err := zipPathToBuffer(filePath)
@@ -552,6 +556,9 @@ func addStartCmd() {
 			return errors.New("no GRG name, see --help")
 		}
 		grgNameVer := *grgName
+		if err := loadExtensions(pluginDir); err != nil {
+			return err
+		}
 
 		workDir := *workDir
 		logStream := log.NewStream("grg")
@@ -1176,26 +1183,13 @@ func addMsgTraceCmd() {
 
 // ShellMain is the main entry of gshell
 func ShellMain() error {
-	// no arg, shell mode
-	if len(os.Args) == 1 {
-		gsh, err := newShell()
-		if err != nil {
-			return err
-		}
-		if err := gsh.init(interp.Options{}); err != nil {
-			return err
-		}
-
-		gsh.runREPL()
-		return nil
-	}
-
 	var traceList string
 	flag.StringVar(&loglevel, "l", loglevel, "")
 	flag.StringVar(&loglevel, "loglevel", loglevel, "")
 	flag.StringVar(&providerID, "p", providerID, "")
 	flag.StringVar(&providerID, "provider", providerID, "")
 	flag.StringVar(&traceList, "trace", "", "")
+	flag.StringVar(&pluginDir, "plugin", pluginDir, "")
 
 	addIDCmd()
 	addExecCmd()
@@ -1213,7 +1207,18 @@ func ShellMain() error {
 	addMsgTraceCmd()
 
 	usage := func() {
-		const opt = `Usage: [OPTIONS] COMMAND ...
+		const opt = `
+gshell is a simple pure golang service framework for linux devices.
+
+Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
+Each node has an unique provider ID.
+
+Each job runs in one dedicated GRE(Gshell Runtime Environment) which runs in a GRG(Gshell Runtime Group).
+GREs can be grouped into one named GRG for better performance.
+
+gshell enters interactive mode if no options and no commands provided.
+
+Usage: [OPTIONS] COMMAND ...
 OPTIONS:
   -l, --loglevel
         loglevel, debug/info/warn/error (default "%s")
@@ -1221,6 +1226,8 @@ OPTIONS:
         provider ID, run following command on the remote node with this ID (default "%s")
   --trace
         Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
+  --plugin
+        Local path that contains gshell plugins(.so files)
 `
 		fmt.Printf(opt, loglevel, providerID)
 		fmt.Println("COMMANDS:")
@@ -1233,31 +1240,32 @@ OPTIONS:
 	}
 	flag.Usage = usage
 
-	switch os.Args[1] {
-	case "-h", "--help":
-		help := `  gshell is a simple pure golang service framework for linux devices.
+	flag.Parse()
+	args := flag.Args()
+	// no command, enter interactive mode
+	if len(args) == 0 {
+		if err := loadExtensions(pluginDir); err != nil {
+			return err
+		}
 
-  Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
-  Each node has an unique provider ID.
+		gsh, err := newShell()
+		if err != nil {
+			return err
+		}
 
-  Each job runs in one dedicated GRE(Gshell Runtime Environment) which runs in a GRG(Gshell Runtime Group).
-  GREs can be grouped into one named GRG for better performance.
+		if err := gsh.init(interp.Options{}); err != nil {
+			return err
+		}
 
-  gshell enters interactive mode if no options and no commands provided.
-`
-		fmt.Println(help)
-		usage()
+		gsh.runREPL()
 		return nil
+	}
+
+	switch args[1] {
 	case "-v", "--version":
 		fmt.Println(version)
 		return nil
 	default:
-		flag.Parse()
-		args := flag.Args()
-		if len(args) == 0 {
-			return errors.New("no command provided, see --help")
-		}
-
 		var tokens []string
 		if len(traceList) != 0 {
 			fields := strings.Split(traceList, ",")
