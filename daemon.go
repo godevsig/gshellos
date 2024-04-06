@@ -132,7 +132,7 @@ func (gd *daemon) setupgrg(grgName string, rtPriority int, maxprocs int) (as.Con
 		return nil
 	}
 
-	args := fmt.Sprintf("-loglevel %s __start -group %s -wd %s", loglevel, grgName, gd.workDir)
+	args := fmt.Sprintf("-loglevel %s -plugin %s __start -group %s -wd %s", loglevel, pluginDir, grgName, gd.workDir)
 	if os.Args[0] == "gshell.tester" {
 		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + grgName + genID(3) + ".cov -- " + args
 	}

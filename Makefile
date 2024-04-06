@@ -1,5 +1,6 @@
 SHELL=bash
 
+CGO := 0
 PKG_ALL = $(shell go list ./... | grep -v unsafe)
 GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
 COMMIT_REV = $(shell git rev-parse HEAD)
@@ -48,13 +49,14 @@ dep:
 	@echo -n $(BUILD_TIME) > bin/buildtime
 
 build: dep
-	@go build -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
+	@CGO_ENABLED=$(CGO) go build -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
 lite: LDFLAGS += -s -w
 lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build lite release binary to bin dir
 
-full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
+full: CGO := 1
+full: EXTTAGS := $(EXTTAGS),plugin,debug,echo,fileserver,topidchart,docit,recorder
 full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
 full: build ## Build full release binary to bin dir
