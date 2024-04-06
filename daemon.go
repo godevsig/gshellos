@@ -492,15 +492,12 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	fmt.Fprintf(&b, "Builtins: %s\n", buildTags)
 
 	var plugins string
-	if err := loadPlugins(pluginDir); err != nil {
-		plugins = err.Error()
-	} else {
+	if err := loadPlugins(pluginDir); err == nil {
 		plugins = strings.Join(listPlugins(), ",")
+		if len(plugins) != 0 {
+			fmt.Fprintf(&b, "Plugins: %s\n", plugins)
+		}
 	}
-	if len(plugins) == 0 {
-		plugins = "NA"
-	}
-	fmt.Fprintf(&b, "Plugins: %s\n", plugins)
 
 	return b.String()
 }
