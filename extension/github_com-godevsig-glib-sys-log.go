@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/glib/sys/log/log"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/glib/sys/log/log"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"DefaultStream":       reflect.ValueOf(&log.DefaultStream).Elem(),
 		"GetStream":           reflect.ValueOf(log.GetStream),

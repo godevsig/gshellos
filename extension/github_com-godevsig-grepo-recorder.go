@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/recorder/recorder"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/recorder/recorder"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"NewServer": reflect.ValueOf(recorder.NewServer),
 
@@ -22,7 +22,7 @@ func init() {
 	}
 }
 func init() {
-	Symbols["github.com/godevsig/grepo/recorder/recorder/recorder"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/recorder/recorder/recorder"] = map[string]reflect.Value{
 		// type definitions
 		"SessionRequest":  reflect.ValueOf((*recorder.SessionRequest)(nil)),
 		"SessionResponse": reflect.ValueOf((*recorder.SessionResponse)(nil)),

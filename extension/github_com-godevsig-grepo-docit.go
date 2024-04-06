@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/docit/docit"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/docit/docit"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"NewServer": reflect.ValueOf(docit.NewServer),
 

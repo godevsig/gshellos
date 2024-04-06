@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/topidchart/topidchart"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/topidchart/topidchart"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"NewServer": reflect.ValueOf(topidchart.NewServer),
 		"ParseFile": reflect.ValueOf(topidchart.ParseFile),
@@ -26,7 +26,7 @@ func init() {
 	}
 }
 func init() {
-	Symbols["github.com/godevsig/grepo/topidchart/topidchart/topidchart"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/topidchart/topidchart/topidchart"] = map[string]reflect.Value{
 		// type definitions
 		"ProcessInfo":     reflect.ValueOf((*topidchart.ProcessInfo)(nil)),
 		"Record":          reflect.ValueOf((*topidchart.Record)(nil)),

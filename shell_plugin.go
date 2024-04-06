@@ -23,7 +23,7 @@ func loadPlugins(pluginDir string) error {
 		if err != nil {
 			return err
 		}
-		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".gplugin.so") {
+		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".gplugin") {
 			p, err := plugin.Open(path)
 			if err != nil {
 				return fmt.Errorf("open plugin %s error: %w", path, err)

@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/adaptiveservice/adaptiveservice"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/adaptiveservice/adaptiveservice"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"BuiltinPublisher":          reflect.ValueOf(constant.MakeFromLiteral("\"builtin\"", token.STRING, 0)),
 		"ErrConnReset":              reflect.ValueOf(&adaptiveservice.ErrConnReset).Elem(),

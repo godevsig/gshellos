@@ -497,6 +497,9 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	} else {
 		plugins = strings.Join(listPlugins(), ",")
 	}
+	if len(plugins) == 0 {
+		plugins = "NA"
+	}
 	fmt.Fprintf(&b, "Plugins: %s\n", plugins)
 
 	return b.String()

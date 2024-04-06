@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/glib/sys/pidinfo/pidinfo"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/glib/sys/pidinfo/pidinfo"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"CheckAllTask": reflect.ValueOf(constant.MakeFromLiteral("7", token.INT, 0)),
 		"CheckChild":   reflect.ValueOf(constant.MakeFromLiteral("4", token.INT, 0)),

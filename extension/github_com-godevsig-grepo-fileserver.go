@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/fileserver/fileserver"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/fileserver/fileserver"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"NewFileServer": reflect.ValueOf(fileserver.NewFileServer),
 

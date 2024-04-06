@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/asbench/asbench"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/asbench/asbench"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"NewServer": reflect.ValueOf(asbench.NewServer),
 		"Publisher": reflect.ValueOf(constant.MakeFromLiteral("\"benchmark\"", token.STRING, 0)),
