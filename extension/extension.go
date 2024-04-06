@@ -3,14 +3,11 @@ package extension
 
 import "reflect"
 
-// Symbols variable stores the map of symbols per package.
-var Symbols = map[string]map[string]reflect.Value{}
+// BuiltinSymbols variable stores the map of symbols per built-in package.
+var BuiltinSymbols = map[string]map[string]reflect.Value{}
 
-func init() {
-	Symbols["github.com/godevsig/gshellos/extension/extension"] = map[string]reflect.Value{
-		"Symbols": reflect.ValueOf(Symbols),
-	}
-}
+// PluginSymbols variable stores the map of symbols per plugin.
+var PluginSymbols = map[string]map[string]reflect.Value{}
 
 //go:generate ./gen_symbols.sh github.com/godevsig/adaptiveservice
 

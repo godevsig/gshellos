@@ -28,7 +28,6 @@ import (
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/glib/sys/log"
 	"github.com/godevsig/glib/sys/shell"
-	"github.com/godevsig/gshellos/extension"
 	"github.com/traefik/yaegi/interp"
 )
 
@@ -500,7 +499,7 @@ func addExecCmd() {
 		if len(args) == 0 {
 			return errors.New("no path provided, see gshell exec --help")
 		}
-		if err := loadExtensions(pluginDir); err != nil {
+		if err := loadPlugins(pluginDir); err != nil {
 			return err
 		}
 
@@ -557,7 +556,7 @@ func addStartCmd() {
 			return errors.New("no GRG name, see gshell __start --help")
 		}
 		grgNameVer := *grgName
-		if err := loadExtensions(pluginDir); err != nil {
+		if err := loadPlugins(pluginDir); err != nil {
 			return err
 		}
 
@@ -1182,28 +1181,6 @@ func addMsgTraceCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func addPluginCmd() {
-	cmd := flag.NewFlagSet(newCmd("plugin", "<list>", "List plugins"), flag.ExitOnError)
-
-	action := func() error {
-		args := cmd.Args()
-		if len(args) == 0 || args[0] != "list" {
-			return errors.New("wrong usage, see gshell plugin --help")
-		}
-
-		if err := loadExtensions(pluginDir); err != nil {
-			return err
-		}
-
-		for name := range extension.Symbols {
-			fmt.Println(name)
-		}
-
-		return nil
-	}
-	cmds = append(cmds, subCmd{cmd, action})
-}
-
 // ShellMain is the main entry of gshell
 func ShellMain() error {
 	var traceList string
@@ -1231,7 +1208,6 @@ func ShellMain() error {
 	addLogCmd()
 	addJoblistCmd()
 	addMsgTraceCmd()
-	addPluginCmd()
 
 	usage := func() {
 		const opt = `
@@ -1256,7 +1232,7 @@ OPTIONS:
   --trace
         Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
   --plugin
-        Local path that contains gshell plugins(.so files)
+        Local path that contains gshell plugins(.gplugin.so files)
 `
 		fmt.Printf(opt, loglevel, providerID)
 		fmt.Println("COMMANDS:")
@@ -1277,7 +1253,7 @@ OPTIONS:
 	}
 	// no command, enter interactive mode
 	if len(args) == 0 {
-		if err := loadExtensions(pluginDir); err != nil {
+		if err := loadPlugins(pluginDir); err != nil {
 			return err
 		}
 

@@ -27,7 +27,7 @@ while test $# != 0; do
         esac
 done
 
-head -n 2 $file.raw > $file
+head -n 2 $file.raw | sed 's/Symbols\[/BuiltinSymbols\[/g' > $file
 tail -n +2 $file.raw > fmt-$file
 gopls format -w fmt-$file
 cat fmt-$file >> $file
