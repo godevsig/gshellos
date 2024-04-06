@@ -51,7 +51,7 @@ const (
 var (
 	loglevel     = "info"
 	providerID   = "self"
-	pluginDir    = "/usr/lib/gshell"
+	pluginDir    = "/usr/lib/gshell/plugins"
 	debugService func(lg *log.Logger)
 )
 
