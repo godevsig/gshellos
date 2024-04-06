@@ -34,7 +34,9 @@ func loadExtensions(pluginDir string) error {
 
 			name, symbols := export.(func() (string, map[string]reflect.Value))()
 			if len(name) != 0 && len(symbols) != 0 {
-				extension.Symbols[name] = symbols
+				if _, has := extension.Symbols[name]; !has {
+					extension.Symbols[name] = symbols
+				}
 			}
 		}
 		return nil

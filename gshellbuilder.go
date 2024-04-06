@@ -28,6 +28,7 @@ import (
 	as "github.com/godevsig/adaptiveservice"
 	"github.com/godevsig/glib/sys/log"
 	"github.com/godevsig/glib/sys/shell"
+	"github.com/godevsig/gshellos/extension"
 	"github.com/traefik/yaegi/interp"
 )
 
@@ -497,7 +498,7 @@ func addExecCmd() {
 		}
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no path provided, see --help")
+			return errors.New("no path provided, see gshell exec --help")
 		}
 		if err := loadExtensions(pluginDir); err != nil {
 			return err
@@ -553,7 +554,7 @@ func addStartCmd() {
 			return errors.New("command does not run on remote node")
 		}
 		if len(*grgName) == 0 {
-			return errors.New("no GRG name, see --help")
+			return errors.New("no GRG name, see gshell __start --help")
 		}
 		grgNameVer := *grgName
 		if err := loadExtensions(pluginDir); err != nil {
@@ -692,7 +693,7 @@ func addRepoCmd() {
 			}
 			return nil
 		}
-		return fmt.Errorf("unknown command %s, see --help", args[0])
+		return fmt.Errorf("unknown command %s, see gshell repo --help", args[0])
 	}
 	cmds = append(cmds, subCmd{cmd, action})
 }
@@ -719,7 +720,7 @@ only applicable for non-interactive mode`)
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no file provided, see --help")
+			return errors.New("no file provided, see gshell run --help")
 		}
 		grg := *grgName
 
@@ -727,10 +728,10 @@ only applicable for non-interactive mode`)
 			grg = randStringRunes(6)
 		} else {
 			if strings.Contains(grg, "*") {
-				return errors.New("wrong use of wildcard(*), see --help")
+				return errors.New("wrong use of wildcard(*), see gshell run --help")
 			}
 			if strings.Count(grg, "-") > 1 {
-				return errors.New("wrong group format, see --help")
+				return errors.New("wrong group format, see gshell run --help")
 			}
 		}
 		maxprocs := *maxprocs
@@ -813,13 +814,13 @@ func addKillCmd() {
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no GRG specified, see --help")
+			return errors.New("no GRG specified, see gshell kill --help")
 		}
 		force := *force
 		if force {
 			str := strings.Join(args, " ")
 			if strings.Contains(str, "*") {
-				return errors.New("wildcard not supported when force kill, see --help")
+				return errors.New("wildcard not supported when force kill, see gshell kill --help")
 			}
 		}
 
@@ -855,7 +856,7 @@ func addJoblistCmd() {
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no subcommand provided, see --help")
+			return errors.New("no subcommand provided, see gshell joblist --help")
 		}
 		action := args[0]
 
@@ -945,7 +946,7 @@ func addJoblistCmd() {
 				return err
 			}
 		default:
-			return errors.New("wrong subcommand, see --help")
+			return errors.New("wrong subcommand, see gshell joblist --help")
 		}
 
 		return nil
@@ -1122,7 +1123,7 @@ func addLogCmd() {
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 {
-			return errors.New("no target provided, see --help")
+			return errors.New("no target provided, see gshell log --help")
 		}
 		target := args[0]
 		lg := newLogger(log.DefaultStream, "main")
@@ -1166,7 +1167,7 @@ func addMsgTraceCmd() {
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 || args[0] != "list" {
-			return errors.New("wrong usage, see --help")
+			return errors.New("wrong usage, see gshell mtrace --help")
 		}
 
 		types := as.GetKnownMessageTypes()
@@ -1181,9 +1182,34 @@ func addMsgTraceCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
+func addPluginCmd() {
+	cmd := flag.NewFlagSet(newCmd("plugin", "<list>", "List plugins"), flag.ExitOnError)
+
+	action := func() error {
+		args := cmd.Args()
+		if len(args) == 0 || args[0] != "list" {
+			return errors.New("wrong usage, see gshell plugin --help")
+		}
+
+		if err := loadExtensions(pluginDir); err != nil {
+			return err
+		}
+
+		for name := range extension.Symbols {
+			fmt.Println(name)
+		}
+
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
 // ShellMain is the main entry of gshell
 func ShellMain() error {
 	var traceList string
+	var showVersion bool
+	flag.BoolVar(&showVersion, "v", false, "")
+	flag.BoolVar(&showVersion, "version", false, "")
 	flag.StringVar(&loglevel, "l", loglevel, "")
 	flag.StringVar(&loglevel, "loglevel", loglevel, "")
 	flag.StringVar(&providerID, "p", providerID, "")
@@ -1205,6 +1231,7 @@ func ShellMain() error {
 	addLogCmd()
 	addJoblistCmd()
 	addMsgTraceCmd()
+	addPluginCmd()
 
 	usage := func() {
 		const opt = `
@@ -1220,10 +1247,12 @@ gshell enters interactive mode if no options and no commands provided.
 
 Usage: [OPTIONS] COMMAND ...
 OPTIONS:
+  -v, --version
+        Show version
   -l, --loglevel
-        loglevel, debug/info/warn/error (default "%s")
+        Loglevel, debug/info/warn/error (default "%s")
   -p, --provider
-        provider ID, run following command on the remote node with this ID (default "%s")
+        Provider ID, run following command on the remote node with this ID (default "%s")
   --trace
         Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
   --plugin
@@ -1242,6 +1271,10 @@ OPTIONS:
 
 	flag.Parse()
 	args := flag.Args()
+	if showVersion {
+		fmt.Println(version)
+		return nil
+	}
 	// no command, enter interactive mode
 	if len(args) == 0 {
 		if err := loadExtensions(pluginDir); err != nil {
@@ -1261,42 +1294,36 @@ OPTIONS:
 		return nil
 	}
 
-	switch args[1] {
-	case "-v", "--version":
-		fmt.Println(version)
-		return nil
-	default:
-		var tokens []string
-		if len(traceList) != 0 {
-			fields := strings.Split(traceList, ",")
-			for _, name := range fields {
-				token, err := as.TraceMsgByName(name, 1)
+	var tokens []string
+	if len(traceList) != 0 {
+		fields := strings.Split(traceList, ",")
+		for _, name := range fields {
+			token, err := as.TraceMsgByName(name, 1)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			fmt.Printf("Tracing <%s> with token %s\n\n", name, token)
+			tokens = append(tokens, token)
+		}
+	}
+	str := args[0]
+	for _, cmd := range cmds {
+		if str == strings.Split(cmd.Name(), " ")[0] {
+			cmd.SetOutput(os.Stdout)
+			cmd.Parse(args[1:])
+			err := cmd.action()
+			for _, token := range tokens {
+				fmt.Printf("\nTraced records with token: %s\n", token)
+				msgs, err := as.ReadTracedMsg(token)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
-				fmt.Printf("Tracing <%s> with token %s\n\n", name, token)
-				tokens = append(tokens, token)
+				fmt.Println(msgs)
 			}
+			return err
 		}
-		str := args[0]
-		for _, cmd := range cmds {
-			if str == strings.Split(cmd.Name(), " ")[0] {
-				cmd.SetOutput(os.Stdout)
-				cmd.Parse(args[1:])
-				err := cmd.action()
-				for _, token := range tokens {
-					fmt.Printf("\nTraced records with token: %s\n", token)
-					msgs, err := as.ReadTracedMsg(token)
-					if err != nil {
-						fmt.Println(err)
-						continue
-					}
-					fmt.Println(msgs)
-				}
-				return err
-			}
-		}
-		return fmt.Errorf("unknown command: %s, see --help", str)
 	}
+	return fmt.Errorf("unknown command: %s, see gshell --help", str)
 }
