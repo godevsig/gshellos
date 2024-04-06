@@ -1232,7 +1232,7 @@ OPTIONS:
   --trace
         Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
   --plugin
-        Local path that contains gshell plugins(.gplugin.so files)
+        Local path that contains gshell plugins(.gplugin files)
 `
 		fmt.Printf(opt, loglevel, providerID)
 		fmt.Println("COMMANDS:")

@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/glib/sys/shell/shell"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/glib/sys/shell/shell"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"New":     reflect.ValueOf(shell.New),
 		"Run":     reflect.ValueOf(shell.Run),
