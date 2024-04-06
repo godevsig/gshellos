@@ -9,12 +9,13 @@ import (
 	"path/filepath"
 	"plugin"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/godevsig/gshellos/extension"
 )
 
-func loadExtensions(pluginDir string) error {
+func loadPlugins(pluginDir string) error {
 	if _, err := os.Stat(pluginDir); err != nil {
 		return nil // no such path, assume ok
 	}
@@ -22,7 +23,7 @@ func loadExtensions(pluginDir string) error {
 		if err != nil {
 			return err
 		}
-		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".so") {
+		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".gplugin.so") {
 			p, err := plugin.Open(path)
 			if err != nil {
 				return fmt.Errorf("open plugin %s error: %w", path, err)
@@ -34,12 +35,21 @@ func loadExtensions(pluginDir string) error {
 
 			name, symbols := export.(func() (string, map[string]reflect.Value))()
 			if len(name) != 0 && len(symbols) != 0 {
-				if _, has := extension.Symbols[name]; !has {
-					extension.Symbols[name] = symbols
+				if _, has := extension.PluginSymbols[name]; !has {
+					extension.PluginSymbols[name] = symbols
 				}
 			}
 		}
 		return nil
 	})
 	return nil
+}
+
+func listPlugins() []string {
+	var plugins []string
+	for name := range extension.PluginSymbols {
+		plugins = append(plugins, name)
+	}
+	sort.Strings(plugins)
+	return plugins
 }

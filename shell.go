@@ -160,7 +160,10 @@ func (gsh *gshell) init(opt interp.Options) error {
 	if err := i.Use(unsafe.Symbols); err != nil {
 		return err
 	}
-	if err := i.Use(extension.Symbols); err != nil {
+	if err := i.Use(extension.BuiltinSymbols); err != nil {
+		return err
+	}
+	if err := i.Use(extension.PluginSymbols); err != nil {
 		return err
 	}
 	i.ImportUsed()

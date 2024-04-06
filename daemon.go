@@ -489,7 +489,15 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	fmt.Fprintf(&b, "Version: %s\n", version)
 	fmt.Fprintf(&b, "Commit: %s\n", commitRev)
 	fmt.Fprintf(&b, "Build time: %s\n", buildTime)
-	fmt.Fprintf(&b, "Build tags: %s\n", buildTags)
+	fmt.Fprintf(&b, "Builtins: %s\n", buildTags)
+
+	var plugins string
+	if err := loadPlugins(pluginDir); err != nil {
+		plugins = err.Error()
+	} else {
+		plugins = strings.Join(listPlugins(), ",")
+	}
+	fmt.Fprintf(&b, "Plugins: %s\n", plugins)
 
 	return b.String()
 }
