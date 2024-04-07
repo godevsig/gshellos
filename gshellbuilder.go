@@ -1161,12 +1161,15 @@ func addLogCmd() {
 }
 
 func addMsgTraceCmd() {
-	cmd := flag.NewFlagSet(newCmd("mtrace", "<list>", "List traceable message types"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("mtrace", "<list>", "List traceable message types, including those in plugins"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 || args[0] != "list" {
 			return errors.New("wrong usage, see gshell mtrace --help")
+		}
+		if err := loadPlugins(pluginDir); err != nil {
+			return err
 		}
 
 		types := as.GetKnownMessageTypes()
@@ -1232,9 +1235,9 @@ OPTIONS:
   --trace
         Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
   --plugin
-        Local path that contains gshell plugins(.gplugin files)
+        Local path of plugins(.gplugin files) (default "%s")
 `
-		fmt.Printf(opt, loglevel, providerID)
+		fmt.Printf(opt, loglevel, providerID, pluginDir)
 		fmt.Println("COMMANDS:")
 		for _, cmd := range cmds {
 			name := cmd.Name()
