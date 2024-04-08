@@ -19,21 +19,34 @@ lint: dep ## Lint the files
 vet: dep ## Examine and report suspicious constructs
 	@go vet ${PKG_ALL}
 
+testbin: EXTTAGS := plugin,debug,$(EXTTAGS)
 testbin: STDTAGS := $(STDTAGS),stdhttp,stdlog
 testbin: LDFLAGS += -X 'github.com/godevsig/gshellos.updateInterval=5'
 testbin: dep ## Generate test version of main binary
-	@go test -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
+	@CGO_ENABLED=1 go test -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
 	@ln -snf gshell.tester bin/gshell.test
 
-rmtestfiles:
-	@rm -rf .working; rm -rf .test; rm -f default.joblist.yaml
+pluginfiles: extractbin
+	@mkdir -p .plugins
+	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/echo; \
+		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-echo.go; \
+		mv github_com-godevsig-grepo-echo.so github_com-godevsig-grepo-echo.gplugin
+	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/topidchart; \
+		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-topidchart.go; \
+		mv github_com-godevsig-grepo-topidchart.so github_com-godevsig-grepo-topidchart.gplugin
+	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/docit; \
+		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-docit.go; \
+		mv github_com-godevsig-grepo-docit.so github_com-godevsig-grepo-docit.gplugin
 
-test: rmtestfiles testbin ## Run unit tests
+rmtestfiles:
+	@rm -rf .working .test .plugins; rm -f default.joblist.yaml
+
+test: rmtestfiles pluginfiles testbin ## Run unit tests
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate
 
-COVER_GOAL := 79
-coverage: rmtestfiles testbin ## Generate global code coverage report
+COVER_GOAL := 80
+coverage: rmtestfiles pluginfiles testbin ## Generate global code coverage report
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
 	@echo "mode: count" > .test/final_coverage.out
