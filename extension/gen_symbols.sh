@@ -5,30 +5,25 @@ pkg=$1 && shift
 basepkg=`basename $pkg`
 : ${tag:=$basepkg}
 
-../cmd/extract/extract -name extension -tag $tag $pkg
-
 file=`echo $pkg | tr ./ _-`.go
-mv $file $file.raw
+../cmd/extract/extract -name extension -tag $tag $pkg
+sed -i 's/Symbols\[/BuiltinSymbols\[/g' $file
+
 while test $# != 0; do
         case $1 in
         -fixlog)
-                sed -i 's/logLogger/log.Logger/' $file.raw
+                sed -i 's/logLogger/log.Logger/' $file
                 shift
                 ;;
         -extramsg)
                 extrapkg=$pkg/$basepkg
                 extrafile=`echo $extrapkg | tr ./ _-`.go
                 ../cmd/extract/extract -name extension -tag ${tag}msg $extrapkg
-                sed -n '/func init/,$p' $extrafile >> $file.raw
+                sed -i 's/Symbols\[/BuiltinSymbols\[/g' $extrafile
+                sed -n '/func init/,$p' $extrafile >> $file
                 shift
                 ;;
         *)
                 shift
         esac
 done
-
-head -n 2 $file.raw > $file
-tail -n +2 $file.raw | sed 's/Symbols\[/BuiltinSymbols\[/g' > fmt-$file
-gopls format -w fmt-$file
-cat fmt-$file >> $file
-rm -f $file.raw fmt-$file

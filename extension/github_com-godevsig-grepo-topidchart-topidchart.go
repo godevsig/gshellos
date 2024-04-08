@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/topidchart/topidchart/topidchart"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/topidchart/topidchart/topidchart"] = map[string]reflect.Value{
 		// type definitions
 		"ProcessInfo":     reflect.ValueOf((*topidchart.ProcessInfo)(nil)),
 		"Record":          reflect.ValueOf((*topidchart.Record)(nil)),

@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	Symbols["github.com/godevsig/grepo/echo/echo/echo"] = map[string]reflect.Value{
+	BuiltinSymbols["github.com/godevsig/grepo/echo/echo/echo"] = map[string]reflect.Value{
 		// function, constant and variable definitions
 		"Publisher":   reflect.ValueOf(constant.MakeFromLiteral("\"example\"", token.STRING, 0)),
 		"ServiceEcho": reflect.ValueOf(constant.MakeFromLiteral("\"echo.v1.0\"", token.STRING, 0)),
