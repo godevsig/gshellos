@@ -1,0 +1,59 @@
+#!/bin/bash
+
+mypath=$(dirname "$0")
+plugin=false
+
+while test $# != 0; do
+    case $1 in
+    -plugin)
+        plugin=true
+        shift
+        ;;
+    -tag)
+        tag=$2
+        shift 2
+        ;;
+    -*)
+        echo "unknown argument $1" && exit 1
+        ;;
+    *)
+        break
+    esac
+done
+
+pkg=$1 && shift
+basepkg=`basename $pkg`
+: ${tag:=$basepkg}
+
+file=`echo $pkg | tr ./ _-`.go
+$mypath/../cmd/extract/extract -name extension -tag $tag $pkg
+if $plugin; then
+    sed -i -r -e '1i package main' \
+        -e '1,/package extension/d' \
+        -e 's/func init\(\)/func Export() (string, map[string]reflect.Value)/' \
+        -e 's/Symbols\[(.*)\] =/return \1,/' \
+        $file
+else
+    sed -i 's/Symbols\[/BuiltinSymbols\[/g' $file
+fi
+
+$plugin && exit
+
+while test $# != 0; do
+    case $1 in
+    -fixlog)
+        sed -i 's/logLogger/log.Logger/' $file
+        shift
+        ;;
+    -extramsg)
+        extrapkg=$pkg/$basepkg
+        extrafile=`echo $extrapkg | tr ./ _-`.go
+        $mypath/../cmd/extract/extract -name extension -tag ${tag}msg $extrapkg
+        sed -i 's/Symbols\[/BuiltinSymbols\[/g' $extrafile
+        sed -n '/func init/,$p' $extrafile >> $file
+        shift
+        ;;
+    *)
+        echo "unknown argument $1" && exit 1
+    esac
+done
