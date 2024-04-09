@@ -37,6 +37,7 @@ pluginfiles: extractbin
 	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/docit; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-docit.go; \
 		mv github_com-godevsig-grepo-docit.so github_com-godevsig-grepo-docit.gplugin
+	@cd .plugins; cp github_com-godevsig-grepo-echo.go wrong-format-test.gplugin
 
 rmtestfiles:
 	@rm -rf .working .test .plugins; rm -f default.joblist.yaml

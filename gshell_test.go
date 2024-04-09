@@ -149,7 +149,7 @@ func makeCmd(cmdstr string) *exec.Cmd {
 
 func gshellTestCmd(cmdstr string, getOutputFile string) (string, error) {
 	cmd := makeCmd(cmdstr)
-	out, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
 	outStr := getSout(out)
 	if getOutputFile == "" {
 		return outStr, err

@@ -484,6 +484,7 @@ func (msg *cmdLog) Handle(stream as.ContextStream) (reply interface{}) {
 type cmdInfo struct{}
 
 func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
+	gd := stream.GetContext().(*daemon)
 	var b strings.Builder
 	fmt.Fprintf(&b, "Arch: %s\n", runtime.GOARCH)
 	fmt.Fprintf(&b, "Version: %s\n", version)
@@ -491,11 +492,12 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	fmt.Fprintf(&b, "Build time: %s\n", buildTime)
 	fmt.Fprintf(&b, "Builtins: %s\n", buildTags)
 
-	if err := loadPlugins(pluginDir); err == nil {
-		plugins := strings.Join(listPlugins(), ",")
-		if len(plugins) != 0 {
-			fmt.Fprintf(&b, "Plugins: %s\n", plugins)
-		}
+	if err := loadPlugins(pluginDir); err != nil {
+		gd.lg.Warnf("load plugins error: %v", err)
+	}
+	plugins := strings.Join(listPlugins(), ",")
+	if len(plugins) != 0 {
+		fmt.Fprintf(&b, "Plugins: %s\n", plugins)
 	}
 
 	return b.String()
