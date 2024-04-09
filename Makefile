@@ -43,11 +43,13 @@ rmtestfiles:
 
 test: rmtestfiles pluginfiles testbin ## Run unit tests
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
+	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestClientServer
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate
 
 COVER_GOAL := 80
 coverage: rmtestfiles pluginfiles testbin ## Generate global code coverage report
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
+	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestClientServer -test.coverprofile .test/gshell_clientserver_coverage.cov
 	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
 	@echo "mode: count" > .test/final_coverage.out
 	@cat `find -name "*.cov"` | grep -E -v "mode: count|/extension/|/stdlib/" >> .test/final_coverage.out
