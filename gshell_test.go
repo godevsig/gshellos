@@ -204,50 +204,6 @@ func gshellRunCmdTimeout(cmdstr string, nSec int) (string, error) {
 	return out.String(), err
 }
 
-func TestCmdAutoRestart(t *testing.T) {
-	out, err := gshellRunCmd("run -group autorestart sleep.go 3")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err = gshellRunCmd("run -group autorestart sleep.go 300")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err = gshellRunCmd("ps")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	time.Sleep(time.Second * 4)
-	pidOld, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
-	t.Logf("\n%s", pidOld)
-	shell.Run(fmt.Sprintf("kill -9 %s", pidOld))
-	time.Sleep(time.Second)
-
-	pidNew, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
-	t.Logf("\n%s", pidNew)
-
-	if pidOld == pidNew {
-		t.Fatal("restart grg error")
-	}
-
-	out, err = gshellRunCmd("ps")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !strings.Contains(out, "running") ||
-		!strings.Contains(out, "exited:OK") {
-		t.Fatal("unexpected output")
-	}
-}
-
 func TestCmdRunWrongGRGVer(t *testing.T) {
 	out, err := gshellRunCmd("run -group testgrg hello.go")
 	t.Logf("\n%s", out)
@@ -456,6 +412,50 @@ func TestCmdKill(t *testing.T) {
 	}
 
 	if strings.Contains(out, "test") {
+		t.Fatal("unexpected output")
+	}
+}
+
+func TestCmdAutoRestart(t *testing.T) {
+	out, err := gshellRunCmd("run -group autorestart sleep.go 3")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("run -group autorestart sleep.go 300")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(time.Second * 4)
+	pidOld, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
+	t.Logf("\n%s", pidOld)
+	shell.Run(fmt.Sprintf("kill -9 %s", pidOld))
+	time.Sleep(time.Second)
+
+	pidNew, _ := shell.Run("ps -eo pid,args | grep autorestart | grep -v grep | awk '{print $1}'")
+	t.Logf("\n%s", pidNew)
+
+	if pidOld == pidNew {
+		t.Fatal("restart grg error")
+	}
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out, "running") ||
+		!strings.Contains(out, "exited:OK") {
 		t.Fatal("unexpected output")
 	}
 }
@@ -824,6 +824,72 @@ func TestCmdREPL(t *testing.T) {
 	}
 }
 
+func TestClientServerEcho(t *testing.T) {
+	out, err := gshellRunCmd("run -group echo echoserver.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serverID := strings.TrimSpace(out)
+
+	out, err = gshellRunCmd("run echoclient.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	OSclientID := strings.TrimSpace(out)
+
+	out, err = gshellRunCmd("run -group echo echoclient.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ProcessClientID := strings.TrimSpace(out)
+
+	time.Sleep(8 * time.Second)
+
+	out, err = gshellRunCmd("ps")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("log " + OSclientID)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "ni hao! 301") ||
+		!strings.Contains(out, "ni hao! 151") {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("log " + ProcessClientID)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "ni hao! 301") ||
+		!strings.Contains(out, "ni hao! 151") {
+		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("stop " + serverID)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	out, err = gshellRunCmd("log " + serverID)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "echo server has served 36 requests") {
+		t.Fatal("unexpected output")
+	}
+}
+
 func TestAutoUpdate(t *testing.T) {
 	os.WriteFile("bin/rev", []byte("11111111111111111111111111111111\n"), 0644)
 	shell.Run("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
@@ -874,7 +940,7 @@ func TestAutoUpdate(t *testing.T) {
 func TestRunMain(t *testing.T) {
 	os.Args = append([]string{os.Args[0]}, flag.Args()...)
 	err := gs.ShellMain()
-	if err != nil {
+	if err != nil && err.Error() != "server closed by signal" {
 		t.Fatal(err)
 	}
 }
