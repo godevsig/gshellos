@@ -19,18 +19,21 @@ func loadPlugins(pluginDir string) error {
 	if _, err := os.Stat(pluginDir); err != nil {
 		return nil // no such path, assume ok
 	}
-	filepath.WalkDir(pluginDir, func(path string, d fs.DirEntry, err error) error {
+	var allErr error
+	if err := filepath.WalkDir(pluginDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".gplugin") {
 			p, err := plugin.Open(path)
 			if err != nil {
-				return fmt.Errorf("open plugin %s error: %w", path, err)
+				allErr = fmt.Errorf("open plugin %s error: %v; %v", path, err, allErr)
+				return nil
 			}
 			export, err := p.Lookup("Export")
 			if err != nil {
-				return fmt.Errorf("symbol lookup error in plugin %s: %w", path, err)
+				allErr = fmt.Errorf("symbol lookup error in plugin %s: %v; %v", path, err, allErr)
+				return nil
 			}
 
 			name, symbols := export.(func() (string, map[string]reflect.Value))()
@@ -41,7 +44,12 @@ func loadPlugins(pluginDir string) error {
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		allErr = fmt.Errorf("walk dir %s error: %v; %v", pluginDir, err, allErr)
+	}
+	if allErr != nil {
+		return allErr
+	}
 	return nil
 }
 

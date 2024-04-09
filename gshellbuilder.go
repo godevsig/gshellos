@@ -500,7 +500,7 @@ func addExecCmd() {
 			return errors.New("no path provided, see gshell exec --help")
 		}
 		if err := loadPlugins(pluginDir); err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
 		}
 
 		filePath := args[0]
@@ -556,14 +556,15 @@ func addStartCmd() {
 			return errors.New("no GRG name, see gshell __start --help")
 		}
 		grgNameVer := *grgName
-		if err := loadPlugins(pluginDir); err != nil {
-			return err
-		}
 
 		workDir := *workDir
 		logStream := log.NewStream("grg")
 		logStream.SetOutput("file:" + workDir + "/logs/grg.log")
 		lg := newLogger(logStream, "grg-"+grgNameVer)
+		if err := loadPlugins(pluginDir); err != nil {
+			lg.Warnf("load plugins error: %v", err)
+		}
+
 		opts := []as.Option{
 			as.WithScope(as.ScopeOS),
 			as.WithLogger(lg),
@@ -1169,7 +1170,7 @@ func addMsgTraceCmd() {
 			return errors.New("wrong usage, see gshell mtrace --help")
 		}
 		if err := loadPlugins(pluginDir); err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
 		}
 
 		types := as.GetKnownMessageTypes()
@@ -1257,7 +1258,7 @@ OPTIONS:
 	// no command, enter interactive mode
 	if len(args) == 0 {
 		if err := loadPlugins(pluginDir); err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
 		}
 
 		gsh, err := newShell()
