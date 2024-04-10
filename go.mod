@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/godevsig/adaptiveservice v0.12.2-0.20240325065735-a4f767cc0f4b
 	github.com/godevsig/glib v0.1.2-0.20230830021401-ee447d68739c
-	github.com/godevsig/grepo v0.2.5-0.20231016075844-edd47a3b9016
+	github.com/godevsig/grepo v0.2.5-0.20240409082928-3c01a5227a9a
 	github.com/traefik/yaegi v0.15.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -20,7 +20,7 @@ require (
 	github.com/peterh/liner v1.2.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/timandy/routine v1.1.3 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
 )
 
 replace (
