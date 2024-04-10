@@ -72,6 +72,7 @@ lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build lite release binary to bin dir
 
 full: CGO := 1
+full: LDFLAGS += -linkmode=external -extldflags=-static
 full: EXTTAGS := plugin,debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
 full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
