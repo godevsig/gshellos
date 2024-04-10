@@ -529,7 +529,7 @@ func addExecCmd() {
 func addStartCmd() {
 	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "Start named GRG"), flag.ExitOnError)
 	workDir := cmd.String("wd", defaultWorkDir, "set working directory")
-	grgName := cmd.String("group", "", "GRG name")
+	grgNameVer := cmd.String("group", "", "GRG name")
 
 	getRealtimePriority := func(pid int) int {
 		statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
@@ -549,13 +549,13 @@ func addStartCmd() {
 	}
 
 	action := func() error {
+		grgNameVer := *grgNameVer
 		if providerID != "self" {
 			return errors.New("command does not run on remote node")
 		}
-		if len(*grgName) == 0 {
+		if len(grgNameVer) == 0 {
 			return errors.New("no GRG name, see gshell __start --help")
 		}
-		grgNameVer := *grgName
 
 		workDir := *workDir
 		logStream := log.NewStream("grg")
@@ -705,9 +705,10 @@ func addRunCmd() {
 		"and run it in a new GRE in specified GRG on local/remote node",
 		"Use `gshell repo ls [path]` to see available code files"),
 		flag.ExitOnError)
-	grgName := cmd.String("group", "", `name of the GRG in the form name-version
-random group name will be used if no name specified
-target daemon version will be used if no version specified`)
+	grgName := cmd.String("group", "", `name of the GRG in below forms
+name-version: exact target group name, usually specifying an existing GRG
+name: target daemon version will be used if no version specified
+random group name will be used if no name specified`)
 	maxprocs := cmd.Int("maxprocs", 0, "set GOMAXPROCS variable")
 	rtPriority := cmd.Int("rt", 0, `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
 silently ignore errors if real-time priority can not be set`)
@@ -718,19 +719,19 @@ only applicable for non-interactive mode`)
 	autoImport := cmd.Bool("import", false, "auto-import dependent packages")
 
 	action := func() error {
+		grgName := *grgName
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see gshell run --help")
 		}
-		grg := *grgName
 
-		if len(grg) == 0 {
-			grg = randStringRunes(6)
+		if len(grgName) == 0 {
+			grgName = randStringRunes(6)
 		} else {
-			if strings.Contains(grg, "*") {
+			if strings.Contains(grgName, "*") {
 				return errors.New("wrong use of wildcard(*), see gshell run --help")
 			}
-			if strings.Count(grg, "-") > 1 {
+			if strings.Count(grgName, "-") > 1 {
 				return errors.New("wrong group format, see gshell run --help")
 			}
 		}
@@ -775,7 +776,7 @@ only applicable for non-interactive mode`)
 				AutoImport:  *autoImport,
 				RequestedBy: selfID,
 			},
-			GRGName:    grg,
+			GRGName:    grgName,
 			RtPriority: rtPriority,
 			Maxprocs:   maxprocs,
 		}
@@ -807,7 +808,7 @@ func addKillCmd() {
 	cmd := flag.NewFlagSet(newCmd("kill",
 		"[options] names ...",
 		"Terminate the named GRG(s) on local/remote node",
-		"name supports simple wildcard(*), but must be full RGRG name when force kill"),
+		"name supports simple wildcard(*), but must be full GRG name when force kill"),
 		flag.ExitOnError)
 	force := cmd.Bool("f", false, "force terminate the GRG even if there are still running GREs in it")
 
@@ -956,7 +957,7 @@ func addJoblistCmd() {
 
 func addPsCmd() {
 	cmd := flag.NewFlagSet(newCmd("ps", "[options] [GRE IDs ...|names ...]", "Show jobs by GRE ID or name on local/remote node"), flag.ExitOnError)
-	grgName := cmd.String("group", "*", "in which GRG")
+	grgName := cmd.String("group", "*", "in which GRG, wildcard(*) is supported")
 
 	action := func() error {
 		lg := newLogger(log.DefaultStream, "main")
@@ -1052,7 +1053,7 @@ func addPatternCmds() {
 	} {
 		cmdStrs := cmdStrs
 		cmd := flag.NewFlagSet(newCmd(cmdStrs[0], cmdStrs[1], cmdStrs[2]), flag.ExitOnError)
-		grgName := cmd.String("group", "*", "in which GRG")
+		grgName := cmd.String("group", "*", "in which GRG, wildcard(*) is supported")
 
 		action := func() error {
 			lg := newLogger(log.DefaultStream, "main")
