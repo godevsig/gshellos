@@ -436,7 +436,8 @@ func TestCmdKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if strings.TrimSpace(out) != "testkill24-"+version+" testkill25-"+version+" killed" {
+	if strings.TrimSpace(out) != "testkill24-"+version+" testkill25-"+version+" killed" &&
+		strings.TrimSpace(out) != "testkill25-"+version+" testkill24-"+version+" killed" {
 		t.Fatal("unexpected output")
 	}
 
