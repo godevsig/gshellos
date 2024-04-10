@@ -859,22 +859,35 @@ func TestCmdREPL(t *testing.T) {
 	}
 }
 
-func TestClientServerEcho(t *testing.T) {
-	out, err := gshellRunCmd("run -group echo echoserver.go")
+func TestClientServerEchoWithMsgTracing(t *testing.T) {
+	out, err := gshellRunCmd("run -group echos echoserver.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 	serverID := strings.TrimSpace(out)
 
-	out, err = gshellRunCmd("run echoclient.go")
+	out, err = gshellRunCmd("run -i -group echoc tracemsg.go tag echo.Request count 5")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var token string
+	if _, after, found := strings.Cut(out, "Tracing <echo.Request> with token"); found {
+		token = strings.TrimSpace(after)
+	}
+	if len(token) == 0 {
+		t.Fatal("No tracing token")
+	}
+
+	out, err = gshellRunCmd("run -group echoc echoclient.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 	OSclientID := strings.TrimSpace(out)
 
-	out, err = gshellRunCmd("run -group echo echoclient.go")
+	out, err = gshellRunCmd("run -group echos echoclient.go")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
@@ -922,6 +935,15 @@ func TestClientServerEcho(t *testing.T) {
 	}
 	if !strings.Contains(out, "echo server has served 36 requests") {
 		t.Fatal("unexpected output")
+	}
+
+	out, err = gshellRunCmd("run -i -rm tracemsg.go show " + token)
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Count(out, "Traced records with token") != 5 {
+		t.Fatal("Tracing count mismatch")
 	}
 }
 
