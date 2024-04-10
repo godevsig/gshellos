@@ -9,26 +9,24 @@ jobs:
   releases-matrix:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Set up Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.18
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.18
 
-    - name: Build
-      run: |
-        CGO_ENABLED=0 GOARCH=amd64 make full && mv -f bin/gshell bin/gshell.amd64
-        CGO_ENABLED=0 GOARCH=mips64 make full && mv -f bin/gshell bin/gshell.mips64
-        CGO_ENABLED=0 GOARCH=arm64 make full && mv -f bin/gshell bin/gshell.arm64
-        md5sum bin/gshell* > bin/md5sum
-        rm -f bin/buildtag bin/gittag
+      - name: Install musl
+        run: sudo apt-get install -y --no-install-recommends musl-dev musl-tools
 
-    - name: Upload files to release
-      uses: svenstaro/upload-release-action@v2
-      with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: bin/*
-        tag: ${{ github.ref }}
-        overwrite: true
-        file_glob: true
+      - name: Build
+        run: CC=musl-gcc GOARCH=amd64 make full && mv -f bin/gshell bin/gshell.amd64 && md5sum bin/gshell* > bin/md5sum && rm -f bin/buildtag bin/gittag
+
+      - name: Upload files to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: bin/*
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
