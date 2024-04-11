@@ -39,7 +39,9 @@ make runs
 make runc
 ```
 
-# Trace messages in gshellos commandline
+# Trace messages in gshell command line
+> `gsh --trace` and `gsh mtrace list` are deprecated, tracing gshell internal message types is for developers only.
+
 `gsh mtrace list` can lists available message types, which can then be used to `gsh --trace msgTypeName`
 ```shell
 cd gshellos
@@ -99,7 +101,7 @@ GRE ID        IN GROUP            NAME                START AT             STATU
 52129def8ddf  echoclient-v2.0.1   echoclient          2023/09/19 12:32:13  exited:OK  12.390925943s
 c493ceaf848c  uzfayo-v2.0.1       echoserver          2023/09/19 12:26:13  running    11m37.875056216s
 
-# same as gsh mtrace list
+# list traceable message type names
 gsh run -group echoclient -rm -i debug/as/tracemsg.go list
 
 # tag echo.Request, must run it in the same group(-group option) with echo client
@@ -152,7 +154,7 @@ GRE ID        IN GROUP            NAME                START AT             STATU
 52129def8ddf  echoclient-v2.0.1   echoclient          2023/09/19 12:32:13  exited:OK  12.390925943s
 c493ceaf848c  uzfayo-v2.0.1       echoserver          2023/09/19 12:26:13  running    11m37.875056216s
 
-# same as gsh mtrace list
+# list traceable message type names
 gsh run -group echoclient -rm -i debug/as/tracemsg.go list
 
 # tag echo.Request, must run it in the same group(-group option) with echo client,

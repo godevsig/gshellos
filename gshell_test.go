@@ -144,7 +144,7 @@ func randID() string {
 
 func makeCmd(cmdstr string) *exec.Cmd {
 	prefix := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_" + strings.Split(cmdstr, " ")[0] + randID() + ".cov -- "
-	return exec.Command("gshell.tester", strings.Fields(prefix+" --plugin .plugins "+cmdstr)...)
+	return exec.Command("gshell.tester", strings.Fields(prefix+" -plugin .plugins "+cmdstr)...)
 }
 
 func gshellTestCmd(cmdstr string, getOutputFile string) (string, error) {
@@ -827,7 +827,7 @@ func TestCmdRepoList(t *testing.T) {
 }
 
 func TestCmdMsgtraceListWithPlugin(t *testing.T) {
-	out, err := gshellRunCmd("mtrace list")
+	out, err := gshellRunCmd("__mtrace list")
 	t.Logf("\n%s", out)
 	if !strings.Contains(out, "echo.Request") ||
 		!strings.Contains(out, "topidchart.SessionRequest") ||
@@ -1008,7 +1008,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 	if len(flag.Args()) == 0 { // called from Makefile
 		cmdstr := "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_gshelld" + randID() + ".cov -- "
-		cmdstr += "-loglevel debug --plugin .plugins daemon -clean -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
+		cmdstr += "-loglevel debug -plugin .plugins daemon -clean -wd .working -registry 127.0.0.1:11985 -bcast 9923 "
 		cmdstr += "-root -repo testdata "
 		cmdstr += "-update http://127.0.0.1:9001"
 		go func() {
