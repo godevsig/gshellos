@@ -1163,7 +1163,7 @@ func addLogCmd() {
 }
 
 func addMsgTraceCmd() {
-	cmd := flag.NewFlagSet(newCmd("mtrace", "<list>", "List traceable message types, including those in plugins"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("__mtrace", "<list>", "List traceable message types, including those in plugins"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -1234,11 +1234,14 @@ OPTIONS:
         Loglevel, debug/info/warn/error (default "%s")
   -p, --provider
         Provider ID, run following command on the remote node with this ID (default "%s")
-  --trace
-        Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
   --plugin
         Local path of plugins(.gplugin files) (default "%s")
 `
+		/* hide --trace option, which is for tracing gshell internal messages only
+		--trace
+			Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
+		*/
+
 		fmt.Printf(opt, loglevel, providerID, pluginDir)
 		fmt.Println("COMMANDS:")
 		for _, cmd := range cmds {
