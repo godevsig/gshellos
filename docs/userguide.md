@@ -232,24 +232,26 @@ Build tags: stdbase,stdcommon,stdruntime,stdarchive,stdcompress,stdcontainer,std
 # gshell help
 ```shell
 $ gsh -h
-  gshell is a simple pure golang service framework for linux devices.
+gshell is a simple pure golang service framework for linux devices.
 
-  Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
-  Each node has an unique provider ID.
+Running a gshell daemon on a board/VM/container makes it a node in the gshell service mesh.
+Each node has an unique provider ID.
 
-  Each job runs in one dedicated GRE(Gshell Runtime Environment) which runs in a GRG(Gshell Runtime Group).
-  GREs can be grouped into one named GRG for better performance.
+Each job runs in one dedicated GRE(Gshell Runtime Environment) which runs in a GRG(Gshell Runtime Group).
+GREs can be grouped into one named GRG for better performance.
 
-  gshell enters interactive mode if no options and no commands provided.
+gshell enters interactive mode if no options and no commands provided.
 
 Usage: [OPTIONS] COMMAND ...
 OPTIONS:
+  -v, --version
+        Show version
   -l, --loglevel
-        loglevel, debug/info/warn/error (default "error")
+        Loglevel, debug/info/warn/error (default "info")
   -p, --provider
-        provider ID, run following command on the remote node with this ID (default "self")
-  --trace
-        Comma seprated messages to be traced, use "gshell mtrace list" to show possbile values
+        Provider ID, run following command on the remote node with this ID (default "self")
+  --plugin
+        Local path of plugins(.gplugin files) (default "/usr/lib/gshell/plugins")
 COMMANDS:
   id
         Print self provider ID
@@ -267,7 +269,7 @@ COMMANDS:
         Use `gshell repo ls [path]` to see available code files
   kill [options] names ...
         Terminate the named GRG(s) on local/remote node
-        wildcard(*) is supported
+        name supports simple wildcard(*), but must be full GRG name when force kill
   ps [options] [GRE IDs ...|names ...]
         Show jobs by GRE ID or name on local/remote node
   stop [options] [GRE IDs ...|names ...]
@@ -282,6 +284,4 @@ COMMANDS:
         Print target log on local/remote node
   joblist [options] <save|load>
         Save all current jobs to file or load them to run on local/remote node
-  mtrace <list>
-        List traceable message types
 ```
