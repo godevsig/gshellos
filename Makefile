@@ -21,7 +21,7 @@ vet: dep ## Examine and report suspicious constructs
 
 testbin: EXTTAGS := plugin,debug,$(EXTTAGS)
 testbin: STDTAGS := $(STDTAGS),stdhttp,stdlog
-testbin: LDFLAGS += -X 'github.com/godevsig/gshellos.updateInterval=5'
+testbin: LDFLAGS += -X github.com/godevsig/gshellos.updateInterval=5
 testbin: dep ## Generate test version of main binary
 	@CGO_ENABLED=1 go test -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
 	@ln -snf gshell.tester bin/gshell.test
@@ -69,14 +69,16 @@ build: dep
 
 lite: LDFLAGS += -s -w
 lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
-lite: build ## Build lite release binary to bin dir
+lite: build ## Build with lite feature set
 
 full: CGO := 1
-full: LDFLAGS += -linkmode=external -extldflags=-static
 full: EXTTAGS := plugin,debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
 full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
 full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
-full: build ## Build full release binary to bin dir
+full: build ## Build with full feature set, dynamically linked
+
+full-static: LDFLAGS += -linkmode=external -extldflags=-static
+full-static: full ## Build with full feature set, statically linked, no plugin support
 
 generate: gen-extlib gen-stdlib ## Generate libraries
 
