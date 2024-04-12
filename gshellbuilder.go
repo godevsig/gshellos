@@ -1168,7 +1168,7 @@ func addMsgTraceCmd() {
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 || args[0] != "list" {
-			return errors.New("wrong usage, see gshell mtrace --help")
+			return errors.New("wrong usage, see gshell __mtrace --help")
 		}
 		if err := loadPlugins(pluginDir); err != nil {
 			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
@@ -1180,6 +1180,27 @@ func addMsgTraceCmd() {
 		})
 		for i, name := range types {
 			fmt.Println(i, name)
+		}
+		return nil
+	}
+	cmds = append(cmds, subCmd{cmd, action})
+}
+
+func addPluginsCmd() {
+	cmd := flag.NewFlagSet(newCmd("__plugin", "<list>", "List plugins"), flag.ExitOnError)
+
+	action := func() error {
+		args := cmd.Args()
+		if len(args) == 0 || args[0] != "list" {
+			return errors.New("wrong usage, see gshell __plugin --help")
+		}
+		if err := loadPlugins(pluginDir); err != nil {
+			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
+		}
+
+		plugins := strings.Join(listPlugins(), ",")
+		if len(plugins) != 0 {
+			fmt.Printf("%s", plugins)
 		}
 		return nil
 	}
@@ -1213,6 +1234,7 @@ func ShellMain() error {
 	addLogCmd()
 	addJoblistCmd()
 	addMsgTraceCmd()
+	addPluginsCmd()
 
 	usage := func() {
 		const opt = `

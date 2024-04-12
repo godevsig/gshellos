@@ -518,12 +518,21 @@ func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	fmt.Fprintf(&b, "Build time: %s\n", buildTime)
 	fmt.Fprintf(&b, "Builtins: %s\n", buildTags)
 
-	if err := loadPlugins(pluginDir); err != nil {
-		gd.lg.Warnf("load plugins error: %v", err)
+	exe := os.Args[0]
+	args := fmt.Sprintf("-plugin %s __plugin list", pluginDir)
+	if os.Args[0] == "gshell.tester" {
+		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_plugin.cov -- " + args
 	}
-	plugins := strings.Join(listPlugins(), ",")
-	if len(plugins) != 0 {
-		fmt.Fprintf(&b, "Plugins: %s\n", plugins)
+	cmd := exec.Command(exe, strings.Split(args, " ")...)
+	gd.lg.Debugf("load plugins from %s, cmd: %s %s\n", pluginDir, exe, args)
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	out, _ := cmd.Output()
+	if stderr.Len() != 0 {
+		gd.lg.Warnf("load plugins error: %s", stderr.Bytes())
+	}
+	if len(out) != 0 {
+		fmt.Fprintf(&b, "Plugins: %s\n", out)
 	}
 
 	return b.String()

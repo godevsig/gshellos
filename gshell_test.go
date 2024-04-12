@@ -1012,7 +1012,7 @@ func TestMain(m *testing.M) {
 		cmdstr += "-root -repo testdata "
 		cmdstr += "-update http://127.0.0.1:9001"
 		go func() {
-			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).CombinedOutput()
+			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).Output()
 			fmt.Println(string(output))
 		}()
 
