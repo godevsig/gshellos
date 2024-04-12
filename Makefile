@@ -7,6 +7,7 @@ COMMIT_REV = $(shell git rev-parse HEAD)
 BUILD_TIME = $(shell date "+%Y.%m.%d %H:%M:%S")
 STDTAGS := stdbase,stdcommon,stdruntime
 EXTTAGS := adaptiveservice,shell,log,pidinfo,asbench
+PLUGIN := ,plugin
 
 all: format lint vet test build
 
@@ -19,11 +20,11 @@ lint: dep ## Lint the files
 vet: dep ## Examine and report suspicious constructs
 	@go vet ${PKG_ALL}
 
-testbin: EXTTAGS := plugin,debug,$(EXTTAGS)
+testbin: EXTTAGS := debug,$(EXTTAGS)
 testbin: STDTAGS := $(STDTAGS),stdhttp,stdlog
 testbin: LDFLAGS += -X github.com/godevsig/gshellos.updateInterval=5
 testbin: dep ## Generate test version of main binary
-	@CGO_ENABLED=1 go test -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
+	@CGO_ENABLED=1 go test -tags $(STDTAGS),$(EXTTAGS)$(PLUGIN) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
 	@ln -snf gshell.tester bin/gshell.test
 
 pluginfiles: extractbin
@@ -65,20 +66,23 @@ dep:
 	@echo -n $(BUILD_TIME) > bin/buildtime
 
 build: dep
-	@CGO_ENABLED=$(CGO) go build -tags $(STDTAGS),$(EXTTAGS) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
+	@CGO_ENABLED=$(CGO) go build -tags $(STDTAGS),$(EXTTAGS)$(PLUGIN) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
 lite: LDFLAGS += -s -w
 lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build with lite feature set
 
-full: CGO := 1
-full: EXTTAGS := plugin,debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
-full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
-full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
-full: build ## Build with full feature set, dynamically linked
+.full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
+.full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
+.full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
+.full: build
 
-full-static: LDFLAGS += -linkmode=external -extldflags=-static
-full-static: full ## Build with full feature set, statically linked, no plugin support
+full: CGO := 1
+full: .full ## Build with full feature set, dynamically linked
+
+full-static: PLUGIN :=
+#full-static: LDFLAGS += -linkmode=external -extldflags=-static
+full-static: .full ## Build with full feature set, statically linked, no plugin support
 
 generate: gen-extlib gen-stdlib ## Generate libraries
 
