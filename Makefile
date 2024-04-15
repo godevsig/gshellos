@@ -1,5 +1,6 @@
 SHELL=bash
 
+PLUGIN :=
 CGO := 0
 PKG_ALL = $(shell go list ./... | grep -v unsafe)
 GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
@@ -7,9 +8,6 @@ COMMIT_REV = $(shell git rev-parse HEAD)
 BUILD_TIME = $(shell date "+%Y.%m.%d %H:%M:%S")
 STDTAGS := stdbase,stdcommon,stdruntime
 EXTTAGS := adaptiveservice,shell,log,pidinfo,asbench
-PLUGIN := ,plugin
-
-all: format lint vet test build
 
 format: ## Check coding style
 	@DIFF=$$(gofmt -d .); echo -n "$$DIFF"; test -z "$$DIFF"
@@ -20,6 +18,7 @@ lint: dep ## Lint the files
 vet: dep ## Examine and report suspicious constructs
 	@go vet ${PKG_ALL}
 
+testbin: PLUGIN := ,plugin
 testbin: EXTTAGS := debug,$(EXTTAGS)
 testbin: STDTAGS := $(STDTAGS),stdhttp,stdlog
 testbin: LDFLAGS += -X github.com/godevsig/gshellos.updateInterval=5
@@ -68,22 +67,18 @@ dep:
 build: dep
 	@CGO_ENABLED=$(CGO) go build -tags $(STDTAGS),$(EXTTAGS)$(PLUGIN) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
-lite: PLUGIN :=
 lite: LDFLAGS += -s -w
 lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build with lite feature set, no cgo, no plugin
 
-.full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
-.full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
-.full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
-.full: build
+full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
+full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
+full: STDTAGS := $(STDTAGS),stdhash,stdhtml,stdlog,stdmath,stdhttp,stdmail,stdrpc,stdregexp,stdtext,stdunicode
+full: build ## Build with full feature set, no cgo, no plugin
 
-full: CGO := 1
-full: .full ## Build with full feature set, with plugin support
-
-full-static: PLUGIN :=
-#full-static: LDFLAGS += -linkmode=external -extldflags=-static
-full-static: .full ## Build with full feature set, no cgo, no plugin
+full-plugin: CGO := 1
+full-plugin: PLUGIN := ,plugin
+full-plugin: full ## Build with full feature set with plugin support, depends on libc
 
 generate: gen-extlib gen-stdlib ## Generate libraries
 
