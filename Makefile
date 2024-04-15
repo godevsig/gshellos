@@ -1,6 +1,7 @@
 SHELL=bash
 
 PLUGIN :=
+LDFLAGS :=
 CGO := 0
 PKG_ALL = $(shell go list ./... | grep -v unsafe)
 GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
