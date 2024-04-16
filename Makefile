@@ -68,9 +68,11 @@ dep:
 build: dep
 	@CGO_ENABLED=$(CGO) go build -tags $(STDTAGS),$(EXTTAGS)$(PLUGIN) -ldflags="$(LDFLAGS)" -o bin ./cmd/gshell
 
-lite: LDFLAGS += -s -w
 lite: EXTTAGS := $(EXTTAGS),echomsg,topidchartmsg,recordermsg
 lite: build ## Build with lite feature set, no cgo, no plugin
+
+lite-strip: LDFLAGS += -s -w
+lite-strip: lite ## Same as lite, but with symbols stripped
 
 full: EXTTAGS := debug,$(EXTTAGS),echo,fileserver,topidchart,docit,recorder
 full: STDTAGS := $(STDTAGS),stdarchive,stdcompress,stdcontainer,stdcrypto,stddatabase,stdencoding
@@ -79,7 +81,7 @@ full: build ## Build with full feature set, no cgo, no plugin
 
 full-plugin: CGO := 1
 full-plugin: PLUGIN := ,plugin
-full-plugin: full ## Build with full feature set with plugin support, depends on libc
+full-plugin: full ## Similar to full, with plugin support, dynamically linked
 
 generate: gen-extlib gen-stdlib ## Generate libraries
 
