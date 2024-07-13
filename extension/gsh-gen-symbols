@@ -1,6 +1,5 @@
 #!/bin/bash
 
-mypath=$(dirname "$0")
 plugin=false
 
 while test $# != 0; do
@@ -26,7 +25,7 @@ basepkg=`basename $pkg`
 : ${tag:=$basepkg}
 
 file=`echo $pkg | tr ./ _-`.go
-$mypath/../cmd/extract/extract -name extension -tag $tag $pkg
+gsh-extract -name extension -tag $tag $pkg
 if $plugin; then
     sed -i -r -e '1i package main' \
         -e '1,/package extension/d' \
@@ -48,7 +47,7 @@ while test $# != 0; do
     -extramsg)
         extrapkg=$pkg/$basepkg
         extrafile=`echo $extrapkg | tr ./ _-`.go
-        $mypath/../cmd/extract/extract -name extension -tag ${tag}msg $extrapkg
+        gsh-extract -name extension -tag ${tag}msg $extrapkg
         sed -i 's/Symbols\[/BuiltinSymbols\[/g' $extrafile
         sed -n '/func init/,$p' $extrafile >> $file
         shift
