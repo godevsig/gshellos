@@ -27,15 +27,15 @@ testbin: dep ## Generate test version of main binary
 	@CGO_ENABLED=1 go test -tags $(STDTAGS),$(EXTTAGS)$(PLUGIN) -ldflags="$(LDFLAGS)" -covermode=count -coverpkg="./..." -c -o bin/gshell.tester .
 	@ln -snf gshell.tester bin/gshell.test
 
-pluginfiles: extractbin
+pluginfiles: gsh-symbol-tools
 	@mkdir -p .plugins
-	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/echo; \
+	@cd .plugins; PATH=`pwd`/../bin:$$PATH gsh-gen-symbols -plugin github.com/godevsig/grepo/echo; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-echo.go; \
 		mv github_com-godevsig-grepo-echo.so github_com-godevsig-grepo-echo.gplugin
-	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/topidchart; \
+	@cd .plugins; PATH=`pwd`/../bin:$$PATH gsh-gen-symbols -plugin github.com/godevsig/grepo/topidchart; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-topidchart.go; \
 		mv github_com-godevsig-grepo-topidchart.so github_com-godevsig-grepo-topidchart.gplugin
-	@cd .plugins; ../extension/gen_symbols -plugin github.com/godevsig/grepo/docit; \
+	@cd .plugins; PATH=`pwd`/../bin:$$PATH gsh-gen-symbols -plugin github.com/godevsig/grepo/docit; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-docit.go; \
 		mv github_com-godevsig-grepo-docit.so github_com-godevsig-grepo-docit.gplugin
 	@cd .plugins; cp github_com-godevsig-grepo-echo.go wrong-format-test.gplugin
@@ -44,15 +44,15 @@ rmtestfiles:
 	@rm -rf .working .test .plugins; rm -f default.joblist.yaml
 
 test: rmtestfiles pluginfiles testbin ## Run unit tests
-	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd
-	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestClientServer
-	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate
+	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestCmd
+	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestClientServer
+	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestAutoUpdate
 
 COVER_GOAL := 80
 coverage: rmtestfiles pluginfiles testbin ## Generate global code coverage report
-	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
-	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestClientServer -test.coverprofile .test/gshell_clientserver_coverage.cov
-	@PATH=$$PATH:`pwd`/bin gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
+	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
+	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestClientServer -test.coverprofile .test/gshell_clientserver_coverage.cov
+	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
 	@echo "mode: count" > .test/final_coverage.out
 	@cat `find -name "*.cov"` | grep -E -v "mode: count|/extension/|/stdlib/" >> .test/final_coverage.out
 	@go tool cover -func=.test/final_coverage.out | tee .test/final_coverage.log
@@ -85,18 +85,20 @@ full-plugin: full ## Similar to full, with plugin support, dynamically linked
 
 generate: gen-extlib gen-stdlib ## Generate libraries
 
-gen-extlib: extractbin
-	@go generate github.com/godevsig/gshellos/extension
+gen-extlib: gsh-symbol-tools
+	@PATH=`pwd`/bin:$$PATH go generate github.com/godevsig/gshellos/extension
 
 check-extlib: gen-extlib
 	@echo Checking if the generated files were forgotten to commit...
 	@DIFF=$$(git diff); echo -n "$$DIFF"; test -z "$$DIFF"
 
-gen-stdlib: extractbin
-	@go generate github.com/godevsig/gshellos/stdlib
+gen-stdlib: gsh-symbol-tools
+	@PATH=`pwd`/bin:$$PATH go generate github.com/godevsig/gshellos/stdlib
 
-extractbin:
-	@go build -o cmd/extract ./cmd/extract
+gsh-symbol-tools:
+	@mkdir -p bin
+	@go build -ldflags="-s -w" -o bin/gsh-extract ./cmd/extract
+	@cp extension/gsh-gen-symbols bin/
 
 clean: rmtestfiles ## Remove previous build and test files
 	@rm -rf bin `find -name "\.test"` `find -name "test"`
