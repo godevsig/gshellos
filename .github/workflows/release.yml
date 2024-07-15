@@ -16,11 +16,13 @@ jobs:
         with:
           go-version: 1.18
 
-      - name: Install musl
-        run: sudo apt-get install -y --no-install-recommends musl-dev musl-tools
-
       - name: Build
-        run: CC=musl-gcc GOARCH=amd64 make full && mv -f bin/gshell bin/gshell.amd64 && md5sum bin/gshell* > bin/md5sum && rm -f bin/buildtag bin/gittag
+        run: |
+          CGO_ENABLED=0 GOARCH=amd64 make full && mv -f bin/gshell bin/gshell.amd64
+          CGO_ENABLED=0 GOARCH=arm64 make lite && mv -f bin/gshell bin/gshell.arm64
+          CGO_ENABLED=0 GOARCH=mips64 make lite && mv -f bin/gshell bin/gshell.mips64
+          md5sum bin/gshell* > bin/md5sum
+          rm -f bin/buildtag bin/gittag
 
       - name: Upload files to release
         uses: svenstaro/upload-release-action@v2
