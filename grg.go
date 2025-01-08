@@ -169,8 +169,13 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		gi.RequestedBy = runMsg.RequestedBy
 	}
 	gc.greInfo = gi
-	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
 	gc.statDir = filepath.Join(grg.statDir, gc.ID)
+	gc.outputFile = filepath.Join(grg.workDir, "logs", gc.ID)
+	of, err := os.Create(gc.outputFile)
+	if err != nil {
+		return nil, err
+	}
+	of.Close()
 
 	if gc.Stat == greStatInit {
 		if err := os.MkdirAll(gc.statDir, 0755); err != nil {

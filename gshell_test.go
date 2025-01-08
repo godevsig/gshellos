@@ -725,6 +725,7 @@ func TestCmdLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out)
+	time.Sleep(1 * time.Second)
 	out, err = gshellRunCmdTimeout("log "+id, 1)
 	t.Logf("\n%s", out)
 	if !strings.Contains(out, "Hello, playground\n") {
