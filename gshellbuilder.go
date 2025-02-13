@@ -237,15 +237,17 @@ func addDaemonCmd() {
 		s := as.NewServer(opts...).
 			SetPublisher(godevsigPublisher).
 			SetScaleFactors(4, 0, 0).
-			EnableServiceLister().
-			EnableMessageTracer()
+			EnableServiceLister()
 		defer s.Close()
 
 		if len(*lanBroadcastPort) != 0 {
 			s.SetBroadcastPort(*lanBroadcastPort)
 		}
-		if !*invisible && scope&as.ScopeNetwork != 0 {
-			s.EnableAutoReverseProxy()
+		if !*invisible {
+			s.EnableMessageTracer()
+			if scope&as.ScopeNetwork != 0 {
+				s.EnableAutoReverseProxy()
+			}
 		}
 
 		if *rootRegistry {
