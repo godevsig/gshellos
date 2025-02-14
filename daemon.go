@@ -52,13 +52,13 @@ func (gd *daemon) grgRestarter() {
 				gd.lg.Infof("grg status %s unlocked, grg died abnormally", grgStatDir)
 				syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 				strs := strings.Split(filepath.Base(grgStatDir), "-")
-				if len(strs) != 5 {
+				if len(strs) != 4 {
 					gd.lg.Warnf("grg dir name format incompatible: %v", strs)
 					return
 				}
 				grgName := strs[1]
-				rtprio, _ := strconv.Atoi(strs[3])
-				maxprocs, _ := strconv.Atoi(strs[4])
+				rtprio, _ := strconv.Atoi(strs[2])
+				maxprocs, _ := strconv.Atoi(strs[3])
 				conn, err := gd.setupgrg(grgName, rtprio, maxprocs)
 				if err != nil {
 					gd.lg.Errorf("restart grg %s failed with error: %v", grgName, err)
@@ -75,10 +75,7 @@ func (gd *daemon) onNewStream(ctx as.Context) {
 	ctx.SetContext(gd)
 }
 
-func (gd *daemon) setupgrg(grgNameVer string, rtPriority int, maxprocs int) (as.Connection, error) {
-	if !strings.Contains(grgNameVer, "-") {
-		grgNameVer = grgNameVer + "-" + version
-	}
+func (gd *daemon) setupgrg(grgName string, rtPriority int, maxprocs int) (as.Connection, error) {
 	if rtPriority < 0 {
 		rtPriority = 0
 	}
@@ -96,13 +93,9 @@ func (gd *daemon) setupgrg(grgNameVer string, rtPriority int, maxprocs int) (as.
 		as.WithScope(as.ScopeOS),
 	}
 	c := as.NewClient(opts...).SetDiscoverTimeout(0)
-	conn := <-c.Discover(godevsigPublisher, "grg-"+grgNameVer)
+	conn := <-c.Discover(godevsigPublisher, "grg-"+grgName)
 	if conn != nil {
 		return conn, nil
-	}
-
-	if grgVer := strings.Split(grgNameVer, "-")[1]; grgVer != version {
-		return nil, fmt.Errorf("running GRG version %s not found", grgVer)
 	}
 
 	runGrg := func(exe, args string) error {
@@ -132,9 +125,9 @@ func (gd *daemon) setupgrg(grgNameVer string, rtPriority int, maxprocs int) (as.
 		return nil
 	}
 
-	args := fmt.Sprintf("-loglevel %s -plugin %s __start -group %s -wd %s", loglevel, pluginDir, grgNameVer, gd.workDir)
+	args := fmt.Sprintf("-loglevel %s -plugin %s __start -group %s -wd %s", loglevel, pluginDir, grgName, gd.workDir)
 	if os.Args[0] == "gshell.tester" {
-		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + grgNameVer + genID(3) + ".cov -- " + args
+		args = "-test.run ^TestRunMain$ -test.coverprofile=.test/l2_grg" + grgName + genID(3) + ".cov -- " + args
 	}
 	exe := os.Args[0]
 
@@ -155,7 +148,7 @@ func (gd *daemon) setupgrg(grgNameVer string, rtPriority int, maxprocs int) (as.
 
 	c.SetDiscoverTimeout(3)
 	c.SetCheckInterval(100)
-	conn = <-c.Discover(godevsigPublisher, "grg-"+grgNameVer)
+	conn = <-c.Discover(godevsigPublisher, "grg-"+grgName)
 	if conn != nil {
 		return conn, nil
 	}
@@ -190,11 +183,11 @@ func killGrgByName(pattern string) (killingList []*processInfo) {
 				cmdline := strings.Join(strs, " ")
 				_, after, found := strings.Cut(cmdline, "__start -group")
 				if found {
-					grgNameVer := strings.Fields(after)[0]
-					if wildcardMatch(pattern, grgNameVer) {
+					grgName := strings.Fields(after)[0]
+					if wildcardMatch(pattern, grgName) {
 						fdDir := filepath.Join(pidDir, "fd")
 						pInfo := processInfo{
-							name: grgNameVer,
+							name: grgName,
 							pid:  pid,
 						}
 						if fds, err := os.ReadDir(fdDir); err == nil {
@@ -227,11 +220,6 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	var killingList []*processInfo
 	for _, grgName := range msg.GRGNames {
-		if !strings.Contains(grgName, "*") {
-			if !strings.Contains(grgName, "-") {
-				grgName = grgName + "-" + version
-			}
-		}
 		connChan := c.Discover(godevsigPublisher, "grg-"+grgName)
 		for conn := range connChan {
 			func() {
@@ -251,11 +239,6 @@ func (gd *daemon) doKill(msg *cmdKill) string {
 
 	if msg.Force {
 		for _, grgName := range msg.GRGNames {
-			if !strings.Contains(grgName, "*") {
-				if !strings.Contains(grgName, "-") {
-					grgName = grgName + "-" + version
-				}
-			}
 			klist := killGrgByName(grgName)
 			if len(klist) != 0 {
 				killingList = append(killingList, klist...)
@@ -399,16 +382,9 @@ type cmdQuery struct {
 func (msg *cmdQuery) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdQuery: %v", msg)
-	grgName := msg.GRGName
-	if !strings.Contains(grgName, "*") {
-		if !strings.Contains(grgName, "-") {
-			grgName = grgName + "-" + version
-		}
-	}
-
 	var ggis []*grgGREInfo
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
-	connChan := c.Discover(godevsigPublisher, "grg-"+grgName)
+	connChan := c.Discover(godevsigPublisher, "grg-"+msg.GRGName)
 	for conn := range connChan {
 		var ggi *grgGREInfo
 		conn.SetRecvTimeout(time.Second)
@@ -443,12 +419,6 @@ func (msg *cmdPatternAction) Handle(stream as.ContextStream) (reply interface{})
 	gd := stream.GetContext().(*daemon)
 	gd.lg.Debugf("handle cmdPatternAction: %v", msg)
 	grgName := msg.GRGName
-	if !strings.Contains(grgName, "*") {
-		if !strings.Contains(grgName, "-") {
-			grgName = grgName + "-" + version
-		}
-	}
-
 	var ggreids []*grgGREIDs
 	c := as.NewClient(as.WithLogger(gd.lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(0)
 	connChan := c.Discover(godevsigPublisher, "grg-"+grgName)

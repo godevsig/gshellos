@@ -204,26 +204,6 @@ func gshellRunCmdTimeout(cmdstr string, nSec int) (string, error) {
 	return out.String(), err
 }
 
-func TestCmdRunWrongGRGVer(t *testing.T) {
-	out, err := gshellRunCmd("run -group testgrg hello.go")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	out, err = gshellRunCmd("run -group testgrg-v0.0.0 hello.go")
-	t.Logf("\n%s", out)
-	if !strings.Contains(out, "running GRG version v0.0.0 not found") {
-		t.Fatal("expected version not found error")
-	}
-
-	out, err = gshellRunCmd("ps")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestCmdList(t *testing.T) {
 	out, err := gshellRunCmd("list -h")
 	t.Logf("\n%s", out)
@@ -358,7 +338,6 @@ func TestCmdKill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version := strings.TrimSuffix(out, "\n")
 
 	out, err = gshellRunCmd("run -group testkill11 hello.go")
 	t.Logf("\n%s", out)
@@ -407,7 +386,7 @@ func TestCmdKill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(out) != "testkill12-"+version+" killed" {
+	if strings.TrimSpace(out) != "testkill12"+" killed" {
 		t.Fatal("unexpected output")
 	}
 
@@ -416,17 +395,17 @@ func TestCmdKill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(out) != "testkill11-"+version+" killed" {
+	if strings.TrimSpace(out) != "testkill11"+" killed" {
 		t.Fatal("unexpected output")
 	}
 
-	out, err = gshellRunCmd("kill -f testkill23-" + version)
+	out, err = gshellRunCmd("kill -f testkill23")
 	t.Logf("\n%s", out)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if strings.TrimSpace(out) != "testkill23-"+version+" killed" {
+	if strings.TrimSpace(out) != "testkill23"+" killed" {
 		t.Fatal("unexpected output")
 	}
 
@@ -436,8 +415,8 @@ func TestCmdKill(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if strings.TrimSpace(out) != "testkill24-"+version+" testkill25-"+version+" killed" &&
-		strings.TrimSpace(out) != "testkill25-"+version+" testkill24-"+version+" killed" {
+	if strings.TrimSpace(out) != "testkill24"+" testkill25"+" killed" &&
+		strings.TrimSpace(out) != "testkill25"+" testkill24"+" killed" {
 		t.Fatal("unexpected output")
 	}
 
@@ -1013,7 +992,7 @@ func TestMain(m *testing.M) {
 		cmdstr += "-root -repo testdata "
 		cmdstr += "-update http://127.0.0.1:9001"
 		go func() {
-			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).Output()
+			output, _ := exec.Command("gshell.tester", strings.Split(cmdstr, " ")...).CombinedOutput()
 			fmt.Println(string(output))
 		}()
 

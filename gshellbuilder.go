@@ -531,7 +531,7 @@ func addExecCmd() {
 func addStartCmd() {
 	cmd := flag.NewFlagSet(newCmd("__start", "[options]", "Start named GRG"), flag.ExitOnError)
 	workDir := cmd.String("wd", defaultWorkDir, "set working directory")
-	grgNameVer := cmd.String("group", "", "GRG name")
+	grgName := cmd.String("group", "", "GRG name")
 
 	getRealtimePriority := func(pid int) int {
 		statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
@@ -551,18 +551,18 @@ func addStartCmd() {
 	}
 
 	action := func() error {
-		grgNameVer := *grgNameVer
+		grgName := *grgName
 		if providerID != "self" {
 			return errors.New("command does not run on remote node")
 		}
-		if len(grgNameVer) == 0 {
+		if len(grgName) == 0 {
 			return errors.New("no GRG name, see gshell __start --help")
 		}
 
 		workDir := *workDir
 		logStream := log.NewStream("grg")
 		logStream.SetOutput("file:" + workDir + "/logs/grg.log")
-		lg := newLogger(logStream, "grg-"+grgNameVer)
+		lg := newLogger(logStream, "grg-"+grgName)
 		if err := loadPlugins(pluginDir); err != nil {
 			lg.Warnf("load plugins error: %v", err)
 		}
@@ -580,7 +580,7 @@ func addStartCmd() {
 				maxProcs = i
 			}
 		}
-		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%d", workDir, grgNameVer, rtprio, maxProcs)
+		grgStatDir := fmt.Sprintf("%s/status/grg-%s-%d-%d", workDir, grgName, rtprio, maxProcs)
 		if err := os.MkdirAll(grgStatDir, 0755); err != nil {
 			return err
 		}
@@ -608,7 +608,7 @@ func addStartCmd() {
 		s := as.NewServer(opts...).SetPublisher(godevsigPublisher)
 		grg := &grg{
 			processInfo: processInfo{
-				name:       grgNameVer,
+				name:       grgName,
 				rtPriority: rtprio,
 				maxProcs:   maxProcs,
 				statDir:    grgStatDir,
@@ -623,7 +623,7 @@ func addStartCmd() {
 			return err
 		}
 
-		if err := s.Publish("grg-"+grgNameVer,
+		if err := s.Publish("grg-"+grgName,
 			grgKnownMsgs,
 			as.OnNewStreamFunc(grg.onNewStream),
 		); err != nil {
@@ -707,9 +707,7 @@ func addRunCmd() {
 		"and run it in a new GRE in specified GRG on local/remote node",
 		"Use `gshell repo ls [path]` to see available code files"),
 		flag.ExitOnError)
-	grgName := cmd.String("group", "", `name of the GRG in below forms
-name-version: exact target group name, usually specifying an existing GRG
-name: target daemon version will be used if no version specified
+	grgName := cmd.String("group", "", `target group name, usually specifying an existing GRG
 random group name will be used if no name specified`)
 	maxprocs := cmd.Int("maxprocs", 0, "set GOMAXPROCS variable")
 	rtPriority := cmd.Int("rt", 0, `set the GRG to SCHED_RR min/max priority 1/99 on new GRG creation
