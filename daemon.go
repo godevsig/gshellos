@@ -184,7 +184,7 @@ func killGrgByName(pattern string) (killingList []*processInfo) {
 				_, after, found := strings.Cut(cmdline, "__start -group")
 				if found {
 					grgName := strings.Fields(after)[0]
-					if wildcardMatch(pattern, grgName) {
+					if as.WildcardMatch(pattern, grgName) {
 						fdDir := filepath.Join(pidDir, "fd")
 						pInfo := processInfo{
 							name: grgName,

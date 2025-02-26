@@ -19,7 +19,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -70,22 +69,12 @@ func init() {
 	}
 }
 
-var getSelfID = getSelfIDFunc()
-
-func getSelfIDFunc() func() string {
-	var selfID = "NA"
-	var once sync.Once
-	return func() string {
-		once.Do(func() {
-			c := as.NewClient(as.WithScope(as.ScopeProcess | as.ScopeOS)).SetDiscoverTimeout(0)
-			conn := <-c.Discover(as.BuiltinPublisher, as.SrvProviderInfo)
-			if conn != nil {
-				conn.SendRecv(&as.ReqProviderInfo{}, &selfID)
-				conn.Close()
-			}
-		})
-		return selfID
+func getSelfID() string {
+	selfID, err := as.GetSelfProviderID()
+	if err != nil {
+		selfID = "NA"
 	}
+	return selfID
 }
 
 func trimName(name string, size int) string {
