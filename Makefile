@@ -4,8 +4,8 @@ PLUGIN :=
 LDFLAGS :=
 CGO := 0
 PKG_ALL = $(shell go list ./... | grep -v unsafe)
-GIT_TAG = $(shell git describe --tags --abbrev=0 2>/dev/null)
-COMMIT_REV = $(shell git rev-parse HEAD)
+GIT_TAG ?= $(shell git describe --tags --abbrev=0 2>/dev/null)
+COMMIT_REV ?= $(shell git rev-parse HEAD)
 BUILD_TIME = $(shell date "+%Y.%m.%d %H:%M:%S")
 STDTAGS := stdbase,stdcommon,stdruntime
 EXTTAGS := adaptiveservice,shell,log,pidinfo,asbench
