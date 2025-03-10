@@ -40,7 +40,8 @@ make runc
 ```
 
 # Trace messages in gshell command line
-> `gsh --trace` and `gsh mtrace list` are deprecated, tracing gshell internal message types is for developers only.
+> `gsh --trace` and `gsh mtrace list` now are hidden options, tracing gshell internal message types is for developers only.
+> Use `gsh __mtrace list` and `gsh --trace` to do the tracing.
 
 `gsh mtrace list` can lists available message types, which can then be used to `gsh --trace msgTypeName`
 ```shell
@@ -50,10 +51,10 @@ alias gsh='bin/gshell'
 make full
 
 # start gshell daemon
-gsh -loglevel info daemon -wd .working -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
+gsh -loglevel info daemon -clean -wd .working -registry 10.10.10.10:11985 -bcast 9923 -root -repo github.com/godevsig/ghub/master &
 
 # list traceable message type names
-gsh mtrace list
+gsh __mtrace list
 
 # trace message type *adaptiveservice.ListService while doing gsh list command
 gsh --trace *adaptiveservice.ListService list
