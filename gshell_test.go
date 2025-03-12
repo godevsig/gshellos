@@ -929,7 +929,7 @@ func TestClientServerEchoWithMsgTracing(t *testing.T) {
 }
 
 func TestAutoUpdate(t *testing.T) {
-	os.WriteFile("bin/version", []byte("v0.0.0\n"), 0644)
+	os.WriteFile("bin/version", []byte("v999.999.999\n"), 0644)
 	shell.Run("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
 	md5sum, _ := shell.Run("md5sum bin/gshell." + runtime.GOARCH)
 	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
