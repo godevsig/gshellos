@@ -482,9 +482,8 @@ type cmdInfo struct{}
 func (msg cmdInfo) Handle(stream as.ContextStream) (reply interface{}) {
 	gd := stream.GetContext().(*daemon)
 	var b strings.Builder
-	fmt.Fprintf(&b, "Arch: %s\n", runtime.GOARCH)
 	fmt.Fprintf(&b, "Version: %s\n", version)
-	fmt.Fprintf(&b, "Commit: %s\n", commitRev)
+	fmt.Fprintf(&b, "Arch: %s\n", runtime.GOARCH)
 	fmt.Fprintf(&b, "Build time: %s\n", buildTime)
 	fmt.Fprintf(&b, "Builtins: %s\n", buildTags)
 
@@ -665,19 +664,19 @@ func (msg tryUpdate) Handle(stream as.ContextStream) (reply interface{}) {
 	lg := updtr.lg
 	lg.Debugf("tryUpdate: %v", msg)
 
-	rev, err := httpOp.readFile(updtr.url + "/rev")
+	rev, err := httpOp.readFile(updtr.url + "/version")
 	if err != nil {
 		return err
 	}
-	revNew := strings.TrimSpace(string(rev))
-	lg.Debugf("tryUpdate rev: %s", revNew)
-	if revNew != commitRev { // check root registry rev
+	newVersion := strings.TrimSpace(string(rev))
+	lg.Debugf("tryUpdate new version: %s", newVersion)
+	if newVersion != version { // check root registry version
 		// not update other gshell daemons if root registry is not the latest
 		if stream.GetNetconn().LocalAddr().Network() != "chan" {
 			return ErrNoUpdate
 		}
 	}
-	if revNew == msg.revInuse {
+	if newVersion == msg.revInuse {
 		return ErrNoUpdate
 	}
 

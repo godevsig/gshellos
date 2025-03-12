@@ -30,10 +30,7 @@ import (
 	"github.com/traefik/yaegi/interp"
 )
 
-//go:embed bin/rev
-var commitRev string
-
-//go:embed bin/gittag
+//go:embed bin/version
 var version string
 
 //go:embed bin/buildtag
@@ -55,11 +52,8 @@ var (
 )
 
 func init() {
-	if len(commitRev) == 0 {
-		commitRev = "devel"
-	}
 	if len(version) == 0 {
-		version = commitRev[:5]
+		version = "devel"
 	}
 	if len(buildTags) == 0 {
 		buildTags = "unknown"
@@ -295,7 +289,7 @@ func addDaemonCmd() {
 				}
 				var gshellbin *gshellBin
 				lg.Debugln("trying to update")
-				err := conn.SendRecv(tryUpdate{revInuse: commitRev, arch: runtime.GOARCH}, &gshellbin)
+				err := conn.SendRecv(tryUpdate{revInuse: version, arch: runtime.GOARCH}, &gshellbin)
 				conn.Close()
 				lg.Debugln("updater returned with", err)
 				if err != nil {

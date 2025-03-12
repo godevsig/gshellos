@@ -127,7 +127,7 @@ bin/gshell repo ls
 - root: root registry mode
 - repo addr: specify central repo address where .go files reside
 - update addr: automatically update gshell binary from the address, which should contain:
-  `gshell.386 gshell.amd64 gshell.arm64 gshell.mips64 gshell.ppc gshell.ppc64 md5sum rev`
+  `gshell.386 gshell.amd64 gshell.arm64 gshell.mips64 gshell.ppc gshell.ppc64 md5sum version`
 
 ## Example: deploy coordinated gshell daemons
 
@@ -204,7 +204,7 @@ The file server should contain:
 
 ```shell
 $ ls
-gshell.386  gshell.aarch64  gshell.amd64  gshell.arm64  gshell.i386  gshell.mips64  gshell.ppc  gshell.ppc64  gshell.x86_64  md5sum  rev
+gshell.386  gshell.aarch64  gshell.amd64  gshell.arm64  gshell.i386  gshell.mips64  gshell.ppc  gshell.ppc64  gshell.x86_64  md5sum  version
 
 $ cat md5sum
 94530ecb0cc832039cb47011469038fc  bin/gshell.386
@@ -217,8 +217,8 @@ e8e7693e741c3388d9ae437627c82eb4  bin/gshell.mips64
 895ed26b51b98c1b2ef2df32df6aa7b1  bin/gshell.ppc64
 13209e10228da7c65d0c1bd93543624a  bin/gshell.x86_64
 
-$ cat rev
-957ca365d0ecd26846d15733203d3e3bfc4e9645
+$ cat version
+v3.1.1
 ```
 
 ### Disable auto update
