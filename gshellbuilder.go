@@ -1240,7 +1240,7 @@ OPTIONS:
   -p, --provider
         Provider ID, run following command on the remote node with this ID (default "%s")
   --plugin
-        Local path of plugins(.gplugin files) (default "%s")
+        Local path of plugins(.gp files) (default "%s")
 `
 		/* hide --trace option, which is for tracing gshell internal messages only
 		--trace

@@ -30,14 +30,14 @@ pluginfiles: gsh-symbol-tools
 	@mkdir -p .plugins
 	@cd .plugins; PATH=`pwd`/../bin:$$PATH gsh-gen-symbols -plugin github.com/godevsig/grepo/echo; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-echo.go; \
-		mv github_com-godevsig-grepo-echo.so github_com-godevsig-grepo-echo.gplugin
+		mv github_com-godevsig-grepo-echo.so github_com-godevsig-grepo-echo.gp
 	@cd .plugins; PATH=`pwd`/../bin:$$PATH gsh-gen-symbols -plugin github.com/godevsig/grepo/topidchart; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-topidchart.go; \
-		mv github_com-godevsig-grepo-topidchart.so github_com-godevsig-grepo-topidchart.gplugin
+		mv github_com-godevsig-grepo-topidchart.so github_com-godevsig-grepo-topidchart.gp
 	@cd .plugins; PATH=`pwd`/../bin:$$PATH gsh-gen-symbols -plugin github.com/godevsig/grepo/docit; \
 		CGO_ENABLED=1 go build -buildmode=plugin github_com-godevsig-grepo-docit.go; \
-		mv github_com-godevsig-grepo-docit.so github_com-godevsig-grepo-docit.gplugin
-	@cd .plugins; cp github_com-godevsig-grepo-echo.go wrong-format-test.gplugin
+		mv github_com-godevsig-grepo-docit.so github_com-godevsig-grepo-docit.gp
+	@cd .plugins; cp github_com-godevsig-grepo-echo.go wrong-format-test.gp
 
 rmtestfiles:
 	@rm -rf .working .test .plugins; rm -f default.joblist.yaml
