@@ -42,12 +42,13 @@ var buildTime string
 const (
 	defaultWorkDir    = "/var/tmp/gshell"
 	godevsigPublisher = "godevsig"
+	defaultLibDir     = "/usr/lib/gshell"
 )
 
 var (
 	loglevel     = "info"
 	providerID   = "self"
-	pluginDir    = "/usr/lib/gshell/plugins"
+	pluginDir    = defaultLibDir + "/plugins"
 	debugService func(lg *log.Logger)
 )
 
@@ -686,8 +687,11 @@ func addRepoCmd() {
 func addRunCmd() {
 	cmd := flag.NewFlagSet(newCmd("run",
 		"[options] <path[/file.go]> [args...]",
-		"Try local code path[/file.go] first or fetch the code from `gshell repo`,",
-		"and run it in a new GRE in specified GRG on local/remote node",
+		"Run path[/file.go] in a new GRE in specified GRG on local/remote node.",
+		"The source code is searched in below order:",
+		"try local ./path[/file.go] or else",
+		"try with -src specified prefix dir or else",
+		"fetch the code from `gshell repo`.",
 		"Use `gshell repo ls [path]` to see available code files"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "", `target group name, usually specifying an existing GRG
@@ -700,9 +704,11 @@ silently ignore errors if real-time priority can not be set`)
 	autoRestart := cmd.Uint("restart", 0, `auto-restart the GRE on failure for at most specified times
 only applicable for non-interactive mode`)
 	autoImport := cmd.Bool("import", false, "auto-import dependent packages")
+	srcDir := cmd.String("src", defaultLibDir+"/src/", "src prefix dir")
 
 	action := func() error {
 		grgName := *grgName
+		srcDir := *srcDir
 		args := cmd.Args()
 		if len(args) == 0 {
 			return errors.New("no file provided, see gshell run --help")
@@ -747,6 +753,12 @@ only applicable for non-interactive mode`)
 
 		// try to use local file/path if it exists
 		filePath := args[0]
+		if zip, err := zipPathToBuffer(filePath); err == nil {
+			jobcmd.CodeZip = zip
+		}
+
+		// try to use it with -src prefix
+		filePath = srcDir + args[0]
 		if zip, err := zipPathToBuffer(filePath); err == nil {
 			jobcmd.CodeZip = zip
 		}
