@@ -21,10 +21,3 @@ func init() {
 		"SessionResponse": reflect.ValueOf((*recorder.SessionResponse)(nil)),
 	}
 }
-func init() {
-	BuiltinSymbols["github.com/godevsig/grepo/recorder/recorder/recorder"] = map[string]reflect.Value{
-		// type definitions
-		"SessionRequest":  reflect.ValueOf((*recorder.SessionRequest)(nil)),
-		"SessionResponse": reflect.ValueOf((*recorder.SessionResponse)(nil)),
-	}
-}

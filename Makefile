@@ -42,13 +42,13 @@ pluginfiles: gsh-symbol-tools
 rmtestfiles:
 	@rm -rf .working .test .plugins; rm -f default.joblist.yaml
 
-test: rmtestfiles pluginfiles testbin ## Run unit tests
+test: clean pluginfiles testbin ## Run unit tests
 	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestCmd
 	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestClientServer
 	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestAutoUpdate
 
 COVER_GOAL := 80
-coverage: rmtestfiles pluginfiles testbin ## Generate global code coverage report
+coverage: clean pluginfiles testbin ## Generate global code coverage report
 	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestCmd -test.coverprofile .test/gshell_coverage.cov
 	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestClientServer -test.coverprofile .test/gshell_clientserver_coverage.cov
 	@PATH=`pwd`/bin:$$PATH gshell.test -test.v -test.run TestAutoUpdate -test.coverprofile .test/gshell_update_coverage.cov
@@ -95,7 +95,8 @@ gen-stdlib: gsh-symbol-tools
 
 gsh-symbol-tools:
 	@mkdir -p bin
-	@go build -ldflags="-s -w" -o bin/gsh-extract ./cmd/extract
+	@go build -ldflags="-s -w" -o cmd/extract/extract ./cmd/extract
+	@cp cmd/extract/extract bin/gsh-extract
 	@cp extension/gsh-gen-symbols bin/
 
 clean: rmtestfiles ## Remove previous build and test files

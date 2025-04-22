@@ -25,13 +25,3 @@ func init() {
 		"SysInfo":         reflect.ValueOf((*topidchart.SysInfo)(nil)),
 	}
 }
-func init() {
-	BuiltinSymbols["github.com/godevsig/grepo/topidchart/topidchart/topidchart"] = map[string]reflect.Value{
-		// type definitions
-		"ProcessInfo":     reflect.ValueOf((*topidchart.ProcessInfo)(nil)),
-		"Record":          reflect.ValueOf((*topidchart.Record)(nil)),
-		"SessionRequest":  reflect.ValueOf((*topidchart.SessionRequest)(nil)),
-		"SessionResponse": reflect.ValueOf((*topidchart.SessionResponse)(nil)),
-		"SysInfo":         reflect.ValueOf((*topidchart.SysInfo)(nil)),
-	}
-}
