@@ -12,6 +12,7 @@ require (
 
 require (
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.2.7 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
