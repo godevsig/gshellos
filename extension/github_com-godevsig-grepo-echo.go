@@ -27,3 +27,16 @@ func init() {
 		"WhoElse":         reflect.ValueOf((*echo.WhoElse)(nil)),
 	}
 }
+func init() {
+	BuiltinSymbols["github.com/godevsig/grepo/echo/echo/echo"] = map[string]reflect.Value{
+		// function, constant and variable definitions
+		"Publisher":   reflect.ValueOf(constant.MakeFromLiteral("\"example\"", token.STRING, 0)),
+		"ServiceEcho": reflect.ValueOf(constant.MakeFromLiteral("\"echo.v1.0\"", token.STRING, 0)),
+
+		// type definitions
+		"Reply":           reflect.ValueOf((*echo.Reply)(nil)),
+		"Request":         reflect.ValueOf((*echo.Request)(nil)),
+		"SubWhoElseEvent": reflect.ValueOf((*echo.SubWhoElseEvent)(nil)),
+		"WhoElse":         reflect.ValueOf((*echo.WhoElse)(nil)),
+	}
+}

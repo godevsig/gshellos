@@ -26,6 +26,17 @@ basepkg=`basename $pkg`
 
 file=`echo $pkg | tr ./ _-`.go
 gsh-extract -name extension -tag $tag $pkg
+if $plugin; then
+    sed -i -r -e '1i package main' \
+        -e '1,/package extension/d' \
+        -e 's/func init\(\)/func Export() (string, map[string]reflect.Value)/' \
+        -e 's/Symbols\[(.*)\] =/return \1,/' \
+        $file
+else
+    sed -i 's/Symbols\[/BuiltinSymbols\[/g' $file
+fi
+
+$plugin && exit
 
 while test $# != 0; do
     case $1 in
@@ -37,23 +48,11 @@ while test $# != 0; do
         extrapkg=$pkg/$basepkg
         extrafile=`echo $extrapkg | tr ./ _-`.go
         gsh-extract -name extension -tag ${tag}msg $extrapkg
-        #not neccessary for server side, which does not use extramsg directly in interpreter mode
-        #sed -n '/func init/,$p' $extrafile >> $file
+        sed -i 's/Symbols\[/BuiltinSymbols\[/g' $extrafile
+        sed -n '/func init/,$p' $extrafile >> $file
         shift
         ;;
     *)
         echo "unknown argument $1" && exit 1
     esac
-done
-
-for f in $file $extrafile; do
-    if $plugin; then
-        sed -i -r -e '1i package main' \
-            -e '1,/package extension/d' \
-            -e 's/func init\(\)/func Export() (string, map[string]reflect.Value)/' \
-            -e 's/Symbols\[(.*)\] =/return \1,/' \
-            $f
-    else
-        sed -i 's/Symbols\[/BuiltinSymbols\[/g' $f
-    fi
 done
