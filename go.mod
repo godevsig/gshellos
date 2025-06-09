@@ -3,7 +3,8 @@ module github.com/godevsig/gshellos
 go 1.18
 
 require (
-	github.com/godevsig/adaptiveservice v0.12.2-0.20250226095326-ad51961c01a4
+	github.com/fsnotify/fsnotify v1.9.0
+	github.com/godevsig/adaptiveservice v0.12.2-0.20250609024628-a3f58512e002
 	github.com/godevsig/glib v0.1.2-0.20230830021401-ee447d68739c
 	github.com/godevsig/grepo v0.2.5-0.20240409082928-3c01a5227a9a
 	github.com/traefik/yaegi v0.15.1
@@ -12,7 +13,6 @@ require (
 
 require (
 	github.com/barkimedes/go-deepcopy v0.0.0-20220514131651-17c30cfc62df // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-echarts/go-echarts/v2 v2.2.7 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
