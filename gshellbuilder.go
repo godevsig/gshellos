@@ -114,7 +114,9 @@ var updateInterval = "600"
 
 func addDaemonCmd() {
 	cmd := flag.NewFlagSet(newCmd("daemon", "[options]", "Start local gshell daemon"), flag.ExitOnError)
+	nodeProviderID := cmd.String("id", "auto", "specify self node providerID")
 	workDir := cmd.String("wd", defaultWorkDir, "set working directory")
+	namedUDS := cmd.Bool("namedsocket", false, "use named Unix Domain Socket for the daemon")
 	rootRegistry := cmd.Bool("root", false, "enable root registry service")
 	invisible := cmd.Bool("invisible", false, "make gshell daemon invisible in gshell service network")
 	registryAddr := cmd.String("registry", "", "root registry address in host:port format")
@@ -215,9 +217,15 @@ func addDaemonCmd() {
 			as.WithScope(scope),
 			as.WithLogger(lg),
 		}
-		if len(*registryAddr) != 0 {
-			opts = append(opts, as.WithRegistryAddr(*registryAddr))
+		registryAddr := *registryAddr
+		if len(registryAddr) != 0 {
+			opts = append(opts, as.WithRegistryAddr(registryAddr))
 		}
+		nodeProviderID := *nodeProviderID
+		if nodeProviderID != "auto" {
+			opts = append(opts, as.WithProviderID(nodeProviderID))
+		}
+
 		s := as.NewServer(opts...).
 			SetPublisher(godevsigPublisher).
 			SetScaleFactors(4, 0, 0).
@@ -359,9 +367,17 @@ func addDaemonCmd() {
 		if *invisible {
 			visibleScope = as.ScopeProcess | as.ScopeOS
 		}
+
+		svcOpts := []as.ServiceOption{
+			as.OnNewStreamFunc(gd.onNewStream),
+		}
+		if *namedUDS {
+			svcOpts = append(svcOpts, as.UseNamedUDS())
+		}
+
 		if err := s.PublishIn(visibleScope, "gshellDaemon",
 			daemonKnownMsgs,
-			as.OnNewStreamFunc(gd.onNewStream),
+			svcOpts...,
 		); err != nil {
 			return err
 		}
@@ -451,8 +467,8 @@ func addListCmd() {
 				if p == nil {
 					panic("nil p")
 				}
-				ss := strings.Split(svc, "_")
-				fmt.Printf("%-24s  %-24s  %-12s  %4b\n", trimName(ss[0], 24), trimName(ss[1], 24), ss[2], *p)
+				ss := strings.SplitN(svc, "_", 3)
+				fmt.Printf("%-24s  %-24s  %-12s  %4b\n", trimName(ss[0], 24), trimName(ss[1], 24), trimName(ss[2], 12), *p)
 			}
 		}
 		return nil
@@ -637,7 +653,8 @@ func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
 		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
 	} else { // remote
-		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeNetwork)).SetDiscoverTimeout(3)
+		// added as.ScopeOS to cover the shared named UDS use case
+		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeOS|as.ScopeNetwork)).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
 	}
 	return
