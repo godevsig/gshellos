@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/fsnotify/fsnotify v1.9.0
-	github.com/godevsig/adaptiveservice v0.12.2-0.20250616070241-d4cb84dc1f87
+	github.com/godevsig/adaptiveservice v0.12.2-0.20250617025843-812b3edb30e1
 	github.com/godevsig/glib v0.1.2-0.20230830021401-ee447d68739c
 	github.com/godevsig/grepo v0.2.5-0.20240409082928-3c01a5227a9a
 	github.com/traefik/yaegi v0.15.1

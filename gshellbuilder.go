@@ -649,32 +649,40 @@ func randStringRunes(n int) string {
 }
 
 func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
+	opts := []as.Option{}
+	if lg != nil {
+		opts = append(opts, as.WithLogger(lg))
+	}
 	if providerID == "self" || providerID == getSelfID() { // local
-		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeOS)).SetDiscoverTimeout(3)
+		opts = append(opts, as.WithScope(as.ScopeOS))
+		c := as.NewClient(opts...).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon")
 	} else { // remote
+		opts = append(opts, as.WithScope(as.ScopeOS|as.ScopeNetwork))
 		// added as.ScopeOS to cover the shared named UDS use case
-		c := as.NewClient(as.WithLogger(lg), as.WithScope(as.ScopeOS|as.ScopeNetwork)).SetDiscoverTimeout(3)
+		c := as.NewClient(opts...).SetDiscoverTimeout(3)
 		conn = <-c.Discover(godevsigPublisher, "gshellDaemon", providerID)
 	}
 	return
 }
 
 func addRepoCmd() {
-	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "List contens of the code repo seen on local/remote node"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("repo", "[ls [path]]", "List contents of the code repo seen on local and remote node"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
-		lg := newLogger(log.DefaultStream, "main")
-		conn := connectDaemon(providerID, lg)
+		conn := connectDaemon(providerID, nil)
 		if conn == nil {
 			return as.ErrServiceNotFound(godevsigPublisher, "gshellDaemon")
 		}
 		defer conn.Close()
+
+		localSrcDir := filepath.Join(defaultLibDir, "src")
 		if len(args) == 0 {
+			fmt.Println("[Local] : " + localSrcDir)
 			addr := "NA"
 			conn.SendRecv(codeRepoAddrByNode{}, &addr)
-			fmt.Println(addr)
+			fmt.Println("[Remote]: " + addr)
 			return nil
 		}
 
@@ -683,9 +691,22 @@ func addRepoCmd() {
 			if len(args) >= 2 {
 				path = args[1]
 			}
+			fmt.Println("[Local]:")
+			if entries, err := os.ReadDir(filepath.Join(localSrcDir, path)); err == nil {
+				for _, e := range entries {
+					if e.IsDir() {
+						fmt.Printf("\x1b[34m%s\x1b[0m\n", e.Name())
+					} else {
+						fmt.Println(e.Name())
+					}
+				}
+			}
+
+			fmt.Println("\n[Remote]:")
 			var entries []dirEntry
 			if err := conn.SendRecv(codeRepoListByNode{codeRepoList{path}}, &entries); err != nil {
-				return err
+				fmt.Println("NA")
+				return nil
 			}
 			for _, e := range entries {
 				if e.isDir {
@@ -708,7 +729,7 @@ func addRunCmd() {
 		"The source code is searched in below order:",
 		"try local ./path[/file.go] or else",
 		"try with -src specified prefix dir or else",
-		"fetch the code from `gshell repo`.",
+		"fetch the code from the remote part in `gshell repo`.",
 		"Use `gshell repo ls [path]` to see available code files"),
 		flag.ExitOnError)
 	grgName := cmd.String("group", "", `target group name, usually specifying an existing GRG
