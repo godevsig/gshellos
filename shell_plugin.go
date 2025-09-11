@@ -11,7 +11,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/godevsig/gshellos/extension"
 )
 
@@ -49,49 +48,35 @@ func loadPluginFile(path string) error {
 	return nil
 }
 
-// Watch a plugin directory and load new .gp files as they appear
+// load .gp files
 func loadPlugins(pluginDir string) error {
 	if _, err := os.Stat(pluginDir); err != nil {
-		return nil // no such path, assume ok
+		if os.IsNotExist(err) {
+			return nil // no such path, assume ok
+		}
+		return err
 	}
 
+	var allErr error
+
 	// Preload existing .gp files
-	filepath.WalkDir(pluginDir, func(path string, d os.DirEntry, err error) error {
-		if err == nil && d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".gp") {
+	if err := filepath.WalkDir(pluginDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr == nil && d.Type().IsRegular() && strings.HasSuffix(d.Name(), ".gp") {
 			if err := loadPluginFile(path); err != nil {
-				fmt.Fprintf(os.Stderr, "load plugin %s error: %v", path, err)
+				e := fmt.Errorf("load plugin %s error: %v", path, err)
+				if allErr == nil {
+					allErr = e
+				} else {
+					allErr = fmt.Errorf("%v; %v", allErr, e)
+				}
 			}
 		}
 		return nil
-	})
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
-	if err := watcher.Add(pluginDir); err != nil {
-		return err
-	}
-
-	// Watch for new .gp files
-	go func() {
-		defer watcher.Close()
-		for {
-			select {
-			case event := <-watcher.Events:
-				if event.Op&fsnotify.Create != 0 && strings.HasSuffix(event.Name, ".gp") {
-					if err := loadPluginFile(event.Name); err != nil {
-						fmt.Fprintf(os.Stderr, "load plugin %s error: %v", event.Name, err)
-					}
-				}
-			case err := <-watcher.Errors:
-				fmt.Fprintf(os.Stderr, "watch error: %v\n", err)
-			}
-		}
-	}()
-
-	return nil
+	return allErr
 }
 
 func listPlugins() []string {
