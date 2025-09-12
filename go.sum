@@ -9,8 +9,8 @@ github.com/godevsig/go-echarts/v2 v2.0.0-20211101104447-e8e4a51bc4fd h1:NXoy9fdg
 github.com/godevsig/go-echarts/v2 v2.0.0-20211101104447-e8e4a51bc4fd/go.mod h1:6TOomEztzGDVDkOSCFBq3ed7xOYfbOqhaBzD0YV771A=
 github.com/godevsig/gotiny v0.0.4-0.20250609020402-bcea04b6dccb h1:ENam7feJFGclvpvDLBqUsKzQpbG3COy4vcqFpvW2j0I=
 github.com/godevsig/gotiny v0.0.4-0.20250609020402-bcea04b6dccb/go.mod h1:nArZSfo+oQIHkUBFSJhjdN0ZAoN6r51bJoyJb7Hq690=
-github.com/godevsig/yaegi v0.15.2-0.20250609023220-1635ffdac80a h1:rgz36N4mQAAi0dVDtGjWe2y7PHe5kN7290uEQmNUVrk=
-github.com/godevsig/yaegi v0.15.2-0.20250609023220-1635ffdac80a/go.mod h1:pkOs3wa7+hKuTCqPav6dNWzfV5G5ZYK5hl5F9xBHp6I=
+github.com/godevsig/yaegi v0.16.1 h1:/3qcWtDdSAT7IwvpmQbmGhg3b0fAcsNXGsraF8wxwPE=
+github.com/godevsig/yaegi v0.16.1/go.mod h1:pkOs3wa7+hKuTCqPav6dNWzfV5G5ZYK5hl5F9xBHp6I=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
