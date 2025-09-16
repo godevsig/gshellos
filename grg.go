@@ -186,7 +186,7 @@ func (grg *grg) newGRE(gi *greInfo, runMsg *grgCmdRun) (*greCtl, error) {
 		}
 	}
 
-	gsh, err := newShellWithCodeZip(runMsg.CodeZip)
+	gsh, err := newShellWithCodeZip(runMsg.CodeZip, pluginDir)
 	if err != nil {
 		return nil, err
 	}
@@ -318,7 +318,7 @@ func (gc *greCtl) runGRE() {
 	gc.cancel = cancel
 
 	gsh := gc.gsh
-	if err := gsh.init(interp.Options{
+	if err := gsh.initWithPlugin(interp.Options{
 		Stdin:  gc.stdin,
 		Stdout: gc.stdout,
 		Stderr: gc.stderr,

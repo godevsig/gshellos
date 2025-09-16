@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"syscall"
 
@@ -23,7 +24,8 @@ import (
 )
 
 type gshell struct {
-	src         *sourceCode
+	pluginPath  string
+	src         *sourceCode // nil for REPL
 	interpreter *interp.Interpreter
 }
 
@@ -124,7 +126,7 @@ func (src *sourceCode) close() {
 	}
 }
 
-func newShellWithCodeZip(codeZip []byte) (*gshell, error) {
+func newShellWithCodeZip(codeZip []byte, pluginPath string) (*gshell, error) {
 	gsh := &gshell{}
 	if codeZip != nil {
 		src, err := newSharedSourceCode(codeZip)
@@ -133,12 +135,13 @@ func newShellWithCodeZip(codeZip []byte) (*gshell, error) {
 		}
 		gsh.src = src
 	}
+	gsh.pluginPath = pluginPath
 
 	return gsh, nil
 }
 
-func newShell() (*gshell, error) {
-	return newShellWithCodeZip(nil)
+func newShell(pluginPath string) (*gshell, error) {
+	return newShellWithCodeZip(nil, pluginPath)
 }
 
 func (gsh *gshell) close() {
@@ -160,13 +163,15 @@ func (gsh *gshell) init(opt interp.Options) error {
 	if err := i.Use(unsafe.Symbols); err != nil {
 		return err
 	}
+	if gsh.src == nil {
+		i.ImportUsed()
+	}
 	if err := i.Use(extension.BuiltinSymbols); err != nil {
 		return err
 	}
 	if err := i.Use(extension.PluginSymbols); err != nil {
 		return err
 	}
-	i.ImportUsed()
 	os.Args = opt.Args //reset os.Args for interpreter
 	gsh.interpreter = i
 	if gsh.src != nil {
@@ -175,6 +180,48 @@ func (gsh *gshell) init(opt interp.Options) error {
 		}
 	}
 	return nil
+}
+
+func moduleNameToFileName(path string) string {
+	path = strings.ReplaceAll(path, ".", "_")
+	path = strings.ReplaceAll(path, "/", "-")
+	return path
+}
+
+func (gsh *gshell) tryLoadMissingPlugin(err error) error {
+	re := regexp.MustCompile(`import "([^"]+)" error:`)
+	matches := re.FindAllStringSubmatch(err.Error(), -1)
+	if len(matches) == 0 {
+		return err
+	}
+	// last import path
+	module := matches[len(matches)-1][1]
+
+	pluginFile := filepath.Join(gsh.pluginPath, moduleNameToFileName(module)+".gp")
+	exports, loadErr := loadPluginFile(pluginFile)
+	if loadErr != nil {
+		return loadErr
+	}
+
+	if gsh.src == nil {
+		if useErr := gsh.interpreter.Use(exports); useErr != nil {
+			return useErr
+		}
+	}
+
+	return nil
+}
+
+func (gsh *gshell) initWithPlugin(opt interp.Options) error {
+	for {
+		if err := gsh.init(opt); err != nil {
+			if err := gsh.tryLoadMissingPlugin(err); err != nil {
+				return err
+			}
+			continue // retry after successful plugin load
+		}
+		return nil
+	}
 }
 
 func (gsh *gshell) start(ctx context.Context) error {
@@ -222,9 +269,15 @@ func (gsh *gshell) runREPL() {
 		if errors.Is(err, io.EOF) {
 			break
 		}
-		if len(line) != 0 {
-			_, err := gsh.interpreter.EvalWithContext(ctx, line)
-			if err != nil {
+		if len(line) == 0 {
+			continue
+		}
+		if _, err := gsh.interpreter.EvalWithContext(ctx, line); err != nil {
+			if err := gsh.tryLoadMissingPlugin(err); err != nil {
+				fmt.Println(err)
+				continue
+			}
+			if _, err := gsh.interpreter.EvalWithContext(ctx, line); err != nil {
 				fmt.Println(err)
 			}
 		}

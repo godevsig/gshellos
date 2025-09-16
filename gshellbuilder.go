@@ -501,9 +501,6 @@ func addExecCmd() {
 		if len(args) == 0 {
 			return errors.New("no path provided, see gshell exec --help")
 		}
-		if err := loadPlugins(pluginDir); err != nil {
-			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
-		}
 
 		filePath := args[0]
 		zip, err := zipPathToBuffer(filePath)
@@ -511,13 +508,13 @@ func addExecCmd() {
 			return err
 		}
 
-		gsh, err := newShellWithCodeZip(zip)
+		gsh, err := newShellWithCodeZip(zip, pluginDir)
 		if err != nil {
 			return err
 		}
 		defer gsh.close()
 
-		if err := gsh.init(interp.Options{Args: args}); err != nil {
+		if err := gsh.initWithPlugin(interp.Options{Args: args}); err != nil {
 			return err
 		}
 
@@ -563,9 +560,6 @@ func addStartCmd() {
 		logStream := log.NewStream("grg")
 		logStream.SetOutput("file:" + workDir + "/logs/grg.log")
 		lg := newLogger(logStream, "grg-"+grgName)
-		if err := loadPlugins(pluginDir); err != nil {
-			lg.Warnf("load plugins error: %v", err)
-		}
 
 		opts := []as.Option{
 			as.WithScope(as.ScopeOS),
@@ -1196,15 +1190,12 @@ func addLogCmd() {
 }
 
 func addMsgTraceCmd() {
-	cmd := flag.NewFlagSet(newCmd("__mtrace", "<list>", "List traceable message types, including those in plugins"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("__mtrace", "<list>", "List traceable message types in gshell binary"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 || args[0] != "list" {
 			return errors.New("wrong usage, see gshell __mtrace --help")
-		}
-		if err := loadPlugins(pluginDir); err != nil {
-			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
 		}
 
 		types := as.GetKnownMessageTypes()
@@ -1220,7 +1211,7 @@ func addMsgTraceCmd() {
 }
 
 func addPluginsCmd() {
-	cmd := flag.NewFlagSet(newCmd("__plugin", "<list>", "List plugins"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("__plugin", "<list>", "List plugins. Deprecated"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
@@ -1316,11 +1307,7 @@ OPTIONS:
 	}
 	// no command, enter interactive mode
 	if len(args) == 0 {
-		if err := loadPlugins(pluginDir); err != nil {
-			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
-		}
-
-		gsh, err := newShell()
+		gsh, err := newShell(pluginDir)
 		if err != nil {
 			return err
 		}
