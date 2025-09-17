@@ -633,13 +633,19 @@ func addStartCmd() {
 	cmds = append(cmds, subCmd{cmd, action})
 }
 
-func randStringRunes(n int) string {
-	var letterRunes = []rune("abcdefghijklmnopqrstuvwxyz")
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+func randWordWithDigit(syllables int) string {
+	var consonants = []rune("bcdfghjklmnpqrstvwxyz")
+	var vowels = []rune("aeiou")
+
+	b := make([]rune, 0, syllables*2)
+	for i := 0; i < syllables; i++ {
+		b = append(b, consonants[rand.Intn(len(consonants))])
+		b = append(b, vowels[rand.Intn(len(vowels))])
 	}
-	return string(b)
+	if rand.Intn(2) == 0 {
+		b = append(b, consonants[rand.Intn(len(consonants))])
+	}
+	return fmt.Sprintf("%s%02d", string(b), rand.Intn(100))
 }
 
 func connectDaemon(providerID string, lg *log.Logger) (conn as.Connection) {
@@ -747,7 +753,7 @@ only applicable for non-interactive mode`)
 		}
 
 		if len(grgName) == 0 {
-			grgName = randStringRunes(6)
+			grgName = randWordWithDigit(3)
 		} else {
 			if strings.Contains(grgName, "*") {
 				return errors.New("wrong use of wildcard(*), see gshell run --help")
