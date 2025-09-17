@@ -13,6 +13,8 @@ import (
 func usage() string {
 	return os.Args[0] + ` <list|tag ...|untag ... |show ...|purge>
 
+	Note: MUST run in the same GRG with the tagged message sender
+
 list:
     List traceable message type names
 tag <msgName> [count <number>] [filters <filterList>]:

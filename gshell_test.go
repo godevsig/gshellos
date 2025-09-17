@@ -848,6 +848,13 @@ func TestClientServerEchoWithMsgTracing(t *testing.T) {
 	}
 	serverID := strings.TrimSpace(out)
 
+	out, err = gshellRunCmd("run -group echoc echoclient.go")
+	t.Logf("\n%s", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	OSclientID := strings.TrimSpace(out)
+
 	out, err = gshellRunCmd("run -i -group echoc tracemsg.go tag echo.Request count 5")
 	t.Logf("\n%s", out)
 	if err != nil {
@@ -860,13 +867,6 @@ func TestClientServerEchoWithMsgTracing(t *testing.T) {
 	if len(token) == 0 {
 		t.Fatal("No tracing token")
 	}
-
-	out, err = gshellRunCmd("run -group echoc echoclient.go")
-	t.Logf("\n%s", out)
-	if err != nil {
-		t.Fatal(err)
-	}
-	OSclientID := strings.TrimSpace(out)
 
 	out, err = gshellRunCmd("run -group echos echoclient.go")
 	t.Logf("\n%s", out)
@@ -929,12 +929,22 @@ func TestClientServerEchoWithMsgTracing(t *testing.T) {
 }
 
 func TestAutoUpdate(t *testing.T) {
+	shell.Run("cp bin/version bin/version.bak")
 	os.WriteFile("bin/version", []byte("v999.999.999\n"), 0644)
 	shell.Run("cp -f bin/gshell.tester bin/gshell." + runtime.GOARCH)
 	md5sum, _ := shell.Run("md5sum bin/gshell." + runtime.GOARCH)
 	os.WriteFile("bin/md5sum", []byte(md5sum), 0644)
 	out, _ := shell.Run("cat bin/version bin/md5sum")
 	t.Logf("\n%s", out)
+
+	getDaemonPid := func() string {
+		out, _ = shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep")
+		t.Logf("\n%v", out)
+		return strings.Fields(out)[0]
+	}
+
+	oldpid := getDaemonPid()
+	t.Logf("\n%s", oldpid)
 
 	out, err := gshellRunCmd("run fileserver.go -dir bin -port 9001")
 	t.Logf("\n%s", out)
@@ -949,17 +959,17 @@ func TestAutoUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, _ = shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep")
-	t.Logf("\n%v", out)
-	oldpid := strings.Fields(out)[0]
-	t.Logf("\n%s", oldpid)
-
-	time.Sleep(8 * time.Second)
-
-	out, _ = shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep")
-	t.Logf("\n%v", out)
-	newpid := strings.Fields(out)[0]
-	t.Logf("\n%s", newpid)
+	var newpid string
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		newpid = getDaemonPid()
+		t.Logf("\n%s", newpid)
+		if newpid != oldpid {
+			shell.Run("cp bin/version.bak bin/version")
+			break
+		}
+		time.Sleep(time.Second)
+	}
 
 	if newpid == oldpid {
 		t.Fatal("old daemon still running")

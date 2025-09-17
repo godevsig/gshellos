@@ -1190,12 +1190,15 @@ func addLogCmd() {
 }
 
 func addMsgTraceCmd() {
-	cmd := flag.NewFlagSet(newCmd("__mtrace", "<list>", "List traceable message types in gshell binary"), flag.ExitOnError)
+	cmd := flag.NewFlagSet(newCmd("__mtrace", "<list>", "List traceable message types in gshell binary and plugins"), flag.ExitOnError)
 
 	action := func() error {
 		args := cmd.Args()
 		if len(args) == 0 || args[0] != "list" {
 			return errors.New("wrong usage, see gshell __mtrace --help")
+		}
+		if err := loadPlugins(pluginDir); err != nil {
+			fmt.Fprintf(os.Stderr, "load plugins error: %v", err)
 		}
 
 		types := as.GetKnownMessageTypes()
