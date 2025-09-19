@@ -188,11 +188,11 @@ func moduleNameToFileName(path string) string {
 	return path
 }
 
-func (gsh *gshell) tryLoadMissingPlugin(err error) error {
+func (gsh *gshell) tryLoadMissingPlugin(origErr error) error {
 	re := regexp.MustCompile(`import "([^"]+)" error:`)
-	matches := re.FindAllStringSubmatch(err.Error(), -1)
+	matches := re.FindAllStringSubmatch(origErr.Error(), -1)
 	if len(matches) == 0 {
-		return err
+		return origErr
 	}
 	// last import path
 	module := matches[len(matches)-1][1]
@@ -200,12 +200,12 @@ func (gsh *gshell) tryLoadMissingPlugin(err error) error {
 	pluginFile := filepath.Join(gsh.pluginPath, moduleNameToFileName(module)+".gp")
 	exports, loadErr := loadPluginFile(pluginFile)
 	if loadErr != nil {
-		return loadErr
+		return fmt.Errorf("%v: %v", loadErr, origErr)
 	}
 
 	if gsh.src == nil {
 		if useErr := gsh.interpreter.Use(exports); useErr != nil {
-			return useErr
+			return fmt.Errorf("%v: %v", useErr, origErr)
 		}
 	}
 
