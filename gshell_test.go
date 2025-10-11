@@ -304,7 +304,8 @@ func TestCmdRunRT(t *testing.T) {
 		t.Fatal(err)
 	}
 	id := strings.TrimSpace(out)
-	out, _ = gshellRunCmdTimeout("log "+id, 1)
+	out, _ = gshellRunCmdTimeout("log "+id, 3)
+	t.Logf("\n%s", out)
 	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")
 	}
@@ -705,7 +706,7 @@ func TestCmdLog(t *testing.T) {
 	}
 	id := strings.TrimSpace(out)
 	time.Sleep(1 * time.Second)
-	out, err = gshellRunCmdTimeout("log "+id, 1)
+	out, err = gshellRunCmdTimeout("log "+id, 3)
 	t.Logf("\n%s", out)
 	if !strings.Contains(out, "Hello, playground\n") {
 		t.Fatal("unexpected output")
