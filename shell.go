@@ -188,24 +188,27 @@ func moduleNameToFileName(path string) string {
 	return path
 }
 
-func (gsh *gshell) tryLoadMissingPlugin(origErr error) error {
-	re := regexp.MustCompile(`import "([^"]+)" error:`)
-	matches := re.FindAllStringSubmatch(origErr.Error(), -1)
+var reImportError = regexp.MustCompile(`import "([^"]+)" error: unable to find source related to`)
+
+func getMissingPkg(errMsg string) string {
+	matches := reImportError.FindAllStringSubmatch(errMsg, -1)
 	if len(matches) == 0 {
-		return origErr
+		return ""
 	}
 	// last import path
-	module := matches[len(matches)-1][1]
+	return matches[len(matches)-1][1]
+}
 
-	pluginFile := filepath.Join(gsh.pluginPath, moduleNameToFileName(module)+".gp")
-	exports, loadErr := loadPluginFile(pluginFile)
-	if loadErr != nil {
-		return fmt.Errorf("%v: %v", loadErr, origErr)
+func (gsh *gshell) loadPlugin(pkg string) error {
+	pluginFile := filepath.Join(gsh.pluginPath, moduleNameToFileName(pkg)+".gp")
+	exports, err := loadPluginFile(pluginFile)
+	if err != nil {
+		return err
 	}
 
 	if gsh.src == nil {
-		if useErr := gsh.interpreter.Use(exports); useErr != nil {
-			return fmt.Errorf("%v: %v", useErr, origErr)
+		if err := gsh.interpreter.Use(exports); err != nil {
+			return err
 		}
 	}
 
@@ -214,9 +217,13 @@ func (gsh *gshell) tryLoadMissingPlugin(origErr error) error {
 
 func (gsh *gshell) initWithPlugin(opt interp.Options) error {
 	for {
-		if err := gsh.init(opt); err != nil {
-			if err := gsh.tryLoadMissingPlugin(err); err != nil {
-				return err
+		if origErr := gsh.init(opt); origErr != nil {
+			pkg := getMissingPkg(origErr.Error())
+			if pkg == "" {
+				return origErr
+			}
+			if loadErr := gsh.loadPlugin(pkg); loadErr != nil {
+				return fmt.Errorf("%v: %v", loadErr, origErr)
 			}
 			continue // retry after successful plugin load
 		}
@@ -272,9 +279,14 @@ func (gsh *gshell) runREPL() {
 		if len(line) == 0 {
 			continue
 		}
-		if _, err := gsh.interpreter.EvalWithContext(ctx, line); err != nil {
-			if err := gsh.tryLoadMissingPlugin(err); err != nil {
-				fmt.Println(err)
+		if _, origErr := gsh.interpreter.EvalWithContext(ctx, line); origErr != nil {
+			pkg := getMissingPkg(origErr.Error())
+			if pkg == "" {
+				fmt.Println(origErr)
+				continue
+			}
+			if loadErr := gsh.loadPlugin(pkg); loadErr != nil {
+				fmt.Printf("%v: %v", loadErr, origErr)
 				continue
 			}
 			if _, err := gsh.interpreter.EvalWithContext(ctx, line); err != nil {
