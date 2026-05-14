@@ -941,6 +941,9 @@ func TestAutoUpdate(t *testing.T) {
 	getDaemonPid := func() string {
 		out, _ = shell.Run("ps -eo pid,args | grep daemon | grep gshell.tester | grep -v grep")
 		t.Logf("\n%v", out)
+		if len(out) == 0 {
+			return ""
+		}
 		return strings.Fields(out)[0]
 	}
 
@@ -964,6 +967,9 @@ func TestAutoUpdate(t *testing.T) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		newpid = getDaemonPid()
+		if len(newpid) == 0 {
+			continue
+		}
 		t.Logf("\n%s", newpid)
 		if newpid != oldpid {
 			shell.Run("cp bin/version.bak bin/version")
