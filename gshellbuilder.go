@@ -64,6 +64,29 @@ func init() {
 	}
 }
 
+func detachSessionIO() error {
+	devNull, err := os.OpenFile(os.DevNull, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+
+	fd := int(devNull.Fd())
+
+	if fd > 2 {
+		defer devNull.Close()
+	}
+
+	for _, stdfd := range []int{0, 1, 2} {
+		if fd != stdfd {
+			if err := syscall.Dup2(fd, stdfd); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func getSelfID() string {
 	selfID, err := as.GetSelfProviderID()
 	if err != nil {
@@ -383,6 +406,9 @@ func addDaemonCmd() {
 		}
 		if debugService != nil {
 			go debugService(lg)
+		}
+		if err := detachSessionIO(); err != nil {
+			return err
 		}
 
 		go gd.grgRestarter()
