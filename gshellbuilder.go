@@ -78,8 +78,15 @@ func detachSessionIO() error {
 
 	for _, stdfd := range []int{0, 1, 2} {
 		if fd != stdfd {
-			if err := syscall.Dup2(fd, stdfd); err != nil {
+			if err := syscall.Close(stdfd); err != nil {
 				return err
+			}
+			newFD, _, errno := syscall.Syscall(syscall.SYS_DUP, uintptr(fd), 0, 0)
+			if errno != 0 {
+				return errno
+			}
+			if int(newFD) != stdfd {
+				return fmt.Errorf("dup /dev/null to fd %d got fd %d", stdfd, newFD)
 			}
 		}
 	}
